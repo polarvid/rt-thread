@@ -168,6 +168,8 @@ after_mmu_enable:
     adr     x1, __start
     mov     sp, x1           /* sp_el1 set to _start */
 
+    mov x29, xzr
+    mov x30, xzr
     b  rtthread_startup
 
 #ifdef RT_USING_SMP

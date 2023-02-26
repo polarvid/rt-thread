@@ -79,9 +79,11 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
         {
             break;
         }
+        // next table entry in current level
         level_info[level].pos = cur_lv_tbl + off;
         cur_lv_tbl = (unsigned long *)(page & MMU_ADDRESS_MASK);
         cur_lv_tbl = (unsigned long *)((unsigned long)cur_lv_tbl - PV_OFFSET);
+        // next table entry at
         level_info[level].page = cur_lv_tbl;
         level_shift -= MMU_LEVEL_SHIFT;
     }
@@ -113,6 +115,7 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
         {
             break;
         }
+
         level--;
     }
 
@@ -145,7 +148,7 @@ static int _kenrel_map_4K(unsigned long *lv0_tbl, void *vaddr, void *paddr,
         off &= MMU_LEVEL_MASK;
         if (!(cur_lv_tbl[off] & MMU_TYPE_USED))
         {
-            page = (unsigned long)rt_pages_alloc(0);
+            page = (unsigned long)rt_pages_alloc2(0, PAGE_ANY_AVAILABLE);
             if (!page)
             {
                 ret = MMU_MAP_ERROR_NOPAGE;

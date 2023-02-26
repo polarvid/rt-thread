@@ -23,6 +23,16 @@
         union {struct {fields}; char _padding[GET_FLOOR(struct {fields})];};\
     } *rt_page_t
 
+/**
+ * @brief PAGE ALLOC FLAGS
+ *
+ * @info PAGE_ANY_AVAILABLE
+ * page allocation default to use lower region, this behavior can change by setting
+ * PAGE_ANY_AVAILABLE
+ */
+
+#define PAGE_ANY_AVAILABLE 0x1ul
+
 DEF_PAGE_T(
     struct rt_page *next;   /* same level next */
     struct rt_page *pre;    /* same level pre  */
@@ -56,6 +66,8 @@ void rt_page_init(rt_region_t reg);
 void rt_page_cleanup(void);
 
 void *rt_pages_alloc(rt_uint32_t size_bits);
+
+void *rt_pages_alloc2(rt_uint32_t size_bits, size_t flags);
 
 void rt_page_ref_inc(void *addr, rt_uint32_t size_bits);
 

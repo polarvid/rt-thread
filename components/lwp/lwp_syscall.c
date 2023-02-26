@@ -1904,7 +1904,7 @@ static char *_insert_args(int new_argc, char *new_argv[], struct lwp_args_info *
     {
         goto quit;
     }
-    page = rt_pages_alloc(0); /* 1 page */
+    page = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE); /* 1 page */
     if (!page)
     {
         goto quit;
@@ -2108,7 +2108,7 @@ int load_ldso(struct rt_lwp *lwp, char *exec_name, char *const argv[], char *con
         }
     }
 
-    page = rt_pages_alloc(0); /* 1 page */
+    page = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE); /* 1 page */
     if (!page)
     {
         SET_ERRNO(ENOMEM);
@@ -2295,7 +2295,7 @@ int sys_execve(const char *path, char *const argv[], char *const envp[])
         SET_ERRNO(EINVAL);
         goto quit;
     }
-    page = rt_pages_alloc(0); /* 1 page */
+    page = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE); /* 1 page */
     if (!page)
     {
         SET_ERRNO(ENOMEM);
