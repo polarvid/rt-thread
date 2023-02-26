@@ -94,6 +94,87 @@ static struct rt_mem_obj mm_page_mapper = {
     .hint_free = hint_free,
 };
 
+#ifdef RT_DEBUG_PAGE_LEAK
+static volatile int enable;
+static rt_page_t _trace_head;
+#define TRACE_ALLOC(pg, size)       _trace_alloc(pg, NULL, size)
+#define TRACE_FREE(pgaddr, size)    _trace_free(pgaddr, NULL, size)
+
+void rt_page_leak_trace_start()
+{
+    // TODO multicore safety
+    _trace_head = NULL;
+    enable = 1;
+}
+MSH_CMD_EXPORT(rt_page_leak_trace_start, start page leak tracer);
+
+static void _collect()
+{
+    rt_page_t page = _trace_head;
+
+    while (page)
+    {
+        rt_page_t next = page->next;
+        void *pg_va = rt_page_page2addr(page);
+        LOG_W("LEAK: %p, allocator: %p, size bits: %lx", pg_va, page->caller, page->trace_size);
+        rt_pages_free(pg_va, page->trace_size);
+        page = next;
+    }
+}
+
+void rt_page_leak_trace_stop()
+{
+    // TODO multicore safety
+    enable = 0;
+    _collect();
+}
+MSH_CMD_EXPORT(rt_page_leak_trace_stop, stop page leak tracer);
+
+static void _trace_alloc(rt_page_t page, void *caller, size_t size_bits)
+{
+    if (enable)
+    {
+        page->caller = caller;
+        page->trace_size = size_bits;
+        page->tl_prev = NULL;
+        page->tl_next = NULL;
+
+        if (_trace_head == NULL)
+        {
+            _trace_head = page;
+        }
+        else
+        {
+            _trace_head->tl_prev = page;
+            page->tl_next = _trace_head;
+            _trace_head = page;
+        }
+    }
+}
+
+static void _trace_free(rt_page_t page, void *caller, size_t size_bits)
+{
+    if (enable)
+    {
+        RT_ASSERT(page->trace_size == size_bits);
+
+        if (page->tl_prev)
+            page->tl_prev->tl_next = page->tl_next;
+        if (page->tl_next)
+            page->tl_next->tl_prev = page->tl_prev;
+
+        if (page == _trace_head)
+            _trace_head = page->next;
+
+        page->tl_prev = NULL;
+        page->tl_next = NULL;
+        page->trace_size = 1234;
+    }
+}
+#else
+#define TRACE_ALLOC(x, y)
+#endif
+
 static inline void *page_to_addr(rt_page_t page)
 {
     return (void *)((page - page_start) << ARCH_PAGE_SHIFT) - PV_OFFSET;
@@ -412,7 +493,14 @@ void *rt_pages_alloc(rt_uint32_t size_bits)
     if (p)
     {
         alloc_buf = page_to_addr(p);
+
+        #ifdef RT_DEBUG_PAGE_LEAK
+        level = rt_hw_interrupt_disable();
+        TRACE_ALLOC(p, size_bits);
+        rt_hw_interrupt_enable(level);
+        #endif
     }
+
     return alloc_buf;
 }
 
@@ -427,8 +515,11 @@ int rt_pages_free(void *addr, rt_uint32_t size_bits)
         rt_base_t level;
         level = rt_hw_interrupt_disable();
         real_free = _pages_free(p, size_bits);
+        if (real_free)
+            TRACE_FREE(p, size_bits);
         rt_hw_interrupt_enable(level);
     }
+
     return real_free;
 }
 

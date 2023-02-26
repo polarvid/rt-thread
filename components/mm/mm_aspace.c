@@ -65,6 +65,25 @@ static inline void _varea_post_install(rt_varea_t varea, rt_aspace_t aspace,
         varea->mem_obj->on_varea_open(varea);
 }
 
+static inline void _varea_uninstall(rt_varea_t varea)
+{
+    rt_aspace_t aspace = varea->aspace;
+
+    if (varea->mem_obj && varea->mem_obj->on_varea_close)
+        varea->mem_obj->on_varea_close(varea);
+
+    rt_varea_free_pages(varea);
+
+    WR_LOCK(aspace);
+    _aspace_bst_remove(aspace, varea);
+    WR_UNLOCK(aspace);
+
+    rt_hw_mmu_unmap(aspace, varea->start, varea->size);
+    rt_hw_tlb_invalidate_range(aspace, varea->start, varea->size, ARCH_PAGE_SIZE);
+
+    rt_free(varea);
+}
+
 int _init_lock(rt_aspace_t aspace)
 {
     MM_PGTBL_LOCK_INIT(aspace);
@@ -278,6 +297,10 @@ static int _mm_aspace_map(rt_aspace_t aspace, rt_varea_t varea, rt_size_t attr,
         if (MMF_TEST_CNTL(flags, MMF_PREFETCH))
         {
             err = _do_prefetch(aspace, varea, varea->start, varea->size);
+            if (err)
+            {
+                _varea_uninstall(varea);
+            }
         }
     }
 
@@ -334,6 +357,10 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
         if (varea)
         {
             err = _mm_aspace_map(aspace, varea, attr, flags, mem_obj, offset);
+            if (err)
+            {
+
+            }
         }
         else
         {
@@ -504,19 +531,7 @@ void _aspace_unmap(rt_aspace_t aspace, void *addr, rt_size_t length)
     rt_varea_t varea = _aspace_bst_search_overlap(aspace, range);
     while (varea)
     {
-        if (varea->mem_obj && varea->mem_obj->on_varea_close)
-            varea->mem_obj->on_varea_close(varea);
-
-        rt_varea_free_pages(varea);
-
-        WR_LOCK(aspace);
-        _aspace_bst_remove(aspace, varea);
-        WR_UNLOCK(aspace);
-
-        rt_hw_mmu_unmap(aspace, varea->start, varea->size);
-        rt_hw_tlb_invalidate_range(aspace, varea->start, varea->size, ARCH_PAGE_SIZE);
-
-        rt_free(varea);
+        _varea_uninstall(varea);
         varea = _aspace_bst_search_overlap(aspace, range);
     }
 }

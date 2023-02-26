@@ -27,6 +27,14 @@ DEF_PAGE_T(
     struct rt_page *next;   /* same level next */
     struct rt_page *pre;    /* same level pre  */
 
+#ifdef RT_DEBUG_PAGE_LEAK
+    /* trace list */
+    struct rt_page *tl_next;
+    struct rt_page *tl_prev;
+    void *caller;
+    size_t trace_size;
+#endif
+
     rt_uint32_t size_bits;     /* if is ARCH_ADDRESS_WIDTH_BITS, means not free */
     rt_uint32_t ref_cnt;       /* page group ref count */
 );
@@ -77,5 +85,9 @@ struct rt_page *rt_page_addr2page(void *addr);
  * @return int 0 on success
  */
 int rt_page_install(rt_region_t region);
+
+void rt_page_leak_trace_start(void);
+
+void rt_page_leak_trace_stop(void);
 
 #endif /* __MM_PAGE_H__ */
