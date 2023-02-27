@@ -262,6 +262,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_memset(&thread->signal_mask, 0, sizeof(lwp_sigset_t));
     thread->signal_mask_bak = 0;
     thread->signal_in_process = 0;
+    thread->siginfo_list = RT_NULL;
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
 #endif
 
