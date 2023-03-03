@@ -121,8 +121,7 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
     return;
 }
 
-static int _kenrel_map_4K(unsigned long *lv0_tbl, void *vaddr, void *paddr,
-                          unsigned long attr)
+static int _kernel_map_4K(unsigned long *lv0_tbl, void *vaddr, void *paddr, unsigned long attr)
 {
     int ret = 0;
     int level;
@@ -190,19 +189,106 @@ err:
     return ret;
 }
 
+static int _kernel_map_2M(unsigned long *lv0_tbl, void *vaddr, void *paddr, unsigned long attr)
+{
+    int ret = 0;
+    int level;
+    unsigned long *cur_lv_tbl = lv0_tbl;
+    unsigned long page;
+    unsigned long off;
+    unsigned long va = (unsigned long)vaddr;
+    unsigned long pa = (unsigned long)paddr;
+
+    int level_shift = MMU_ADDRESS_BITS;
+
+    if (va & ARCH_SECTION_MASK)
+    {
+        return MMU_MAP_ERROR_VANOTALIGN;
+    }
+    if (pa & ARCH_SECTION_MASK)
+    {
+        return MMU_MAP_ERROR_PANOTALIGN;
+    }
+    for (level = 0; level < MMU_TBL_BLOCK_2M_LEVEL; level++)
+    {
+        off = (va >> level_shift);
+        off &= MMU_LEVEL_MASK;
+        if (!(cur_lv_tbl[off] & MMU_TYPE_USED))
+        {
+            page = (unsigned long)rt_pages_alloc2(0, PAGE_ANY_AVAILABLE);
+            if (!page)
+            {
+                ret = MMU_MAP_ERROR_NOPAGE;
+                goto err;
+            }
+            rt_memset((char *)page, 0, ARCH_PAGE_SIZE);
+            rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, (void *)page, ARCH_PAGE_SIZE);
+            cur_lv_tbl[off] = (page + PV_OFFSET) | MMU_TYPE_TABLE;
+            rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, cur_lv_tbl + off, sizeof(void *));
+        }
+        else
+        {
+            page = cur_lv_tbl[off];
+            page &= MMU_ADDRESS_MASK;
+            /* page to va */
+            page -= PV_OFFSET;
+            rt_page_ref_inc((void *)page, 0);
+        }
+        page = cur_lv_tbl[off];
+        if ((page & MMU_TYPE_MASK) == MMU_TYPE_BLOCK)
+        {
+            /* is block! error! */
+            ret = MMU_MAP_ERROR_CONFLICT;
+            goto err;
+        }
+        cur_lv_tbl = (unsigned long *)(page & MMU_ADDRESS_MASK);
+        cur_lv_tbl = (unsigned long *)((unsigned long)cur_lv_tbl - PV_OFFSET);
+        level_shift -= MMU_LEVEL_SHIFT;
+    }
+    /* now is level page */
+    attr &= MMU_ATTRIB_MASK;
+    pa |= (attr | MMU_TYPE_BLOCK); /* block */
+    off = (va >> ARCH_SECTION_SHIFT);
+    off &= MMU_LEVEL_MASK;
+    cur_lv_tbl[off] = pa;
+    rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, cur_lv_tbl + off, sizeof(void *));
+    return ret;
+err:
+    _kenrel_unmap_4K(lv0_tbl, (void *)va);
+    return ret;
+}
+
+#include <backtrace.h>
+
 void *rt_hw_mmu_map(rt_aspace_t aspace, void *v_addr, void *p_addr, size_t size,
                     size_t attr)
 {
     int ret = -1;
 
     void *unmap_va = v_addr;
-    size_t npages = size >> ARCH_PAGE_SHIFT;
+    size_t npages;
+    size_t stride;
+    int (*mapper)(unsigned long *lv0_tbl, void *vaddr, void *paddr, unsigned long attr);
 
-    // TODO trying with HUGEPAGE here
+    if (((rt_ubase_t)v_addr & ARCH_SECTION_MASK) || (size & ARCH_SECTION_MASK))
+    {
+        /* legacy 4k mapping */
+        npages = size >> ARCH_PAGE_SHIFT;
+        stride = ARCH_PAGE_SIZE;
+        mapper = _kernel_map_4K;
+    }
+    else
+    {
+        /* 2m huge page */
+        npages = size >> ARCH_SECTION_SHIFT;
+        stride = ARCH_SECTION_SIZE;
+        mapper = _kernel_map_2M;
+    }
+
     while (npages--)
     {
         MM_PGTBL_LOCK(aspace);
-        ret = _kenrel_map_4K(aspace->page_table, v_addr, p_addr, attr);
+        ret = mapper(aspace->page_table, v_addr, p_addr, attr);
         MM_PGTBL_UNLOCK(aspace);
 
         if (ret != 0)
@@ -215,12 +301,12 @@ void *rt_hw_mmu_map(rt_aspace_t aspace, void *v_addr, void *p_addr, size_t size,
                 MM_PGTBL_LOCK(aspace);
                 _kenrel_unmap_4K(aspace->page_table, (void *)unmap_va);
                 MM_PGTBL_UNLOCK(aspace);
-                unmap_va += ARCH_PAGE_SIZE;
+                unmap_va += stride;
             }
             break;
         }
-        v_addr += ARCH_PAGE_SIZE;
-        p_addr += ARCH_PAGE_SIZE;
+        v_addr += stride;
+        p_addr += stride;
     }
 
     if (ret == 0)

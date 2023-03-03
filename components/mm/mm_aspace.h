@@ -22,6 +22,31 @@
 #define MM_PA_TO_OFF(pa) ((uintptr_t)(pa) >> MM_PAGE_SHIFT)
 #define PV_OFFSET        (rt_kmem_pvoff())
 
+#ifdef DEBUG_MEM
+extern void *mm_buf;
+extern const size_t mm_size;
+extern rt_slab_t mm_slab;
+
+static inline void *MM_MALLOC(rt_size_t size)
+{
+    void *_buf;
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    _buf = rt_slab_alloc(mm_slab, size);
+    rt_hw_interrupt_enable(level);
+    return _buf;
+}
+
+static inline void MM_FREE(void *buf)
+{
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    rt_slab_free(mm_slab, buf);
+    rt_hw_interrupt_enable(level);
+}
+#else
+#define MM_MALLOC rt_malloc
+#define MM_FREE rt_free
+#endif
+
 #ifndef RT_USING_SMP
 typedef rt_spinlock_t mm_spinlock;
 

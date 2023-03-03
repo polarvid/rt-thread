@@ -37,17 +37,46 @@ static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
                         mm_flag_t flags);
 
 struct rt_aspace rt_kernel_space;
+rt_slab_t mm_slab;
 
 rt_varea_t _varea_create(void *start, rt_size_t size)
 {
     rt_varea_t varea;
-    varea = (rt_varea_t)rt_malloc(sizeof(struct rt_varea));
+    varea = (rt_varea_t)MM_MALLOC(sizeof(struct rt_varea));
     if (varea)
     {
         varea->start = start;
         varea->size = size;
     }
     return varea;
+}
+
+static int _varea_install(rt_aspace_t aspace, rt_varea_t varea, rt_mm_va_hint_t hint)
+{
+    void *alloc_va;
+    int err = RT_EOK;
+
+    /**
+     * find a suitable va range.
+     * even though this is sleepable, it's still ok for startup routine
+     */
+    alloc_va =
+        _find_free(aspace, hint->prefer, hint->map_size, hint->limit_start,
+                   hint->limit_range_size, hint->flags);
+
+    /* TODO try merge surrounding regions to optimize memory footprint */
+
+    if (alloc_va != RT_NULL)
+    {
+        varea->start = alloc_va;
+        _aspace_bst_insert(aspace, varea);
+    }
+    else
+    {
+        err = -RT_ENOSPC;
+    }
+
+    return err;
 }
 
 static inline void _varea_post_install(rt_varea_t varea, rt_aspace_t aspace,
@@ -98,7 +127,7 @@ rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl)
 
     if (page_table)
     {
-        aspace = (rt_aspace_t)rt_malloc(sizeof(*aspace));
+        aspace = (rt_aspace_t)MM_MALLOC(sizeof(*aspace));
         if (aspace)
         {
             aspace->page_table = page_table;
@@ -107,7 +136,7 @@ rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl)
             if (_init_lock(aspace) != RT_EOK ||
                 _aspace_bst_init(aspace) != RT_EOK)
             {
-                rt_free(aspace);
+                MM_FREE(aspace);
                 aspace = NULL;
             }
         }
@@ -145,7 +174,7 @@ void rt_aspace_delete(rt_aspace_t aspace)
     if (aspace)
     {
         rt_aspace_detach(aspace);
-        rt_free(aspace);
+        MM_FREE(aspace);
     }
 }
 
@@ -241,34 +270,6 @@ static int _do_prefetch(rt_aspace_t aspace, rt_varea_t varea, void *start,
             LOG_W("%s failed because no memory is provided", __func__);
             break;
         }
-    }
-
-    return err;
-}
-
-int _varea_install(rt_aspace_t aspace, rt_varea_t varea, rt_mm_va_hint_t hint)
-{
-    void *alloc_va;
-    int err = RT_EOK;
-
-    /**
-     * find a suitable va range.
-     * even though this is sleepable, it's still ok for startup routine
-     */
-    alloc_va =
-        _find_free(aspace, hint->prefer, hint->map_size, hint->limit_start,
-                   hint->limit_range_size, hint->flags);
-
-    /* TODO try merge surrounding regions to optimize memory footprint */
-
-    if (alloc_va != RT_NULL)
-    {
-        varea->start = alloc_va;
-        _aspace_bst_insert(aspace, varea);
-    }
-    else
-    {
-        err = -RT_ENOSPC;
     }
 
     return err;
@@ -499,7 +500,7 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             err = _mm_aspace_map_phy(aspace, varea, hint, attr, pa_off, ret_va);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                MM_FREE(varea);
             }
         }
         else

@@ -1974,7 +1974,7 @@ void rt_assert_set_hook(void (*hook)(const char *ex, const char *func, rt_size_t
 {
     rt_assert_hook = hook;
 }
-
+#include <backtrace.h>
 /**
  * The RT_ASSERT function.
  *
@@ -1999,7 +1999,13 @@ void rt_assert_handler(const char *ex_string, const char *func, rt_size_t line)
         else
 #endif /*RT_USING_MODULE*/
         {
+            unsigned long pc, lr, fp;
+            __asm__ volatile("adr %0, .\n":"=r"(pc));
+            __asm__ volatile("mov %0, x30\n":"=r"(lr));
+            __asm__ volatile("mov %0, x29\n":"=r"(fp));
+            backtrace(pc, lr, fp);
             rt_kprintf("(%s) assertion failed at function:%s, line number:%d \n", ex_string, func, line);
+            rt_hw_cpu_shutdown();
             while (dummy == 0);
         }
     }
