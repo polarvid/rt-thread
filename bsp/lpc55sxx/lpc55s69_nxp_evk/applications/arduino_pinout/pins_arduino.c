@@ -29,13 +29,13 @@ const pin_map_t pin_map_table[]=
     {D3, GET_PINS(1,6)},
     {D4, GET_PINS(1,7), "pwm2", 2},     /* PWM */
     {D5, GET_PINS(1,4), "pwm2", 1},     /* PWM */
-    {D6, GET_PINS(1,10)},
-    {D7, GET_PINS(1,9), "pwm1", 0},     /* PWM */
+    {D6, GET_PINS(1,10), "pwm1", 0},    /* PWM */
+    {D7, GET_PINS(1,9)},
     {D8, GET_PINS(1,8)},
     {D9, GET_PINS(1,5)},
     {D10, GET_PINS(1,1)},
     {D11, GET_PINS(0,26)},
-    {D12, GET_PINS(1,3), "pwm0", 3},    /* PWM */
+    {D12, GET_PINS(1,3)},
     {D13, GET_PINS(1,2)},
     {D14, GET_PINS(1,21), "i2c4"},      /* I2C-SDA (Wire) */
     {D15, GET_PINS(1,20), "i2c4"},      /* I2C-SCL (Wire) */
@@ -44,7 +44,7 @@ const pin_map_t pin_map_table[]=
     {A2, RT_NULL},
     {A3, GET_PINS(1,31)},
     {A4, GET_PINS(0,13), "i2c1"},       /* I2C-SDA (Wire) */
-    {A5, GET_PINS(1,14), "i2c1"},       /* I2C-SCL (Wire) */
+    {A5, GET_PINS(0,14), "i2c1"},       /* I2C-SCL (Wire) */
     {A6, RT_NULL, "adc0", 13},          /* ADC, On-Chip: internal reference voltage, ADC_CHANNEL_VREFINT */
     {A7, RT_NULL, "adc0", 26},          /* ADC, On-Chip: internal temperature sensor, ADC_CHANNEL_TEMPSENSOR */
 };

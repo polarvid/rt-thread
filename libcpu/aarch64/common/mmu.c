@@ -115,7 +115,6 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
         {
             break;
         }
-
         level--;
     }
 
@@ -208,6 +207,8 @@ void *rt_hw_mmu_map(rt_aspace_t aspace, void *v_addr, void *p_addr, size_t size,
 
         if (ret != 0)
         {
+            /* other types of return value are taken as programming error */
+            RT_ASSERT(ret == MMU_MAP_ERROR_NOPAGE);
             /* error, undo map */
             while (unmap_va != v_addr)
             {
