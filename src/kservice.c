@@ -1654,6 +1654,10 @@ rt_weak void rt_system_heap_init(void *begin_addr, void *end_addr)
     _heap_lock_init();
 }
 
+#ifdef ARCH_ENABLE_SOFT_KASAN
+#include <kasan.h>
+#endif /* ARCH_ENABLE_SOFT_KASAN */
+
 /**
  * @brief Allocate a block of memory with a minimum of 'size' bytes.
  *
@@ -1738,7 +1742,7 @@ RTM_EXPORT(rt_calloc);
  */
 rt_weak void rt_free(void *rmem)
 {
-    rmem = (void *)((rt_ubase_t)rmem | 0xff00000000000000);
+    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
     rt_base_t level;
 
     /* call 'rt_free' hook */

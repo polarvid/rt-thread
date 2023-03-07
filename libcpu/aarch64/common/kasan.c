@@ -213,6 +213,9 @@ static rt_uint8_t _tag_alloc(void *start, rt_size_t length)
 
 void *kasan_unpoisoned(void *start, rt_size_t length)
 {
+    if (!kasan_enable)
+        return start;
+
     unsigned long tag;
     tag = _tag_alloc(start, length);
 
@@ -222,6 +225,10 @@ void *kasan_unpoisoned(void *start, rt_size_t length)
 
 int kasan_poisoned(void *start, rt_size_t length)
 {
+    if (!kasan_enable)
+        return 0;
+    // TODO: cannot sure kasan accessible at this moment
+
     _shadow_set_tag(_addr_to_shadow(start), SUPER_TAG, length);
     return 0;
 }
