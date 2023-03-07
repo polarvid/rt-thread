@@ -85,6 +85,23 @@ _dummy_trampoline:
     ldp x29, x30, [sp], #0x10
     ret
 
+.cfi_sections .debug_frame 
+.global _thread_start;
+.type _thread_start, %function
+.p2align 6
+    hint	34
+.cfi_startproc
+.text
+_thread_start:
+    .cfi_undefined x30
+    mov x29, #0
+    mov x30, #0
+    /* x0 */
+    blr x1
+    br x28
+.cfi_endproc
+.size _thread_start,.-_thread_start
+
 .macro SAVE_CONTEXT
     /* Save the entire context. */
     SAVE_FPU SP
