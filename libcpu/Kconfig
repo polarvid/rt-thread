@@ -157,6 +157,11 @@ config ARCH_ARMV8
     select ARCH_ARM
     select ARCH_ARM_MMU
 
+    if ARCH_ARMV8
+        config ARCH_ENABLE_SOFT_KASAN
+            bool "Enable software-tagged KASAN"
+    endif
+
 config ARCH_MIPS
     bool
 

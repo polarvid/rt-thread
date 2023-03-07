@@ -425,13 +425,32 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
     rt_page_cleanup();
 }
 
+#ifdef ARCH_ENABLE_SOFT_KASAN
+#include "kasan.h"
+#endif /* ARCH_ENABLE_SOFT_KASAN */
 
 #ifdef RT_USING_SMART
-static inline void _init_region(void *vaddr, size_t size)
+static void _init_region(void *vaddr, size_t size)
 {
     rt_ioremap_start = vaddr;
     rt_ioremap_size = size;
     rt_mpr_start = rt_ioremap_start - rt_mpr_size;
+
+#ifdef ARCH_ENABLE_SOFT_KASAN
+    kasan_area_start = rt_mpr_start - KASAN_AREA_SIZE;
+    int ret;
+    ret = rt_aspace_map_static(&rt_kernel_space, &kasan_area, (void **)&kasan_area_start,
+                               KASAN_AREA_SIZE, MMU_MAP_K_RWCB, 0, &kasan_mapper, 0);
+
+    if (ret)
+    {
+        LOG_W("kasan area map failed");
+    }
+    else
+    {
+        kasan_init();
+    }
+#endif /* ARCH_ENABLE_SOFT_KASAN */
 }
 #else
 
@@ -523,7 +542,7 @@ void mmu_tcr_init(void)
             | (0x0UL << 35)  /* reserved */
             | (0x1UL << 36)  /* as: 0:8bit 1:16bit */
             | (0x0UL << 37)  /* tbi0 */
-            | (0x0UL << 38); /* tbi1 */
+            | (0x1UL << 38); /* tbi1 */
     __asm__ volatile("msr TCR_EL1, %0\n" ::"r"(val64));
 }
 
@@ -674,17 +693,26 @@ void *rt_hw_mmu_v2p(rt_aspace_t aspace, void *v_addr)
 {
     int level_shift;
     unsigned long paddr;
-    unsigned long *pte = _query(aspace, v_addr, &level_shift);
 
-    if (pte)
+    if (aspace == &rt_kernel_space)
     {
-        paddr = *pte & MMU_ADDRESS_MASK;
-        paddr |= (uintptr_t)v_addr & ((1ul << level_shift) - 1);
+        paddr = (unsigned long)rt_hw_mmu_kernel_v2p(v_addr);
     }
     else
     {
-        paddr = (unsigned long)ARCH_MAP_FAILED;
+        unsigned long *pte = _query(aspace, v_addr, &level_shift);
+
+        if (pte)
+        {
+            paddr = *pte & MMU_ADDRESS_MASK;
+            paddr |= (uintptr_t)v_addr & ((1ul << level_shift) - 1);
+        }
+        else
+        {
+            paddr = (unsigned long)ARCH_MAP_FAILED;
+        }
     }
+
     return (void *)paddr;
 }
 

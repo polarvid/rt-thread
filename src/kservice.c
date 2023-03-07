@@ -1674,7 +1674,7 @@ rt_weak void *rt_malloc(rt_size_t size)
     _heap_unlock(level);
     /* call 'rt_malloc' hook */
     RT_OBJECT_HOOK_CALL(rt_malloc_hook, (ptr, size));
-    return ptr;
+    return ptr ? kasan_unpoisoned(ptr, size) : ptr;
 }
 RTM_EXPORT(rt_malloc);
 
@@ -1738,6 +1738,7 @@ RTM_EXPORT(rt_calloc);
  */
 rt_weak void rt_free(void *rmem)
 {
+    rmem = (void *)((rt_ubase_t)rmem | 0xff00000000000000);
     rt_base_t level;
 
     /* call 'rt_free' hook */
@@ -1999,11 +2000,7 @@ void rt_assert_handler(const char *ex_string, const char *func, rt_size_t line)
         else
 #endif /*RT_USING_MODULE*/
         {
-            unsigned long pc, lr, fp;
-            __asm__ volatile("adr %0, .\n":"=r"(pc));
-            __asm__ volatile("mov %0, x30\n":"=r"(lr));
-            __asm__ volatile("mov %0, x29\n":"=r"(fp));
-            backtrace(pc, lr, fp);
+            rt_backtrace();
             rt_kprintf("(%s) assertion failed at function:%s, line number:%d \n", ex_string, func, line);
             rt_hw_cpu_shutdown();
             while (dummy == 0);
