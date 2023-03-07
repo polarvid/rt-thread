@@ -30,7 +30,7 @@ extern struct rt_mem_obj kasan_mapper;
 void kasan_init(void);
 
 void *kasan_unpoisoned(void *start, rt_size_t length);
-int kasan_poisoned(void *start, rt_size_t length);
+int kasan_poisoned(void *start);
 
 #else
 #define kasan_unpoisoned(ptr, sz) (ptr)

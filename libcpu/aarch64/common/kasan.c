@@ -9,6 +9,7 @@
  */
 
 #include <rtthread.h>
+#include "backtrace.h"
 
 #ifdef ARCH_ENABLE_SOFT_KASAN
 #include "mmu.h"
@@ -22,7 +23,8 @@
 
 #define SUPER_TAG (0xff)
 #define RET_ADDR (_PTR(__builtin_return_address(0)))
-
+#define FRAME_PTR (_PTR(__builtin_frame_address(0)))
+#define _PC ({ __label__ __here; __here: (unsigned long)&&__here; })
 #define _V2P(ptr) (rt_hw_mmu_kernel_v2p((void *)((rt_ubase_t)ptr | 0xff00000000000000)))
 #define _PTR(integer) ((void *)(integer))
 
@@ -86,16 +88,14 @@ static inline char *_addr_to_shadow(void *addr)
 
 static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
-    RT_ASSERT(0);
+    LOG_E("[KASAN]: Invalid %s Access", is_write ? "WRITE" : "READ");
+    LOG_E("(%p) try to access 0x%lx bytes at %p\n", ret_addr, length, start);
+    rt_backtrace_skipn(3);
     return RT_FALSE;
 }
 
-/* detect accessibility of shadow region, then compare a given tag with the region */
-static rt_bool_t _is_region_valid(char *shadow, char tag, rt_size_t region_sz)
+static rt_bool_t _shadow_accessible(char *shadow, const size_t shadow_words)
 {
-    const size_t shadow_words = RT_ALIGN(region_sz, KASAN_WORD_SIZE) / KASAN_WORD_SIZE;
-
-    /* check shadow accessible */
     const void *sha_end = shadow + shadow_words;
     void *sha_pg = _PTR((rt_ubase_t)shadow & ~ARCH_PAGE_MASK);
     void *sha_pg_end = _PTR(RT_ALIGN((rt_ubase_t)sha_end, ARCH_PAGE_SIZE));
@@ -106,6 +106,17 @@ static rt_bool_t _is_region_valid(char *shadow, char tag, rt_size_t region_sz)
             return RT_FALSE;
         sha_pg += ARCH_PAGE_SIZE;
     } while (sha_pg != sha_pg_end);
+    return RT_TRUE;
+}
+
+/* detect accessibility of shadow region, then compare a given tag with the region */
+static rt_bool_t _is_region_valid(char *shadow, char tag, rt_size_t region_sz)
+{
+    const size_t shadow_words = RT_ALIGN(region_sz, KASAN_WORD_SIZE) / KASAN_WORD_SIZE;
+
+    /* unaccessible shadow area indicated a poisoned tag */
+    if (!_shadow_accessible(shadow, shadow_words))
+        return RT_FALSE;
 
     /* check all the tags in given region */
     for (size_t i = 0; i < shadow_words; shadow++, i++)
@@ -126,7 +137,10 @@ static void _shadow_set_tag(char *shadow, const char tag, rt_size_t region_sz)
     return ;
 }
 
-static inline rt_bool_t kasan_accessible(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
+/**
+ * @brief entry of kasan address verification routine on each access (load/store)
+ */
+static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
     if (length == 0 || !kasan_enable)
         return RT_TRUE;
@@ -160,7 +174,6 @@ static rt_uint8_t _tag_alloc(void *start, rt_size_t length)
     void *sha_pg_end = _PTR(RT_ALIGN((rt_ubase_t)sha_end, ARCH_PAGE_SIZE));
 
     do {
-        RT_ASSERT(sha_pg >= (void *)kasan_area_start && sha_pg < (void *)kasan_area_start + KASAN_AREA_SIZE);
         void *phyaddr = _V2P(sha_pg);
         if (phyaddr == ARCH_MAP_FAILED)
         {
@@ -186,7 +199,7 @@ static rt_uint8_t _tag_alloc(void *start, rt_size_t length)
         sha_pg += ARCH_PAGE_SIZE;
     } while (sha_pg != sha_pg_end);
 
-    /* calculate a new tag by increase left tag */
+    /* calculate a new tag */
     char left, right;
     char *pleft = _addr_to_shadow(start - 1);
     char *pright = _addr_to_shadow(start + length);
@@ -211,6 +224,7 @@ static rt_uint8_t _tag_alloc(void *start, rt_size_t length)
     return tag;
 }
 
+/* called on malloc */
 void *kasan_unpoisoned(void *start, rt_size_t length)
 {
     if (!kasan_enable)
@@ -223,13 +237,16 @@ void *kasan_unpoisoned(void *start, rt_size_t length)
     return _PTR(TAG2PTR(start, tag));
 }
 
-int kasan_poisoned(void *start, rt_size_t length)
+/* called on free */
+int kasan_poisoned(void *start)
 {
+    /* assumed that address pointed by start is legal */
+    /* we poisoned every contiguous tag that is identical to start */
     if (!kasan_enable)
         return 0;
-    // TODO: cannot sure kasan accessible at this moment
+    // TODO: cannot ensure kasan accessible at this moment
 
-    _shadow_set_tag(_addr_to_shadow(start), SUPER_TAG, length);
+    // _shadow_set_tag(_addr_to_shadow(start), SUPER_TAG, length);
     return 0;
 }
 
@@ -239,13 +256,13 @@ int kasan_poisoned(void *start, rt_size_t length)
 #define KASAN_FN_TEMPLATE(size) \
     void __asan_load##size(void *p) \
     {   \
-        kasan_accessible(p, size, RT_FALSE, RET_ADDR); \
+        _kasan_verify(p, size, RT_FALSE, RET_ADDR); \
     } \
     void __asan_load##size##_noabort(void *p) \
     __attribute__((alias(RT_STRINGIFY(__asan_load##size))));\
     void __asan_store##size(void *p) \
     {   \
-        kasan_accessible(p, size, RT_TRUE, RET_ADDR); \
+        _kasan_verify(p, size, RT_TRUE, RET_ADDR); \
     } \
     void __asan_store##size##_noabort(void *p) \
     __attribute__((alias(RT_STRINGIFY(__asan_store##size))));
@@ -258,14 +275,14 @@ KASAN_FN_TEMPLATE(16);
 
 void __asan_loadN(void *p, size_t size)
 {
-    kasan_accessible(p, size, RT_FALSE, RET_ADDR);
+    _kasan_verify(p, size, RT_FALSE, RET_ADDR);
 }
 void __asan_loadN_noabort(void *p, size_t size)
 __attribute__((alias("__asan_loadN")));
 
 void __asan_storeN(void *p, size_t size)
 {
-    kasan_accessible(p, size, RT_TRUE, RET_ADDR);
+    _kasan_verify(p, size, RT_TRUE, RET_ADDR);
 }
 void __asan_storeN_noabort(void *p, size_t size)
 __attribute__((alias("__asan_storeN")));
