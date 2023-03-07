@@ -77,6 +77,14 @@ rt_hw_get_gtimer_frq:
     MRS X0,CNTFRQ_EL0
     RET
 
+/* make gdb happy */
+.global _dummy_trampoline
+_stop_frame:
+    nop
+_dummy_trampoline:
+    ldp x29, x30, [sp], #0x10
+    ret
+
 .macro SAVE_CONTEXT
     /* Save the entire context. */
     SAVE_FPU SP

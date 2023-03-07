@@ -24,12 +24,17 @@
  *
  * @return stack address
  */
+void _dummy_trampoline(void);
+
 rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
                              rt_uint8_t *stack_addr, void *texit)
 {
     rt_ubase_t *stk;
 
     stk = (rt_ubase_t *)stack_addr;
+    /* make gdb happy */
+    *(--stk) = (rt_ubase_t)texit;       /* exit point */
+    *(--stk) = (rt_ubase_t)0xabadcafe;  /* magic */
 
     *(--stk) = (rt_ubase_t)0; /* Q0 */
     *(--stk) = (rt_ubase_t)0; /* Q0 */
@@ -96,7 +101,7 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
     *(--stk) = (rt_ubase_t)28;        /* X28 */
     *(--stk) = (rt_ubase_t)0;         /* FPSR */
     *(--stk) = (rt_ubase_t)0;         /* FPCR */
-    *(--stk) = (rt_ubase_t)texit;     /* X30 - procedure call link register. */
+    *(--stk) = (rt_ubase_t)_dummy_trampoline;     /* X30 - procedure call link register. */
     *(--stk) = (rt_ubase_t)0;         /* sp_el0 */
 
     *(--stk) = INITIAL_SPSR_EL1;
