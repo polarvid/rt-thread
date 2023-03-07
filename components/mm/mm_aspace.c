@@ -37,12 +37,15 @@ static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
                         mm_flag_t flags);
 
 struct rt_aspace rt_kernel_space;
+
+#ifdef DEBUG_MEM
 rt_slab_t mm_slab;
+#endif
 
 rt_varea_t _varea_create(void *start, rt_size_t size)
 {
     rt_varea_t varea;
-    varea = (rt_varea_t)MM_MALLOC(sizeof(struct rt_varea));
+    varea = (rt_varea_t)mm_malloc(sizeof(struct rt_varea));
     if (varea)
     {
         varea->start = start;
@@ -127,7 +130,7 @@ rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl)
 
     if (page_table)
     {
-        aspace = (rt_aspace_t)MM_MALLOC(sizeof(*aspace));
+        aspace = (rt_aspace_t)mm_malloc(sizeof(*aspace));
         if (aspace)
         {
             aspace->page_table = page_table;
@@ -136,7 +139,7 @@ rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl)
             if (_init_lock(aspace) != RT_EOK ||
                 _aspace_bst_init(aspace) != RT_EOK)
             {
-                MM_FREE(aspace);
+                mm_free(aspace);
                 aspace = NULL;
             }
         }
@@ -174,7 +177,7 @@ void rt_aspace_delete(rt_aspace_t aspace)
     if (aspace)
     {
         rt_aspace_detach(aspace);
-        MM_FREE(aspace);
+        mm_free(aspace);
     }
 }
 
@@ -365,7 +368,7 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
             err = _mm_aspace_map(aspace, varea, attr, flags, mem_obj, offset);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                mm_free(varea);
             }
         }
         else
@@ -493,7 +496,7 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             err = _mm_aspace_map_phy(aspace, varea, hint, attr, pa_off, ret_va);
             if (err != RT_EOK)
             {
-                MM_FREE(varea);
+                mm_free(varea);
             }
         }
         else
@@ -546,7 +549,7 @@ void _aspace_unmap(rt_aspace_t aspace, void *addr, rt_size_t length)
         _varea_uninstall(varea);
         if (!(varea->flag & MMF_STATIC_ALLOC))
         {
-            rt_free(varea);
+            mm_free(varea);
         }
         varea = _aspace_bst_search_overlap(aspace, range);
     }

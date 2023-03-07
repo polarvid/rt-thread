@@ -95,6 +95,13 @@ void rt_hw_board_init(void)
     /* initialize system heap */
     rt_system_heap_init((void *)HEAP_BEGIN, (void *)HEAP_END);
 
+#ifdef DEBUG_MEM
+    const rt_size_t mm_size = 256ul << 10;
+    void *mm_buf = rt_pages_alloc(rt_page_bits(mm_size));
+    extern rt_slab_t mm_slab;
+    mm_slab = rt_slab_init("mm_slab", mm_buf, mm_size);
+#endif
+
     /* initialize hardware interrupt */
     rt_hw_interrupt_init();
 

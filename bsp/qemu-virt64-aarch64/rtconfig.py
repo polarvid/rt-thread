@@ -23,18 +23,18 @@ if PLATFORM == 'gcc':
     STRIP   = PREFIX + 'strip'
     CFPFLAGS = ' '
     AFPFLAGS = ' '
-    DEVICE   = ' -march=armv8-a -mtune=cortex-a53 -ftree-vectorize -ffast-math -funwind-tables -fno-strict-aliasing'
+    DEVICE   = ' -march=armv8-a -mtune=cortex-a53 -ftree-vectorize -ffast-math -fno-strict-aliasing'
 
     CXXFLAGS= DEVICE + CFPFLAGS + ' -Wall -fdiagnostics-color=always'
-    CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -std=gnu99 -fdiagnostics-color=always'
+    CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -std=gnu11 -fdiagnostics-color=always'
     AFLAGS  = ' -c' + AFPFLAGS + ' -x assembler-with-cpp'
     LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static'
     CPATH   = ''
     LPATH   = ''
 
     if BUILD == 'debug':
-        CFLAGS   += ' -O0 -gdwarf-2'
-        CXXFLAGS += ' -O0 -gdwarf-2'
+        CFLAGS   += ' -O0 -gdwarf-2 -fsanitize=kernel-address'
+        CXXFLAGS += ' -O0 -gdwarf-2 -fsanitize=kernel-address'
         AFLAGS   += ' -gdwarf-2'
     else:
         CFLAGS   += ' -Os'
