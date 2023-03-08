@@ -33,9 +33,6 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
     rt_ubase_t *stk;
 
     stk = (rt_ubase_t *)stack_addr;
-    /* make gdb happy */
-    *(--stk) = (rt_ubase_t)texit;           /* exit point */
-    *(--stk) = (rt_ubase_t)0xabadcafe;      /* magic */
 
     *(--stk) = (rt_ubase_t)0; /* Q0 */
     *(--stk) = (rt_ubase_t)0; /* Q0 */
@@ -70,7 +67,7 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
     *(--stk) = (rt_ubase_t)0; /* Q15 */
     *(--stk) = (rt_ubase_t)0; /* Q15 */
 
-    *(--stk) = (rt_ubase_t)tentry;           /* X1 */
+    *(--stk) = (rt_ubase_t)0;           /* X1 */
     *(--stk) = (rt_ubase_t)parameter;   /* X0 */
     *(--stk) = (rt_ubase_t)3;           /* X3 */
     *(--stk) = (rt_ubase_t)2;           /* X2 */
@@ -88,18 +85,18 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
     *(--stk) = (rt_ubase_t)14;          /* X14 */
     *(--stk) = (rt_ubase_t)17;          /* X17 */
     *(--stk) = (rt_ubase_t)16;          /* X16 */
-    *(--stk) = (rt_ubase_t)19;          /* X19 */
+    *(--stk) = (rt_ubase_t)tentry;      /* X19, 1st param */
     *(--stk) = (rt_ubase_t)18;          /* X18 */
     *(--stk) = (rt_ubase_t)21;          /* X21 */
-    *(--stk) = (rt_ubase_t)20;          /* X20 */
+    *(--stk) = (rt_ubase_t)texit;       /* X20, 2nd param */
     *(--stk) = (rt_ubase_t)23;          /* X23 */
     *(--stk) = (rt_ubase_t)22;          /* X22 */
     *(--stk) = (rt_ubase_t)25;          /* X25 */
     *(--stk) = (rt_ubase_t)24;          /* X24 */
     *(--stk) = (rt_ubase_t)27;          /* X27 */
     *(--stk) = (rt_ubase_t)26;          /* X26 */
-    *(--stk) = (rt_ubase_t)29;          /* X29 */
-    *(--stk) = (rt_ubase_t)texit;          /* X28 */
+    *(--stk) = (rt_ubase_t)0;           /* X29 - addr 0 as AAPCS64 specified */
+    *(--stk) = (rt_ubase_t)28;          /* X28 */
     *(--stk) = (rt_ubase_t)0;           /* FPSR */
     *(--stk) = (rt_ubase_t)0;           /* FPCR */
     *(--stk) = (rt_ubase_t)0;           /* X30 - procedure call link register. */

@@ -77,30 +77,16 @@ rt_hw_get_gtimer_frq:
     MRS X0,CNTFRQ_EL0
     RET
 
-/* make gdb happy */
-.global _dummy_trampoline
-_stop_frame:
-    nop
-_dummy_trampoline:
-    ldp x29, x30, [sp], #0x10
-    ret
-
-.cfi_sections .debug_frame 
-.global _thread_start;
-.type _thread_start, %function
-.p2align 6
-    hint	34
+.cfi_sections .debug_frame, .eh_frame
+.global _thread_start
 .cfi_startproc
-.text
 _thread_start:
     .cfi_undefined x30
-    mov x29, #0
-    mov x30, #0
     /* x0 */
-    blr x1
-    br x28
+    blr x19
+    mov x29, #0
+    blr x20
 .cfi_endproc
-.size _thread_start,.-_thread_start
 
 .macro SAVE_CONTEXT
     /* Save the entire context. */
