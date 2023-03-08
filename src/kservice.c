@@ -1654,9 +1654,7 @@ rt_weak void rt_system_heap_init(void *begin_addr, void *end_addr)
     _heap_lock_init();
 }
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
 #include <kasan.h>
-#endif /* ARCH_ENABLE_SOFT_KASAN */
 
 /**
  * @brief Allocate a block of memory with a minimum of 'size' bytes.
@@ -1693,6 +1691,8 @@ RTM_EXPORT(rt_malloc);
  */
 rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
 {
+    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
+    // unpoisoned ?
     rt_base_t level;
     void *nptr;
 
@@ -1702,7 +1702,7 @@ rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
     nptr = _MEM_REALLOC(rmem, newsize);
     /* Exit critical zone */
     _heap_unlock(level);
-    return nptr;
+    return nptr ? kasan_unpoisoned(nptr, newsize) : nptr;
 }
 RTM_EXPORT(rt_realloc);
 

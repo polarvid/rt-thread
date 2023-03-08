@@ -22,7 +22,7 @@
 #define MM_PA_TO_OFF(pa) ((uintptr_t)(pa) >> MM_PAGE_SHIFT)
 #define PV_OFFSET        (rt_kmem_pvoff())
 
-#define DEBUG_MEM
+// #define DEBUG_MEM
 
 #ifdef DEBUG_MEM
 #include <kasan.h>
