@@ -35,7 +35,7 @@
 #define NON_TAG_WIDTH (8 * (sizeof(rt_ubase_t) - 1))
 #define NON_TAG_MASK ((1ul << NON_TAG_WIDTH) - 1)
 
-#define PRT2TAG(ptr) (((rt_ubase_t)(ptr) >> NON_TAG_WIDTH) & 0xff)
+#define PTR2TAG(ptr) (((rt_ubase_t)(ptr) >> NON_TAG_WIDTH) & 0xff)
 #define TAG2PTR(ptr, tag) (((rt_ubase_t)(ptr) & NON_TAG_MASK) | ((tag) << NON_TAG_WIDTH))
 
 #define SKIP_SUPER(tag, replace) ((tag) == SUPER_TAG ? (replace) : (tag))
@@ -146,7 +146,7 @@ static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t i
     if (length == 0 || !kasan_enable)
         return RT_TRUE;
 
-    char tag = PRT2TAG(start);
+    char tag = PTR2TAG(start);
 
     if (tag == SUPER_TAG || tag == 0)
         return RT_TRUE;
@@ -238,17 +238,55 @@ void *kasan_unpoisoned(void *start, rt_size_t length)
     return _PTR(TAG2PTR(start, tag));
 }
 
-/* called on free */
+/**
+ * called on free 
+ * start must be unpoisoned before by calling kasan_unpoisoned
+ */
 int kasan_poisoned(void *start)
 {
+    int err = RT_EOK;
     /* assumed that address pointed by start is legal */
     /* we poisoned every contiguous tag that is identical to start */
-    if (!kasan_enable)
-        return 0;
-    // TODO: cannot ensure kasan accessible at this moment
+    if (!kasan_enable || !start)
+        return err;
 
-    // _shadow_set_tag(_addr_to_shadow(start), SUPER_TAG, length);
-    return 0;
+    // 1. try to find the tag of start
+    char *tagp = _addr_to_shadow(start);
+
+    // 2. try to get tag
+    if (_V2P(tagp) != ARCH_MAP_FAILED)
+    {
+        char tag = PTR2TAG(start);
+        char shad_tag = *tagp;
+        if (shad_tag != tag)
+        {
+            LOG_E("%s: unmatched poisoned region %p", __func__, start);
+            err = -RT_ERROR;
+        }
+
+        /**
+         * while doing poisoned, we must ensure that:
+         * 1. check accessibility when crossing page boundary
+         * 2. stop when tag is changed
+         */
+        char *next_page_tagp = (char *)RT_ALIGN((rt_ubase_t)tagp, ARCH_PAGE_SIZE);
+        while (1)
+        {
+            while (tagp < next_page_tagp && *tagp == tag)
+                *tagp++ = SUPER_TAG;
+
+            if (*tagp != tag)
+                break;
+            next_page_tagp += ARCH_PAGE_SIZE;
+        }
+    }
+    else
+    {
+        LOG_E("%s: unallocated poisoned region %p", __func__, start);
+        err = -RT_ERROR;
+    }
+
+    return err;
 }
 
 /**
