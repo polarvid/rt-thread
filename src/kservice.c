@@ -1459,6 +1459,7 @@ rt_weak int rt_kprintf(const char *fmt, ...)
     va_list args;
     rt_size_t length = 0;
     static char rt_log_buf[RT_CONSOLEBUF_SIZE];
+    rt_ubase_t level = rt_hw_interrupt_disable();
 
     va_start(args, fmt);
     /* the return value of vsnprintf is the number of bytes that would be
@@ -1485,6 +1486,7 @@ rt_weak int rt_kprintf(const char *fmt, ...)
     rt_hw_console_output(rt_log_buf);
 #endif /* RT_USING_DEVICE */
     va_end(args);
+    rt_hw_interrupt_enable(level);
 
     return length;
 }
@@ -1691,11 +1693,10 @@ RTM_EXPORT(rt_malloc);
  */
 rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
 {
-    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
-    // unpoisoned ?
     rt_base_t level;
     void *nptr;
-
+    kasan_poisoned(rmem);
+    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
     /* Enter critical zone */
     level = _heap_lock();
     /* Change the size of previously allocated memory block */
@@ -1742,13 +1743,16 @@ RTM_EXPORT(rt_calloc);
  */
 rt_weak void rt_free(void *rmem)
 {
-    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
     rt_base_t level;
 
     /* call 'rt_free' hook */
     RT_OBJECT_HOOK_CALL(rt_free_hook, (rmem));
     /* NULL check */
     if (rmem == RT_NULL) return;
+    // ? the order here, shoule we trust dynamic memory algorithm itself?
+    // we gave him super tag to access anywhere
+    kasan_poisoned(rmem);
+    rmem = rmem ? (void *)((rt_ubase_t)rmem | 0xff00000000000000) : rmem;
     /* Enter critical zone */
     level = _heap_lock();
     _MEM_FREE(rmem);
