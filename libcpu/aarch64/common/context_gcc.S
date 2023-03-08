@@ -82,7 +82,7 @@ rt_hw_get_gtimer_frq:
 .cfi_startproc
 _thread_start:
     .cfi_undefined x30
-    /* x0 */
+    /* x0 - thread entry parameter */
     blr x19
     mov x29, #0
     blr x20
