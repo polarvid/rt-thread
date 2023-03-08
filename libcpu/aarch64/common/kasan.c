@@ -86,10 +86,10 @@ static inline char *_addr_to_shadow(void *addr)
     return kasan_area_start + offset;
 }
 
-static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
+static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr, char tag)
 {
     LOG_E("[KASAN]: Invalid %s Access", is_write ? "WRITE" : "READ");
-    LOG_E("(%p) try to access 0x%lx bytes at %p\n", ret_addr, length, start);
+    LOG_E("(%p) try to access 0x%lx bytes at %p with tag %x\n", ret_addr, length, start, tag);
     rt_backtrace_skipn(3);
     return RT_FALSE;
 }
@@ -110,19 +110,20 @@ static rt_bool_t _shadow_accessible(char *shadow, const size_t shadow_words)
 }
 
 /* detect accessibility of shadow region, then compare a given tag with the region */
-static rt_bool_t _is_region_valid(char *shadow, char tag, rt_size_t region_sz)
+static inline rt_bool_t _is_region_valid(char *shadow, char tag, rt_size_t region_sz,
+    void *start, rt_bool_t is_write, void *ret_addr)
 {
     const size_t shadow_words = RT_ALIGN(region_sz, KASAN_WORD_SIZE) / KASAN_WORD_SIZE;
 
     /* unaccessible shadow area indicated a poisoned tag */
     if (!_shadow_accessible(shadow, shadow_words))
-        return RT_FALSE;
+        return handle_fault(start, region_sz, is_write, ret_addr, SUPER_TAG);
 
     /* check all the tags in given region */
     for (size_t i = 0; i < shadow_words; shadow++, i++)
     {
         if (*shadow != tag)
-            return RT_FALSE;
+            return handle_fault(start, region_sz, is_write, ret_addr, *shadow);
     }
     return RT_TRUE;
 }
@@ -154,8 +155,8 @@ static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t i
         to access unaccessible in situations like demanding pages */
     char *shadow;
     shadow = _addr_to_shadow(start);
-    if (!_is_region_valid(shadow, tag, length))
-        handle_fault(start, length, is_write, ret_addr);
+    if (!_is_region_valid(shadow, tag, length, start, is_write, ret_addr))
+        return RT_FALSE;
 
     return RT_TRUE;
 }
