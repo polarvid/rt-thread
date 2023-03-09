@@ -28,10 +28,6 @@
 #define _V2P(ptr) (rt_hw_mmu_kernel_v2p((void *)((rt_ubase_t)ptr | 0xff00000000000000)))
 #define _PTR(integer) ((void *)(integer))
 
-#ifndef ALWAYS_INLINE
-#define ALWAYS_INLINE inline __attribute__((always_inline))
-#endif
-
 #define NON_TAG_WIDTH (8 * (sizeof(rt_ubase_t) - 1))
 #define NON_TAG_MASK ((1ul << NON_TAG_WIDTH) - 1)
 
@@ -89,8 +85,8 @@ static inline char *_addr_to_shadow(void *addr)
 static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr, char tag)
 {
     LOG_E("[KASAN]: Invalid %s Access", is_write ? "WRITE" : "READ");
-    LOG_E("(%p) try to access 0x%lx bytes at %p; tag %x shadow %x\n",
-          TAG2PTR(ret_addr, 0xfful), length, start, PTR2TAG(ret_addr), tag);
+    LOG_E("(%p) try to access 0x%lx bytes at %p; tag 0x%x shadow 0x%x\n",
+          TAG2PTR(ret_addr, 0xfful), length, start, PTR2TAG(start), tag);
 
     rt_backtrace_skipn(3);
     return RT_FALSE;
@@ -145,12 +141,12 @@ static void _shadow_set_tag(char *shadow, const char tag, rt_size_t region_sz)
  */
 static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
-    if (length == 0 || !kasan_enable)
+    if (!start || length == 0 || !kasan_enable)
         return RT_TRUE;
 
     char tag = PTR2TAG(start);
 
-    if (tag == SUPER_TAG || tag == 0)
+    if (tag == SUPER_TAG)
         return RT_TRUE;
 
     /* is legal address ? we should not check vaddr accessible because it's allowed
@@ -333,5 +329,40 @@ void __asan_storeN(void *p, size_t size)
 }
 void __asan_storeN_noabort(void *p, size_t size)
 __attribute__((alias("__asan_storeN")));
+
+#ifdef RT_KSERVICE_USING_STDLIB_MEMORY
+#error "Don't config this for KASAN as it limits the capability of bugs catching"
+#endif
+
+#undef memset
+void *memset(void *ptr, int value, size_t num)
+{
+    if (!_kasan_verify(ptr, num, RT_TRUE, RET_ADDR))
+        return NULL;
+
+    return rt_memset(ptr, value, num);
+}
+
+#undef memcpy
+void *memcpy(void *destination, const void *source, size_t num)
+{
+    if (!_kasan_verify(_PTR(source), num, RT_FALSE, RET_ADDR) ||
+        !_kasan_verify(destination, num, RT_TRUE, RET_ADDR))
+        return NULL;
+
+    return rt_memcpy(destination, source, num);
+}
+
+#undef strncpy
+char *strncpy(char *destination, const char *source, size_t num)
+{
+    if (!_kasan_verify(_PTR(source), num, RT_FALSE, RET_ADDR) ||
+        !_kasan_verify(destination, num, RT_TRUE, RET_ADDR))
+        return NULL;
+
+    /* MUSL implemented */
+    extern char *__stpncpy(char *destination, const char *source, size_t num);
+    return __stpncpy(destination, source, num);
+}
 
 #endif /* ARCH_ENABLE_SOFT_KASAN */
