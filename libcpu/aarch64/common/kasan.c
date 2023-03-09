@@ -10,6 +10,7 @@
 
 #include <rtthread.h>
 #include "backtrace.h"
+#include "rtconfig.h"
 
 #ifdef ARCH_ENABLE_SOFT_KASAN
 #include "mmu.h"
@@ -141,7 +142,7 @@ static void _shadow_set_tag(char *shadow, const char tag, rt_size_t region_sz)
  */
 static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
-    if (!start || length == 0 || !kasan_enable)
+    if (!start || length == 0 || !kasan_enable || start < (void *)KERNEL_VADDR_START)
         return RT_TRUE;
 
     char tag = PTR2TAG(start);
