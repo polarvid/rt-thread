@@ -37,6 +37,7 @@ static rt_err_t utest_tc_cleanup(void)
  * out-of-bound memset
  * out-of-bound memcpy
  * out-of-bound strncpy
+ * thread overflow
  * ==============================================================
  */
 
@@ -82,11 +83,31 @@ static void test_strncpy(void)
     uassert_true(!__builtin_strncpy(buf, src, kasan_buf_sz + 1));
 }
 
+static void _thread_overflow(void *param)
+{
+    char chunk[kasan_buf_sz];
+    for (size_t i = 0; i < kasan_buf_sz; i++)
+    {
+        chunk[i] = 0;
+    }
+
+    return ;
+}
+
+static void test_stack_overflow(void)
+{
+    rt_thread_t tid = rt_thread_create("overflow", _thread_overflow, RT_NULL, kasan_buf_sz, 8, 20);
+    rt_thread_startup(tid);
+    rt_thread_mdelay(1000);
+    rt_thread_delete(tid);
+}
+
 static void testcase(void)
 {
     UTEST_UNIT_RUN(test_memset);
     UTEST_UNIT_RUN(test_memcpy);
     UTEST_UNIT_RUN(test_strncpy);
+    UTEST_UNIT_RUN(test_stack_overflow);
 }
 
 UTEST_TC_EXPORT(testcase, "testcases.libcpu.kasan", utest_tc_init, utest_tc_cleanup, 10);

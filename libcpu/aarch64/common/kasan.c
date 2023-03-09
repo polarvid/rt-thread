@@ -22,7 +22,7 @@
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
-#define SUPER_TAG (0xff)
+#define SUPER_TAG (0xfful)
 #define RET_ADDR (_PTR(__builtin_return_address(0)))
 #define FRAME_PTR (_PTR(__builtin_frame_address(0)))
 #define _PC ({ __label__ __here; __here: (unsigned long)&&__here; })
@@ -142,7 +142,7 @@ static void _shadow_set_tag(char *shadow, const char tag, rt_size_t region_sz)
  */
 static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
-    if (!start || length == 0 || !kasan_enable || start < (void *)KERNEL_VADDR_START)
+    if (!start || length == 0 || !kasan_enable || TAG2PTR(start, SUPER_TAG) < KERNEL_VADDR_START)
         return RT_TRUE;
 
     char tag = PTR2TAG(start);
