@@ -89,7 +89,9 @@ static inline char *_addr_to_shadow(void *addr)
 static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr, char tag)
 {
     LOG_E("[KASAN]: Invalid %s Access", is_write ? "WRITE" : "READ");
-    LOG_E("(%p) try to access 0x%lx bytes at %p with tag %x\n", ret_addr, length, start, tag);
+    LOG_E("(%p) try to access 0x%lx bytes at %p; tag %x shadow %x\n",
+          TAG2PTR(ret_addr, 0xfful), length, start, PTR2TAG(ret_addr), tag);
+
     rt_backtrace_skipn(3);
     return RT_FALSE;
 }
@@ -228,6 +230,9 @@ static rt_uint8_t _tag_alloc(void *start, rt_size_t length)
 /* called on malloc */
 void *kasan_unpoisoned(void *start, rt_size_t length)
 {
+    /* malloc alignment must at least be kasan word size */
+    RT_ASSERT(!((rt_ubase_t)start & (KASAN_WORD_SIZE - 1)));
+
     if (!kasan_enable)
         return start;
 
@@ -244,6 +249,9 @@ void *kasan_unpoisoned(void *start, rt_size_t length)
  */
 int kasan_poisoned(void *start)
 {
+    /* malloc alignment must at least be kasan word size */
+    RT_ASSERT(!((rt_ubase_t)start & (KASAN_WORD_SIZE - 1)));
+
     int err = RT_EOK;
     /* assumed that address pointed by start is legal */
     /* we poisoned every contiguous tag that is identical to start */
