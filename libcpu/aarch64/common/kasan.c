@@ -87,7 +87,7 @@ static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write,
 {
     LOG_E("[KASAN]: Invalid %s Access", is_write ? "WRITE" : "READ");
     LOG_E("(%p) try to access 0x%lx bytes at %p; tag 0x%x shadow 0x%x\n",
-          TAG2PTR(ret_addr, 0xfful), length, start, PTR2TAG(start), tag);
+          ret_addr, length, TAG2PTR(start, 0xfful), PTR2TAG(start), tag);
 
     rt_backtrace_skipn(3);
     return RT_FALSE;
