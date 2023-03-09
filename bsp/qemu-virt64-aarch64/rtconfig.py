@@ -28,17 +28,18 @@ if PLATFORM == 'gcc':
     CXXFLAGS= DEVICE + CFPFLAGS + ' -Wall -fdiagnostics-color=always'
     CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -std=gnu11 -fdiagnostics-color=always'
     AFLAGS  = ' -c' + AFPFLAGS + ' -x assembler-with-cpp'
-    LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static'
+    LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static -nostartfiles'
     CPATH   = ''
     LPATH   = ''
 
     if BUILD == 'debug':
-        CFLAGS   += ' -O0 -gdwarf-2 -fsanitize=kernel-address'
-        CXXFLAGS += ' -O0 -gdwarf-2 -fsanitize=kernel-address'
-        AFLAGS   += ' -gdwarf-2'
+        INSTFLAG = ' -fsanitize=kernel-address'
+        CFLAGS   += INSTFLAG + ' -O0 -ggdb'
+        CXXFLAGS += INSTFLAG + ' -O0 -ggdb'
+        AFLAGS   += INSTFLAG + ' -ggdb'
     else:
-        CFLAGS   += ' -Os'
-        CXXFLAGS += ' -Os'
+        CFLAGS   += ' -O2'
+        CXXFLAGS += ' -O2'
     CXXFLAGS += ' -Woverloaded-virtual -fno-exceptions -fno-rtti'
 
 DUMP_ACTION = OBJDUMP + ' -D -S $TARGET > rtt.asm\n'
