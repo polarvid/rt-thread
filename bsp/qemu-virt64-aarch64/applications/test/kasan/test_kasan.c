@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2023-03-09     WangXiaoyao  Test for kasan
  */
+#include "rtdef.h"
 #include <rtthread.h>
 #include <rthw.h>
 #include <string.h>
@@ -91,15 +92,34 @@ static void _thread_overflow(void *param)
         chunk[i] = 0;
     }
 
+    uassert_false(strchr(chunk, 'a'));
     return ;
 }
 
+struct rt_thread tcb;
+#define _PADDING 8192
+#define _TST_STK 2048
+
+rt_align(16) static rt_uint8_t _thread_stack[_PADDING + _TST_STK];
+
 static void test_stack_overflow(void)
 {
-    rt_thread_t tid = rt_thread_create("overflow", _thread_overflow, RT_NULL, kasan_buf_sz, 8, 20);
-    rt_thread_startup(tid);
+    LOG_I("test stack overflow");
+
+    void *sp = kasan_unpoisoned(_thread_stack + _PADDING, _TST_STK);
+
+    uassert_false(rt_thread_init(
+        &tcb,
+        "overflow",
+        _thread_overflow,
+        RT_NULL,
+        sp,
+        _TST_STK,
+        8, 20));
+
+    rt_thread_startup(&tcb);
     rt_thread_mdelay(1000);
-    rt_thread_delete(tid);
+    rt_thread_detach(&tcb);
 }
 
 static void testcase(void)

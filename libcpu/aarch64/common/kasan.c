@@ -93,6 +93,16 @@ static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write,
     return RT_FALSE;
 }
 
+static void _handle_stack_overflow(void *sp)
+{
+    LOG_E("[KASAN] stack overflow on %s", rt_thread_self()->name);
+
+    while (1)
+    {
+        rt_thread_yield();
+    }
+}
+
 static rt_bool_t _shadow_accessible(char *shadow, const size_t shadow_words)
 {
     const void *sha_end = shadow + shadow_words;
@@ -137,27 +147,46 @@ static void _shadow_set_tag(char *shadow, const char tag, rt_size_t region_sz)
     return ;
 }
 
+static inline rt_bool_t _is_stack_overflow(void *sp, char tag)
+{
+    if (tag == PTR2TAG(sp))
+    {
+        /* test sp if tag identical */
+        rt_ubase_t pc = _PC;
+        if (!_is_region_valid(_addr_to_shadow(sp), tag, 8, sp - 8, 0, _PTR(pc)))
+        {
+            _handle_stack_overflow(sp);
+            return RT_TRUE;
+        }
+    }
+    return RT_FALSE;
+}
+
 /**
  * @brief entry of kasan address verification routine on each access (load/store)
  */
 static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
-    if (!start || length == 0 || !kasan_enable || TAG2PTR(start, SUPER_TAG) < KERNEL_VADDR_START)
-        return RT_TRUE;
+    rt_bool_t ok = RT_TRUE;
+    if (start && length && kasan_enable && TAG2PTR(start, SUPER_TAG) >= KERNEL_VADDR_START)
+    {
+        rt_ubase_t sp;
+        __asm__ volatile("mov %0, sp":"=r"(sp));
+        rt_ubase_t super_sp = TAG2PTR(sp, SUPER_TAG);
+        __asm__ volatile("mov sp, %0"::"r"(super_sp));
 
-    char tag = PTR2TAG(start);
+        char tag = PTR2TAG(start);
 
-    if (tag == SUPER_TAG)
-        return RT_TRUE;
+        if (tag != SUPER_TAG && !_is_stack_overflow(_PTR(sp), tag))
+        {
+            char *shadow;
+            shadow = _addr_to_shadow(start);
+            ok = _is_region_valid(shadow, tag, length, start, is_write, ret_addr);
+        }
+        __asm__ volatile("mov sp, %0"::"r"(sp));
+    }
 
-    /* is legal address ? we should not check vaddr accessible because it's allowed
-        to access unaccessible in situations like demanding pages */
-    char *shadow;
-    shadow = _addr_to_shadow(start);
-    if (!_is_region_valid(shadow, tag, length, start, is_write, ret_addr))
-        return RT_FALSE;
-
-    return RT_TRUE;
+    return ok;
 }
 
 /**
