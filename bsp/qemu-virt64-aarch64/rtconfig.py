@@ -31,12 +31,11 @@ if PLATFORM == 'gcc':
     LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static -nostartfiles'
     CPATH   = ''
     LPATH   = ''
-
+        
     if BUILD == 'debug':
-        INSTFLAG = ' -fsanitize=kernel-address'
-        CFLAGS   += INSTFLAG + ' -O0 -ggdb'
-        CXXFLAGS += INSTFLAG + ' -O0 -ggdb'
-        AFLAGS   += INSTFLAG + ' -ggdb'
+        CFLAGS   += ' -O0 -ggdb'
+        CXXFLAGS += ' -O0 -ggdb'
+        AFLAGS   += ' -ggdb'
     else:
         CFLAGS   += ' -O2'
         CXXFLAGS += ' -O2'
