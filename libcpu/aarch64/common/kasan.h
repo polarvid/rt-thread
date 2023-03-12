@@ -34,7 +34,7 @@ int kasan_poisoned(void *start);
 
 #else
 #define kasan_unpoisoned(ptr, sz) (ptr)
-#define kasan_poisoned(ptr, sz)
+#define kasan_poisoned(ptr)
 #endif /* ARCH_ENABLE_SOFT_KASAN */
 
 #endif /* __KASAN_H__ */

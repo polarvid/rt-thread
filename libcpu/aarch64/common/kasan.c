@@ -383,10 +383,23 @@ void *memcpy(void *destination, const void *source, size_t num)
     return rt_memcpy(destination, source, num);
 }
 
+static rt_bool_t _string_readable(const char *str, size_t max)
+{
+    for (size_t i = 0; i < max; i++, str++)
+    {
+        if (!_kasan_verify(_PTR(str), 1, RT_FALSE, RET_ADDR))
+            return RT_FALSE;
+        if (!*str)
+            return RT_TRUE;
+    }
+
+    return RT_TRUE;
+}
+
 #undef strncpy
 char *strncpy(char *destination, const char *source, size_t num)
 {
-    if (!_kasan_verify(_PTR(source), num, RT_FALSE, RET_ADDR) ||
+    if ((!_string_readable(source, num)) ||
         !_kasan_verify(destination, num, RT_TRUE, RET_ADDR))
         return NULL;
 
