@@ -96,7 +96,16 @@ sysret_t sys_channel_recv(int fd, rt_channel_msg_t data);
 void sys_enter_critical(void);
 void sys_exit_critical(void);
 
+sysret_t sys_dup(int oldfd);
+sysret_t sys_dup2(int oldfd, int new);
+
 sysret_t sys_log(const char* log, int size);
+
+#ifdef ARCH_MM_MMU
+sysret_t sys_futex(int *uaddr, int op, int val, const struct timespec *timeout, int *uaddr2, int val3);
+sysret_t sys_pmutex(void *umutex, int op, void *arg);
+sysret_t sys_cacheflush(void *addr, int len, int cache);
+#endif /* ARCH_MM_MMU */
 
 #ifdef __cplusplus
 }

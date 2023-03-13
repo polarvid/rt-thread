@@ -55,14 +55,15 @@
     #include <sal_socket.h>
     #include <sys/socket.h>
 
-    #ifdef SAL_USING_POSIX
-        #include <sys/socket.h>
-
-        #define SYSCALL_NET(f)      f
-    #else
-        #define SYSCALL_NET(f)      SYSCALL_SIGN(sys_notimpl)
-    #endif /* SAL_USING_POSIX */
 #endif /* RT_USING_SAL */
+
+#if (defined(RT_USING_SAL) && defined(SAL_USING_POSIX))
+    #include <sys/socket.h>
+
+    #define SYSCALL_NET(f)      f
+#else
+    #define SYSCALL_NET(f)      SYSCALL_SIGN(sys_notimpl)
+#endif /* (defined(RT_USING_SAL) && defined(SAL_USING_POSIX)) */
 
 #if defined(RT_USING_DFS) && defined(ARCH_MM_MMU)
     #define SYSCALL_USPACE(f)   f
@@ -96,16 +97,10 @@ struct musl_sockaddr
     char     sa_data[14];
 };
 
-sysret_t sys_dup(int oldfd);
-sysret_t sys_dup2(int oldfd, int new);
 void lwp_cleanup(struct rt_thread *tid);
 
 #ifdef ARCH_MM_MMU
     #define ALLOC_KERNEL_STACK_SIZE 5120
-
-    sysret_t sys_futex(int *uaddr, int op, int val, void *timeout, void *uaddr2, int val3);
-    sysret_t sys_pmutex(void *umutex, int op, void *arg);
-    sysret_t sys_cacheflush(void *addr, int len, int cache);
 
     static void *kmem_get(size_t size)
     {
