@@ -2564,7 +2564,7 @@ sysret_t sys_stat(const char *file, struct stat *buf)
     }
     copy_path[copy_len] = '\0';
 
-    ret = stat(copy_path, &statbuff);
+    ret = _SYS_WRAP(stat(copy_path, &statbuff));
     rt_free(copy_path);
 
     if (ret == 0)
@@ -2572,7 +2572,7 @@ sysret_t sys_stat(const char *file, struct stat *buf)
         lwp_put_to_user(buf, &statbuff, sizeof statbuff);
     }
 
-    return (ret < 0 ? GET_ERRNO() : ret);
+    return ret;
 }
 
 sysret_t sys_notimpl(void)
