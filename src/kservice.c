@@ -1696,7 +1696,7 @@ rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
     rt_base_t level;
     void *nptr;
     kasan_poisoned(rmem);
-    rmem = TAG2PTR(rmem, SUPER_TAG);
+    rmem = rmem ? TAG2PTR(rmem, SUPER_TAG) : rmem;
     /* Enter critical zone */
     level = _heap_lock();
     /* Change the size of previously allocated memory block */

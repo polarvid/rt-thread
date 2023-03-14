@@ -155,17 +155,23 @@ static inline rt_bool_t _is_stack_overflow(void *sp, char tag)
     return RT_FALSE;
 }
 
+#ifdef RT_USING_SMART
+#define IN_KERNEL_SPACE (TAG2PTR(start, SUPER_TAG) >= (void*)KERNEL_VADDR_START)
+#else
+#define IN_KERNEL_SPACE (1)
+#endif
+
 /**
  * @brief entry of kasan address verification routine on each access (load/store)
  */
 static inline rt_bool_t _kasan_verify(void *start, rt_size_t length, rt_bool_t is_write, void *ret_addr)
 {
     rt_bool_t ok = RT_TRUE;
-    if (start && length && kasan_enable && TAG2PTR(start, SUPER_TAG) >= KERNEL_VADDR_START)
+    if (kasan_enable && start && length && IN_KERNEL_SPACE)
     {
         rt_ubase_t sp;
         __asm__ volatile("mov %0, sp":"=r"(sp));
-        rt_ubase_t super_sp = TAG2PTR(sp, SUPER_TAG);
+        void *super_sp = TAG2PTR(sp, SUPER_TAG);
         __asm__ volatile("mov sp, %0"::"r"(super_sp));
 
         char tag = PTR2TAG(start);
