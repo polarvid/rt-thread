@@ -13,6 +13,18 @@
 
 #include <rtthread.h>
 
+#ifdef RT_USING_SMART
+#define SUPER_TAG (0xfful)
+#else
+#define SUPER_TAG (0x0ul)
+#endif /* RT_USING_SMART */
+
+#define NON_TAG_WIDTH (8 * (sizeof(rt_ubase_t) - 1))
+#define NON_TAG_MASK ((1ul << NON_TAG_WIDTH) - 1)
+
+#define PTR2TAG(ptr) (((rt_ubase_t)(ptr) >> NON_TAG_WIDTH) & 0xff)
+#define TAG2PTR(ptr, tag) ((void *)(((rt_ubase_t)(ptr) & NON_TAG_MASK) | ((tag) << NON_TAG_WIDTH)))
+
 #ifdef ARCH_ENABLE_SOFT_KASAN
 
 struct rt_varea;

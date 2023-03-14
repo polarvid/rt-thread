@@ -22,18 +22,11 @@
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
-#define SUPER_TAG (0xfful)
 #define RET_ADDR (_PTR(__builtin_return_address(0)))
 #define FRAME_PTR (_PTR(__builtin_frame_address(0)))
 #define _PC ({ __label__ __here; __here: (unsigned long)&&__here; })
 #define _V2P(ptr) (rt_hw_mmu_kernel_v2p((void *)((rt_ubase_t)ptr | 0xff00000000000000)))
 #define _PTR(integer) ((void *)(integer))
-
-#define NON_TAG_WIDTH (8 * (sizeof(rt_ubase_t) - 1))
-#define NON_TAG_MASK ((1ul << NON_TAG_WIDTH) - 1)
-
-#define PTR2TAG(ptr) (((rt_ubase_t)(ptr) >> NON_TAG_WIDTH) & 0xff)
-#define TAG2PTR(ptr, tag) (((rt_ubase_t)(ptr) & NON_TAG_MASK) | ((tag) << NON_TAG_WIDTH))
 
 #define SKIP_SUPER(tag, replace) ((tag) == SUPER_TAG ? (replace) : (tag))
 
