@@ -109,6 +109,10 @@ MSH_CMD_EXPORT(rt_page_leak_trace_start, start page leak tracer);
 static void _collect()
 {
     rt_page_t page = _trace_head;
+    if (!page)
+    {
+        rt_kputs("ok!\n");
+    }
 
     while (page)
     {
@@ -150,27 +154,45 @@ static void _trace_alloc(rt_page_t page, void *caller, size_t size_bits)
     }
 }
 
+void _report(rt_page_t page, size_bits, char *msg)
+{
+    void *pg_va = rt_page_page2addr(page);
+    LOG_W("%s: %p, allocator: %p, size bits: %lx", msg, pg_va, page->caller, page->trace_size);
+    rt_kputs("backtrace\n");
+    rt_hw_backtrace(0, 0);
+}
+
 static void _trace_free(rt_page_t page, void *caller, size_t size_bits)
 {
     if (enable)
     {
-        if (page->trace_size != size_bits)
+        /* free after free */
+        if (page->trace_size == 0xabadcafe)
         {
-            LOG_E("LEAKING DETECTED: %p try to free %p with size_bits %ld instead of %ld",
-                caller, rt_page_page2addr(page), size_bits, page->trace_size);
+            _report("free after free")
+            return ;
+        }
+        else if (page->trace_size != size_bits)
+        {
+            rt_kprintf("free with size bits %lx\n", size_bits);
+            _report("incompatible size bits parameter");
+            return ;
         }
 
-        if (page->tl_prev)
-            page->tl_prev->tl_next = page->tl_next;
-        if (page->tl_next)
-            page->tl_next->tl_prev = page->tl_prev;
+        if (page->ref_cnt == 1)
+        {
+            if (page->tl_prev)
+                page->tl_prev->tl_next = page->tl_next;
+            if (page->tl_next)
+                page->tl_next->tl_prev = page->tl_prev;
 
-        if (page == _trace_head)
-            _trace_head = page->next;
+            if (page == _trace_head)
+                _trace_head = page->next;
 
-        page->tl_prev = NULL;
-        page->tl_next = NULL;
-        page->trace_size = 1234;
+            page->tl_prev = NULL;
+            page->tl_next = NULL;
+            page->trace_size = 0xabadcafe;
+        }
     }
 }
 #else
