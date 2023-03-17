@@ -919,14 +919,13 @@ static void rtthread_timer_wrapper(void *timerobj)
 
 #ifdef RT_USING_SMART
     int ret;
-
-    if (!timer->sigev_notify_function)
+    int tid = *(int *)&timer->sigev_notify_function;
+    if (!tid)
     {
         ret = lwp_kill(timer->pid, timer->sigev_signo);
     }
     else
     {
-        int tid = (rt_ubase_t)timer->sigev_notify_function;
         rt_thread_t thread = lwp_tid_get_thread(tid);
         ret = lwp_thread_kill(thread, timer->sigev_signo);
     }
