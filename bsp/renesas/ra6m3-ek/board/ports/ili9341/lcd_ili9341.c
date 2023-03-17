@@ -23,24 +23,11 @@
 _lcd_dev lcddev;
 static struct rt_spi_device *lcd_dev;
 
-static void rt_hw_spi_device_attach(const char *bus_name, const char *device_name, void *cs_Pin)
-{
-    struct rt_spi_device *spi_device;
-    RT_ASSERT(device_name != NULL && bus_name != NULL);
-    spi_device = (struct rt_spi_device *)rt_malloc(sizeof(struct rt_spi_device));
-    RT_ASSERT(spi_device != RT_NULL);
-    rt_err_t err = rt_spi_bus_attach_device(spi_device, device_name, bus_name, cs_Pin);
-    if (RT_EOK != err)
-    {
-        rt_kprintf("%s attach failed.", bus_name);
-    }
-}
-
 rt_err_t spi_lcd_init(void)
 {
     rt_err_t res = RT_EOK;
 
-    rt_hw_spi_device_attach("spi0", "spi30", (void *)LCD_CS_PIN);
+    rt_hw_spi_device_attach("spi0", "spi30", LCD_CS_PIN, RT_NULL);
     lcd_dev = (struct rt_spi_device *)rt_device_find("spi30");
     if (lcd_dev != RT_NULL)
     {
@@ -59,7 +46,6 @@ rt_err_t spi_lcd_init(void)
 
     return res;
 }
-MSH_CMD_EXPORT(spi_lcd_init, lcd_spi_init);
 
 void LCD_RESET(void)
 {
