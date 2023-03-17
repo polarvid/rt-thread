@@ -106,7 +106,9 @@ static struct pbuf *virtio_net_rx(rt_device_t dev)
 #ifdef RT_USING_SMP
             level = rt_spin_lock_irqsave(&virtio_dev->spinlock);
 #endif
-            rt_memcpy(p->payload, (void *)VIRTIO_PA2VA(queue_rx->desc[id].addr), len);
+            void *rx_map = (void *)VIRTIO_PA2VA(queue_rx->desc[id].addr);
+            rt_memcpy(p->payload, rx_map, len);
+            rt_iounmap(rx_map);
 
             queue_rx->used_idx++;
 
