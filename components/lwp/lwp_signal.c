@@ -641,6 +641,8 @@ static rt_bool_t _dequeue_info(rt_thread_t thread, siginfo_t *info, int sig)
     ksiginfo_t iter;
     ksiginfo_t candidate = RT_NULL;
 
+    /* TODO: COMPLETE siginfo list */
+    return RT_TRUE; // TODO
     rt_list_for_each_entry(iter, &_KSI(thread->siginfo_list)->node, node)
     {
         if (iter->si.si_signo == sig)
