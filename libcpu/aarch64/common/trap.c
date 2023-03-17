@@ -34,6 +34,8 @@ extern long list_thread(void);
 #include <lwp_core_dump.h>
 #endif
 
+void maping_trace_dump(rt_aspace_t aspace);
+
 void sys_exit(int value);
 void check_user_fault(struct rt_hw_exp_stack *regs, uint32_t pc_adj, char *info)
 {
@@ -46,6 +48,7 @@ void check_user_fault(struct rt_hw_exp_stack *regs, uint32_t pc_adj, char *info)
         lwp_core_dump(regs, pc_adj);
 #endif
         backtrace((unsigned long)regs->pc, (unsigned long)regs->x30, (unsigned long)regs->x29);
+        maping_trace_dump(lwp_self()->aspace);
         sys_exit(-1);
     }
 }

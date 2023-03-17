@@ -78,6 +78,10 @@ void lwp_aspace_switch(struct rt_thread *thread)
 
 void lwp_unmap_user_space(struct rt_lwp *lwp)
 {
+    void maping_tracer_stop(rt_aspace_t aspace);
+    if (lwp->trace_map)
+        maping_tracer_stop(lwp->aspace);
+    
     arch_user_space_free(lwp);
     rt_free(lwp->lwp_obj);
 }

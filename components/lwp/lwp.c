@@ -1164,6 +1164,14 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
         argc--;
         bg = 1;
     }
+    else if (argv_last[0] == '$' && argv_last[1] == '\0')
+    {
+        rt_kprintf("trace mapping\n");
+        argc--;
+        lwp->trace_map = 1;
+        void maping_tracer_start(rt_aspace_t aspace);
+        maping_tracer_start(lwp->aspace);
+    }
 
     if ((aux = lwp_argscopy(lwp, argc, argv, envp)) == RT_NULL)
     {

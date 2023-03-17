@@ -9,10 +9,12 @@
  */
 
 #include <stdio.h>
+#include "map_tracer.h"
 
 int main(void)
 {
     printf("hello rt-thread\n");
+    maping_tracer_init();
 
     return 0;
 }

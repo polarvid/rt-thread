@@ -53,6 +53,12 @@ struct mmu_level_info
     void *page;
 };
 
+typedef struct mtracer_entry {
+    void *vaddr;
+    unsigned long is_unmap;
+} *mtracer_entry_t;
+void maping_tracer_add(void *pgtbl, mtracer_entry_t entry);
+
 static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
 {
     int level;
@@ -64,6 +70,11 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
     int ref;
     int level_shift = MMU_ADDRESS_BITS;
     unsigned long *pos;
+
+    struct mtracer_entry entry;
+    entry.vaddr = v_addr;
+    entry.is_unmap = 1;
+    maping_tracer_add(lv0_tbl, &entry);
 
     rt_memset(level_info, 0, sizeof level_info);
     for (level = 0; level < MMU_TBL_LEVEL_NR; level++)
@@ -182,6 +193,11 @@ static int _kenrel_map_4K(unsigned long *lv0_tbl, void *vaddr, void *paddr,
     off &= MMU_LEVEL_MASK;
     cur_lv_tbl[off] = pa; /* page */
     rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, cur_lv_tbl + off, sizeof(void *));
+
+    struct mtracer_entry entry;
+    entry.vaddr = vaddr;
+    entry.is_unmap = 0;
+    maping_tracer_add(lv0_tbl, &entry);
     return ret;
 err:
     _kenrel_unmap_4K(lv0_tbl, (void *)va);

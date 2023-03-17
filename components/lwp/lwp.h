@@ -127,6 +127,7 @@ struct rt_lwp
     char working_directory[DFS_PATH_MAX];
     int debug;
     int background;
+    int trace_map;
     uint32_t bak_first_ins;
 
 #ifdef LWP_ENABLE_ASID
