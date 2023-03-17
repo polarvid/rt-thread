@@ -1711,7 +1711,7 @@ rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
     nptr = _MEM_REALLOC(rmem, newsize);
     /* Exit critical zone */
     _heap_unlock(level);
-    return UNPOISONED(rmem, newsize);
+    return UNPOISONED(nptr, newsize);
 }
 RTM_EXPORT(rt_realloc);
 
