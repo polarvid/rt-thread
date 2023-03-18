@@ -9,23 +9,23 @@
 #include <mm_aspace.h>
 #include <ringbuffer.h>
 
-const static size_t _trace_buf_size = 16ul << 10;
-static ring_buffer_t _trace_ring_buf;
-static void *_trace_buffer_va;
+const static size_t _map_trace_rbuf_sz = 16ul << 10;
+static ring_buffer_t _map_trace_rbuf;
+static void *_map_trace_rbuf_va;
 static int _enable;
 static rt_aspace_t watch_aspace;
 
 void maping_tracer_init(void)
 {
     void *prefer = NULL;
-    int ret = rt_aspace_map(&rt_kernel_space, &prefer, _trace_buf_size, MMU_MAP_K_RWCB, MMF_PREFETCH, &rt_mm_dummy_mapper, 0);
-    _trace_buffer_va = prefer;
+    int ret = rt_aspace_map(&rt_kernel_space, &prefer, _map_trace_rbuf_sz, MMU_MAP_K_RWCB, MMF_PREFETCH, &rt_mm_dummy_mapper, 0);
+    _map_trace_rbuf_va = prefer;
     RT_ASSERT(ret == 0);
 }
 
 void maping_tracer_start(rt_aspace_t aspace)
 {
-    ring_buffer_init(&_trace_ring_buf, _trace_buffer_va, _trace_buf_size);
+    ring_buffer_init(&_trace_ring_buf, _map_trace_rbuf_va, _map_trace_rbuf_sz);
     _enable = 1;
     watch_aspace = aspace;
     rt_kprintf("tracing start\n");
@@ -53,7 +53,7 @@ void maping_trace_dump(rt_aspace_t aspace)
 
     for (size_t i = 0; i < item; i++)
     {
-        mtracer_entry_t iter = &((mtracer_entry_t)_trace_buffer_va)[i];
+        mtracer_entry_t iter = &((mtracer_entry_t)_map_trace_rbuf_va)[i];
         rt_kprintf("%s: %p\n", iter->is_unmap ? "unmap" : "map", iter->vaddr);
     }
 }

@@ -49,6 +49,7 @@ void check_user_fault(struct rt_hw_exp_stack *regs, uint32_t pc_adj, char *info)
 #endif
         backtrace((unsigned long)regs->pc, (unsigned long)regs->x30, (unsigned long)regs->x29);
         maping_trace_dump(lwp_self()->aspace);
+        // rt_aspace_print_all(lwp_self()->aspace);
         sys_exit(-1);
     }
 }
