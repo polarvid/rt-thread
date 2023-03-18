@@ -389,7 +389,6 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
     }
     else
     {
-        void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
         maping_tracer_aspace_add(aspace, varea->start, varea->size);
         *addr = varea->start;
     }
@@ -507,7 +506,6 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             }
             else
             {
-                void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
                 maping_tracer_aspace_add(aspace, varea->start, varea->size);
             }
         }
@@ -558,7 +556,6 @@ void _aspace_unmap(rt_aspace_t aspace, void *addr, rt_size_t length)
 
     while (varea)
     {
-        void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
         maping_tracer_aspace_add(aspace, varea->start, varea->size);
         _varea_uninstall(varea);
         if (!(varea->flag & MMF_STATIC_ALLOC))

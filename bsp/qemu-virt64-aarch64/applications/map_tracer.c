@@ -10,12 +10,12 @@
 #include <ringbuffer.h>
 
 /* RING BUFFER for map tracer */
-const static size_t _map_trace_rbuf_sz = 32ul << 10;
+const static size_t _map_trace_rbuf_sz = 128ul << 10;
 static ring_buffer_t _map_trace_rbuf;
 static void *_map_trace_rbuf_va;
 
 /* RING BUFFER for aspace tracer */
-const static size_t _aspace_trace_rbuf_sz = 16ul << 10;
+const static size_t _aspace_trace_rbuf_sz = 8ul << 10;
 static ring_buffer_t _aspace_trace_rbuf;
 static void *_aspace_trace_rbuf_va;
 
