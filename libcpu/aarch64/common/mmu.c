@@ -57,7 +57,7 @@ typedef struct mtracer_entry {
     void *vaddr;
     unsigned long is_unmap;
 } *mtracer_entry_t;
-void maping_tracer_add(void *pgtbl, mtracer_entry_t entry);
+void maping_tracer_mmu_add(void *pgtbl, mtracer_entry_t entry);
 
 static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
 {
@@ -74,7 +74,7 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
     struct mtracer_entry entry;
     entry.vaddr = v_addr;
     entry.is_unmap = 1;
-    maping_tracer_add(lv0_tbl, &entry);
+    maping_tracer_mmu_add(lv0_tbl, &entry);
 
     rt_memset(level_info, 0, sizeof level_info);
     for (level = 0; level < MMU_TBL_LEVEL_NR; level++)
@@ -197,7 +197,7 @@ static int _kenrel_map_4K(unsigned long *lv0_tbl, void *vaddr, void *paddr,
     struct mtracer_entry entry;
     entry.vaddr = vaddr;
     entry.is_unmap = 0;
-    maping_tracer_add(lv0_tbl, &entry);
+    maping_tracer_mmu_add(lv0_tbl, &entry);
     return ret;
 err:
     _kenrel_unmap_4K(lv0_tbl, (void *)va);
@@ -602,17 +602,17 @@ void *rt_hw_mmu_v2p(rt_aspace_t aspace, void *v_addr)
 {
     int level_shift;
     unsigned long paddr;
-    unsigned long *pte = _query(aspace, v_addr, &level_shift);
+        unsigned long *pte = _query(aspace, v_addr, &level_shift);
 
-    if (pte)
-    {
-        paddr = *pte & MMU_ADDRESS_MASK;
-        paddr |= (uintptr_t)v_addr & ((1ul << level_shift) - 1);
-    }
-    else
-    {
-        paddr = (unsigned long)ARCH_MAP_FAILED;
-    }
+        if (pte)
+        {
+            paddr = *pte & MMU_ADDRESS_MASK;
+            paddr |= (uintptr_t)v_addr & ((1ul << level_shift) - 1);
+        }
+        else
+        {
+            paddr = (unsigned long)ARCH_MAP_FAILED;
+        }
     return (void *)paddr;
 }
 

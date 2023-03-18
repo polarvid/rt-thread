@@ -19,9 +19,16 @@ typedef struct mtracer_entry {
     unsigned long is_unmap;
 } *mtracer_entry_t;
 
+typedef struct mtracer_aspace_entry {
+    void *vaddr;
+    unsigned long size;
+    void *backtrace[14];
+} *mtracer_aspace_entry_t;
+
 void maping_tracer_init(void);
 void maping_tracer_start(rt_aspace_t aspace);
-void maping_tracer_add(void *pgtbl, mtracer_entry_t entry);
+void maping_tracer_mmu_add(void *pgtbl, mtracer_entry_t entry);
+void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
 void maping_tracer_stop(rt_aspace_t aspace);
 void maping_trace_dump(rt_aspace_t aspace);
 

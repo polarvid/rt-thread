@@ -34,7 +34,7 @@ extern long list_thread(void);
 #include <lwp_core_dump.h>
 #endif
 
-void maping_trace_dump(rt_aspace_t aspace);
+#include <map_tracer.h>
 
 void sys_exit(int value);
 void check_user_fault(struct rt_hw_exp_stack *regs, uint32_t pc_adj, char *info)

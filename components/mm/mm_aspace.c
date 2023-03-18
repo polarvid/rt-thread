@@ -160,12 +160,12 @@ static int _do_named_map(rt_aspace_t aspace, void *vaddr, rt_size_t length,
     void *phyaddr = (void *)(offset << MM_PAGE_SHIFT);
     while (vaddr != end)
     {
-        /* TODO try to map with huge TLB, when flag & HUGEPAGE */
+    /* TODO try to map with huge TLB, when flag & HUGEPAGE */
         rt_size_t pgsz = ARCH_PAGE_SIZE;
         void *ret = rt_hw_mmu_map(aspace, vaddr, phyaddr, pgsz, attr);
-        if (ret == RT_NULL)
-        {
-            err = -RT_ERROR;
+    if (ret == RT_NULL)
+    {
+        err = -RT_ERROR;
             break;
         }
         vaddr += pgsz;
@@ -343,6 +343,8 @@ static inline int _not_support(rt_size_t flags)
     return flags & ~(support_ops | _MMF_ALIGN_MASK);
 }
 
+#include <map_tracer.h>
+
 int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
                   rt_size_t attr, mm_flag_t flags, rt_mem_obj_t mem_obj,
                   rt_size_t offset)
@@ -387,6 +389,8 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
     }
     else
     {
+        void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
+        maping_tracer_aspace_add(aspace, varea->start, varea->size);
         *addr = varea->start;
     }
     return err;
@@ -501,6 +505,11 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             {
                 rt_free(varea);
             }
+            else
+            {
+                void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
+                maping_tracer_aspace_add(aspace, varea->start, varea->size);
+            }
         }
         else
         {
@@ -549,6 +558,8 @@ void _aspace_unmap(rt_aspace_t aspace, void *addr, rt_size_t length)
 
     while (varea)
     {
+        void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size);
+        maping_tracer_aspace_add(aspace, varea->start, varea->size);
         _varea_uninstall(varea);
         if (!(varea->flag & MMF_STATIC_ALLOC))
         {
