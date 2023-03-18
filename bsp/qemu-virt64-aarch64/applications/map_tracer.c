@@ -4,7 +4,7 @@
  */
 #include "map_tracer.h"
 #include "mm_flag.h"
-#include "rtdef.h"
+#include <rtthread.h>
 #include <mmu.h>
 #include <mm_aspace.h>
 #include <ringbuffer.h>
@@ -23,12 +23,17 @@ static void *_aspace_trace_rbuf_va;
 static int _enable;
 static rt_aspace_t watch_aspace;
 
+/* SPIN LOCK */
+static struct rt_spinlock rbuf_spinlock;
+
 static int _backtrace_skipn(int level, void *buf[], int slot_cnt);
 
 void maping_tracer_init(void)
 {
     void *prefer = NULL;
     int ret;
+    rt_spin_lock_init(&rbuf_spinlock);
+
     ret = rt_aspace_map(&rt_kernel_space, &prefer, _map_trace_rbuf_sz, MMU_MAP_K_RWCB, MMF_PREFETCH, &rt_mm_dummy_mapper, 0);
     _map_trace_rbuf_va = prefer;
     RT_ASSERT(ret == 0);
@@ -54,7 +59,9 @@ void maping_tracer_mmu_add(void *pgtbl, mtracer_entry_t entry)
     if (!_enable || watch_aspace->page_table != pgtbl)
         return ;
 
+    rt_spin_lock(&rbuf_spinlock);
     ring_buffer_queue_arr(&_map_trace_rbuf, (void *)entry, sizeof(struct mtracer_entry));
+    rt_spin_unlock(&rbuf_spinlock);
 }
 
 #define BACKTRACE_SLOT (sizeof(struct mtracer_aspace_entry)/sizeof(void *))
@@ -70,7 +77,9 @@ void maping_tracer_aspace_add(rt_aspace_t aspace, void *vaddr, size_t size)
     entry.vaddr = vaddr;
     _backtrace_skipn(1, entry.backtrace, BACKTRACE_SLOT);
 
+    rt_spin_lock(&rbuf_spinlock);
     ring_buffer_queue_arr(&_aspace_trace_rbuf, (void *)&entry, sizeof(entry));
+    rt_spin_unlock(&rbuf_spinlock);
 }
 
 void _dump_backtrace(mtracer_aspace_entry_t entry)
