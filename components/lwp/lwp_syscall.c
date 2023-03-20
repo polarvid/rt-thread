@@ -1269,14 +1269,9 @@ rt_err_t sys_timer_create(clockid_t clockid, struct sigevent *restrict sevp, tim
 
     ret = _SYS_WRAP(timer_create(clockid, &sevp_k, &timerid_k));
 
-    ret = _SYS_WRAP(timer_create(clockid, &sevp_k, &timerid_k));
-
-    /* ID should not extend 32-bits size for libc */
-    RT_ASSERT((rt_ubase_t)timerid_k < UINT32_MAX);
-    utimer = (rt_ubase_t)timerid_k;
-
     if (ret != -RT_ERROR)
     {
+        utimer = (rt_ubase_t)timerid_k;
         if (!lwp_put_to_user(sevp, (void *)&sevp_k, sizeof(struct ksigevent)) ||
             !lwp_put_to_user(timerid, (void *)&utimer, sizeof(utimer)))
             ret = -EINVAL;

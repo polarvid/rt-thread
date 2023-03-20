@@ -266,7 +266,7 @@ static rt_err_t nrf5x_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
         case NRFX_ERROR_NO_MEM:
             return RT_ENOMEM;
         default:
-            return RT_ERROR;
+            return -RT_ERROR;
     }
 }
 
@@ -356,7 +356,7 @@ const static struct rt_pin_ops _nrf5x_pin_ops =
     RT_NULL,
 };
 
-int rt_hw_pin_init(void)
+rt_err_t rt_hw_pin_init(void)
 {
     nrfx_err_t err_code;
 
@@ -366,11 +366,11 @@ int rt_hw_pin_init(void)
     switch(err_code)
     {
         case NRFX_ERROR_INVALID_STATE:
-            return RT_EINVAL;
+            return -RT_EINVAL;
         case NRFX_SUCCESS:
             return RT_EOK;
         default:
-            return RT_ERROR;;
+            return -RT_ERROR;;
     }
 
 }
