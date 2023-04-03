@@ -1,0 +1,15 @@
+Import('rtconfig')
+from building import *
+
+cwd     = GetCurrentDir()
+src     = []
+CPPPATH = [cwd]
+
+if GetDepend(['TRACING_FTRACE']):
+    src += ['ftrace.c']
+if GetDepend(['TRACING_KSYMTBL']):
+    src += ['ksymtbl.c']
+
+group = DefineGroup('tracing', src, depend = ['RT_USING_TRACING'], CPPPATH = CPPPATH)
+
+Return('group')

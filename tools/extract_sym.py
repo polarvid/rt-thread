@@ -25,6 +25,17 @@ class SymbolEntry:
         self.line = line
         self.section = section
 
+    # oft_idx: index in addr.offset table
+    def set_oft_idx(self, idx:int):
+        self.__oft_idx = idx
+    def get_oft_idx(self):
+        return self.__oft_idx
+    # syt_idx: index in symbol.offset table
+    def set_syt_idx(self, idx:int):
+        self.__syt_idx = idx
+    def get_syt_idx(self):
+        return self.__syt_idx
+
 """
 BLOB generator
 This will build the 6 sections of BLOB with the compile() method
@@ -42,13 +53,13 @@ To accelerate the process of implementation, we sorted the symbols and
 address which give us a chance to choose a log(n) searching algorithm.
 Now it looks like:
 {ordering_sym_idx} -> {symbol} -> {address}
-{ordering_addr_idx} -> {address} -> {symbol}
+{ordering_oft_idx} -> {address} -> {symbol}
 
 Now we have to save some space in RAM. This is done by modifying address
 to an offset by `text_base` and symbol to an offset to `string_section`
 Finally we get 4 mappings:
 {ordering_sym_idx} -> {symbol.offset} -> {address.offset}
-{ordering_addr_idx} -> {address.offset} -> {symbol.offset}
+{ordering_oft_idx} -> {address.offset} -> {symbol.offset}
 {address} -> {address.offset}
 {symbol} -> {symbol.offset}
 
@@ -115,17 +126,37 @@ So there is a compile time processing to dealing with it
 class MapInfo:
     def __init__(self):
         self.entry_list = []
+        # symbol as key, for entry
+        self.__symbol_to_entry = {}
+        # base as key, for value
         self.__oft_str_dict = {}
+        self.__section_entries_dict = {}
+        self.__section_symbols_dict = {}
+        self.__section_str_sec_sz_dict = {}
 
     def __oft_str_insert(self, base, offset):
         oft_str = '0x{0:x},\n'.format(offset)
         if base in self.__oft_str_dict:
             self.__oft_str_dict[base] += oft_str
         else:
-            self.__oft_str_dict[base] = '\n' + oft_str + ',\n'
+            self.__oft_str_dict[base] = '\n' + oft_str
+    def __section_entries_insert(self, base, entry):
+        if base in self.__section_entries_dict:
+            self.__section_entries_dict[base].append(entry)
+        else:
+            self.__section_entries_dict[base] = [entry]
+    def __section_symbols_insert(self, base, symbol):
+        if base in self.__section_symbols_dict:
+            self.__section_symbols_dict[base].append(symbol)
+        else:
+            self.__section_symbols_dict[base] = [symbol]
+    def __section_str_sec_size_set(self, base, str_sec_sz):
+        self.__section_str_sec_sz_dict[base] = str_sec_sz
 
     def compile(self):
-        # 1. compile offset table (assuming entry_list in asc order)
+        # TODO: we only deal with the 4G section first text entry located currently
+        first_text_base = None
+        # 1. compile offset table (assuming entry_list in asc order(sorted by address))
         for entry in self.entry_list:
             entry:SymbolEntry
             # 1.1. build offset table in ascending order
@@ -133,67 +164,137 @@ class MapInfo:
             offset = addr & 0xffffffff
             base = addr & 0xffffffff00000000
             self.__oft_str_insert(base, offset)
+            # 1.2. build entry list for each section (4G based)
+            self.__section_entries_insert(base, entry)
+            if not first_text_base and entry.class_char.upper() == 'T':
+                first_text_base = base
+                self.__first_text_base = base
+            # 1.3. prepare symbol list for compiling symbol tables
+            self.__section_symbols_insert(base, entry)
+            # 1.4. record the oft_idx in entry
+            entry.set_oft_idx(len(self.__section_entries_dict[base]))
 
+        # TODO: we only deal with the 4G section first text entry located currently
+        self.__oft_str = self.__oft_str_dict[base]
+
+        # 2. compile symbol table & string section
+        # The 2 describe all symbols in ascending order in simply
         syt_str = '\n'
         str_str = ''
         offset = 0
-        # 2. compile symbol table & string section
-        # The 2 describe all symbols in ascending order in simply
-        all_symbols_asc = sorted(all_symbols)
+        # TODO: we only deal with the 4G section first text entry located currently
+        sec_symbols_asc = sorted(self.__section_symbols_dict[base], key=lambda x: x.symbol)
         str_off_list = []   # {idx} -> {str_off_to_string_section_base}
                             # e.g. string0 = (char *)(str_base + str_off_list[0])
                             # this will be store in symbol table section
-        for symbol in all_symbols_asc:
+
+        sym_2_off_list = [] # {idx} -> {offset_of_symbol}
+        for entry in sec_symbols_asc:
+            entry:SymbolEntry
+            symbol = entry.symbol
             # 2.1. append entry symbol table
             str_off_list.append(offset)
 
             # 2.2. entry for the string section
-            sym_entry_str = '{0}\\0'.format(symbol)
+            sym_entry_str = '{0}{1}\0'.format(entry.class_char, symbol)
             offset += len(sym_entry_str)    # next entry in symbol table
             str_str += sym_entry_str
 
+            # 2.3. record index in syt
+            entry.set_syt_idx(len(sym_2_off_list))
+
+            # 2.4. build S2O list
+            sym_2_off_list.append(entry.get_oft_idx())
+
         # 2.3. convert symbol table to array of uint32_t
-        if len(str_off_list) % 2 != 0:
-            # padding to '\0' if the length of array is odd
-            str_off_list.append(offset - 1)
-        for i in range(0, len(str_off_list), 2):
-            syt_str += 'MERGE(0x{0:x}, 0x{1:x}),\n'.format(str_off_list[i], str_off_list[i + 1])
+        for i in range(0, len(str_off_list)):
+            syt_str += '0x{0:x},\n'.format(str_off_list[i])
 
         # 2.4. convert string section to array of uint32_t
         bytes = bytearray(str_str, 'utf-8')
         str_str = ''
-        remainder = 4 - len(bytes) % 4
+        remainder = (4 - len(bytes) % 4) % 4
         while remainder > 0:
             # padding with '\0'
             bytes.append(0)
             remainder -= 1
+        # record string section size of current section
+        self.__section_str_sec_size_set(first_text_base, len(bytes))
         for i in range(0, len(bytes), 4):
             value32 = bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24
             str_str += '0x{0:x},\n'.format(value32)
 
+        # 3. compile the S2O mapping
+        if len(sym_2_off_list) % 2 != 0:
+            # padding to '\0' if the length of array is odd
+            sym_2_off_list.append(0x0)
+        s2o_str = ''
+        for i in range(0, len(sym_2_off_list), 2):
+            s2o_str += 'MERGE(0x{0:x}, 0x{1:x}),\n'.format(sym_2_off_list[i], sym_2_off_list[i + 1])
+        
+        # 4. compile the O2S mapping
+        off_2_sym_list = []
+        for entry in self.__section_entries_dict[base]:
+            off_2_sym_list.append(entry.get_syt_idx())
+        if len(off_2_sym_list) % 2 != 0:
+            # padding to '\0' if the length of array is odd
+            off_2_sym_list.append(0x0)
+        o2s_str = ''
+        for i in range(0, len(off_2_sym_list), 2):
+            o2s_str += 'MERGE(0x{0:x}, 0x{1:x}),\n'.format(off_2_sym_list[i], off_2_sym_list[i + 1])
 
+        self.__s2o_str = s2o_str
         self.__syt_str = syt_str
         self.__str_str = str_str
+        self.__o2s_str = o2s_str
+    # TODO: we only deal with the 4G section first text entry located currently
+    def get_first_text_base(self) -> int:
+        return self.__first_text_base
+    # TODO: we only deal with the 4G section first text entry located currently
+    def get_string_section_size(self) -> int:
+        return self.__section_str_sec_sz_dict[self.__first_text_base]
+    # TODO: we only deal with the 4G section first text entry located currently
+    def get_symbol_count(self) -> int:
+        return len(self.__section_symbols_dict[self.__first_text_base])
+
     def get_offset_table(self):
         return self.__oft_str
     def get_symbol_table(self):
         return self.__syt_str
     def get_string_section(self):
         return self.__str_str
+    def get_s2o_str(self):
+        return self.__s2o_str
+    def get_o2s_str(self):
+        return self.__o2s_str
     def get_string(self):
         return self.__str_str
-    def get_symbol_count(self) -> int:
-        return len(self.entry_list)
     def debug_gen_symbols(self):
         return ''
 
-def acceptable_entry(entry:SymbolEntry):
-    # skip absolute class
-    class_char = entry.class_char
-    if class_char.upper() == 'A':
-        return False
+"""
+Symbol Filter
+"""
+class SymbolFilter:
+    def __init__(self):
+        import re
+        # the regexp that rejected
+        self.ignore_rule = [
+            re.compile(r'__FUNCTION__\.\d+'),
+            # re.compile(r'__func__\.\d+'),
+        ]
+    def acceptable_entry(self, entry:SymbolEntry):
+        import re
+        # skip absolute class
+        class_char = entry.class_char
+        if class_char.upper() in ['A', 'D', 'B']:
+            return False
+        for rule in self.ignore_rule:
+            rule:re.Pattern
+            if rule.match(entry.symbol):
+                return False
+        return True
 
-    return True
 """
 Compile a .map file by MapInfo() & generate header file to C compiler
 """
@@ -219,6 +320,7 @@ def extract_sym(file_path):
         # list of `BlockEntry` which represent the block and storage
         # the message we are interested in
         separator_regex = re.compile(r'\|')
+        filter = SymbolFilter()
 
         while True:
             # read one block
@@ -237,7 +339,7 @@ def extract_sym(file_path):
                                     size=entry[4].strip(),
                                     line=entry[5].strip(),
                                     section=entry[6].strip())
-                if acceptable_entry(block):
+                if filter.acceptable_entry(block):
                     map_info.entry_list.append(block)
 
         # 4. generate BLOB
@@ -255,8 +357,8 @@ def extract_sym(file_path):
 #define FLOOR(val) (((size_t)(val) + (ALIGN_REQ)-1) & ~((ALIGN_REQ)-1))
 #define SYMBOL_CNT {symbol_cnt_src}
 
-// 8 entry in header (fixed size)
-#define HEADER_SZ (8 * sizeof(uint32_t))
+// 10 entry in header (fixed size)
+#define HEADER_SZ (10 * sizeof(uint32_t))
 
 // maximum acceptable idx is 2^16(=64k)
 #define O2S_SZ (SYMBOL_CNT * sizeof(uint16_t))
@@ -273,10 +375,15 @@ def extract_sym(file_path):
 uint32_t
 __attribute__((section(".ksymtbl")))
 ksymtbl_blob[] = {{
+    // MAGIC NUMBER
     {magic_src},
+    // SYMBOLS COUNTS
     {symbol_cnt_src},
-    0x{string_size:x},
+    // TOTAL SIZE
+    OFF_STR + 0x{string_size:x},
+    // OFFSET BASE LOW
     0x{offset_baselo_src:x},
+    // OFFSET BASE HIGH
     0x{offset_basehi_src:x},
 
     OFF_O2S, // offset to `offset_to_sym` section
@@ -300,22 +407,20 @@ ksymtbl_blob[] = {{
         map_info.compile()
         # 4.1 generate header with magic number, symbol_cnt and offset of five sections
         magic_src = '0x20233202'
-        offset_baselo = map_info.text_base & 0xffffffff
-        offset_basehi = (map_info.text_base - offset_baselo) >> 32
+        base = map_info.get_first_text_base()
+        offset_baselo = base & 0xffffffff
+        offset_basehi = (base - offset_baselo) >> 32
         # 4.2 generate other symbols
-        oft_str = map_info.get_offset_table()
-        syt_str = map_info.get_symbol_table()
-        str_str = map_info.get_string_section()
-
         print(wrap_src.format(magic_src=magic_src,
                             symbol_cnt_src=map_info.get_symbol_count(),
+                            string_size=map_info.get_string_section_size(),
                             offset_baselo_src=offset_baselo,
                             offset_basehi_src=offset_basehi,
-                            o2s_str='0,',
-                            s2o_str='0,',
-                            oft_str=oft_str,
-                            syt_str=syt_str,
-                            str_str=str_str))
+                            o2s_str=map_info.get_o2s_str(),
+                            s2o_str=map_info.get_s2o_str(),
+                            oft_str=map_info.get_offset_table(),
+                            syt_str=map_info.get_symbol_table(),
+                            str_str=map_info.get_string_section()))
 
 if __name__ == "__main__":
     import sys

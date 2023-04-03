@@ -52,7 +52,19 @@ SECTIONS
     }
 
     __rodata_start = .;
-    .rodata   : { *(.rodata) *(.rodata.*) }
+    .rodata :
+    {
+        *(.rodata)
+        *(.rodata.*)
+
+        . = ALIGN(8);
+        __patchable_function_entries_start = .;
+        KEEP(*(__patchable_function_entries))
+        __patchable_function_entries_end = .;
+
+        __ksymtbl_blob = .;
+        KEEP(*(.ksymtbl))
+    }
     __rodata_end = .;
 
     . = ALIGN(8);
