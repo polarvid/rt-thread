@@ -1,10 +1,11 @@
-menu "Tracing Support"
+menu "Kernel Tracing Support"
 
 config RT_USING_TRACING
     bool "Enable tracing feature inside kernel"
     default n
 
     if RT_USING_TRACING
+
         config TRACING_FTRACE
         bool "Enable function tracing"
         select TRACING_KSYMTBL

@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  extract kernel symbols from ksymtbl BLOB
  */
 #include "ksymtbl.h"
+#include "internal.h"
 #include "rtthread.h"
 
 struct ksymtbl {
@@ -27,48 +28,29 @@ struct ksymtbl {
 
 extern void *__ksymtbl_blob;
 static struct ksymtbl *ksymtbl = (struct ksymtbl *)&__ksymtbl_blob;
+#define OFT_ORDER (2)
 
-#define GET_SECTION(sec)        ((void *)ksymtbl + ksymtbl->sec)
-#define OBJIDX_TO_OFFSET(idx)   (arr + ((idx) << objsz_order))
-#define OFT_ORDER               (2)
-
-static long _search(void *arr, long objcnt, long objsz_order, void *target, int (*cmp)(const void *, const void *))
-{
-    long left = 0;
-    long right = objcnt - 1;
-
-    while (left <= right)
-    {
-        long mid = left + (right - left) / 2;
-        int cmp_result = cmp(OBJIDX_TO_OFFSET(mid), target);
-
-        if (cmp_result == 0)
-        {
-            return mid;
-        }
-        else if (cmp_result < 0)
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            right = mid - 1;
-        }
-    }
-    return -1;
-}
-
-static int _compare_address(const void *a, const void *b)
+static int _compare_addroff(const void *a, const void *b)
 {
     rt_uint32_t aa = *(rt_uint32_t *)a;
     rt_uint32_t bb = *(rt_uint32_t *)b;
     return aa == bb ? 0 : (aa > bb ? 1 : -1);
 }
 
+rt_inline int _is_kernel_text(void *address)
+{
+    extern void *__text_end;
+    extern void *__text_start;
+    return address >= (void *)&__text_start && address < (void *)&__text_end;
+}
+
 int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, size_t bufsz, rt_ubase_t *size, char *class_char)
 {
     int oft_idx;
     int syt_idx;
+    if (!_is_kernel_text(address))
+        return -1;
+
     rt_ubase_t base = (ksymtbl->base_low |
                         ((rt_ubase_t)ksymtbl->base_high << 32));
     RT_ASSERT(base == ((rt_ubase_t)address & 0xffffffff00000000));
@@ -80,11 +62,16 @@ int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, 
     
     /* find oft_idx */
     oft_idx =
-        _search(oft, ksymtbl->symbol_counts, OFT_ORDER, &offset, _compare_address);
-    if (oft_idx < 0)
-        return -1;
+        tracing_binary_search(oft, ksymtbl->symbol_counts, OFT_ORDER, &offset, _compare_addroff);
 
-    RT_ASSERT((void *)base + oft[oft_idx] == address);
+    if (oft_idx < 0)
+    {
+        return -1;
+    }
+
+    RT_ASSERT((void *)base + oft[oft_idx] <= address);
+    RT_ASSERT(oft_idx < ksymtbl->symbol_counts && (void *)base + oft[oft_idx + 1] >= address);
+
     /* find syt_idx */
     syt_idx = off2sym[oft_idx];
     size_t str_off = symbol_table[syt_idx];
@@ -103,27 +90,27 @@ int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, 
     return 0;
 }
 
-static void _dump_all_symbols_symasc(void)
-{
-    rt_ubase_t base = (ksymtbl->base_low |
-                        ((rt_ubase_t)ksymtbl->base_high << 32));
+// static void _dump_all_symbols_symasc(void)
+// {
+//     rt_ubase_t base = (ksymtbl->base_low |
+//                         ((rt_ubase_t)ksymtbl->base_high << 32));
 
-    const size_t counts = ksymtbl->symbol_counts;
-    char *iter = GET_SECTION(off_str);
-    rt_uint32_t *symbol_table = GET_SECTION(off_syt);
-    rt_uint16_t *sym2off = GET_SECTION(off_s2o);
-    rt_uint32_t *offset_table = GET_SECTION(off_oft);
+//     const size_t counts = ksymtbl->symbol_counts;
+//     char *iter = GET_SECTION(off_str);
+//     rt_uint32_t *symbol_table = GET_SECTION(off_syt);
+//     rt_uint16_t *sym2off = GET_SECTION(off_s2o);
+//     rt_uint32_t *offset_table = GET_SECTION(off_oft);
 
-    for (size_t i = 0; i < counts; i++)
-    {
-        rt_ubase_t off_idx = sym2off[i];
-        rt_ubase_t addr = base + offset_table[off_idx];
-        size_t str_off = symbol_table[i];
-        char *pclass = &iter[str_off];
-        char *symbol = &iter[str_off + 1];
-        rt_kprintf("%lx %c %s\n", addr, *pclass, symbol);
-    }
-}
+//     for (size_t i = 0; i < counts; i++)
+//     {
+//         rt_ubase_t off_idx = sym2off[i];
+//         rt_ubase_t addr = base + offset_table[off_idx];
+//         size_t str_off = symbol_table[i];
+//         char *pclass = &iter[str_off];
+//         char *symbol = &iter[str_off + 1];
+//         rt_kprintf("%lx %c %s\n", addr, *pclass, symbol);
+//     }
+// }
 
 static void _dump_all_symbols_offasc(void)
 {
