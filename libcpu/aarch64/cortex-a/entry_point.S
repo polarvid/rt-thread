@@ -155,7 +155,7 @@ __start:
     ret
 
 after_mmu_enable:
-#ifdef RT_USING_SMART
+#if 0
     mrs x0, tcr_el1          /* disable ttbr0, only using kernel space */
     orr x0, x0, #(1 << 7)
     msr tcr_el1, x0
@@ -273,7 +273,7 @@ _secondary_cpu_entry:
     ret
 
 after_mmu_enable_cpux:
-#ifdef RT_USING_SMART
+#if 0
     mrs x0, tcr_el1          /* disable ttbr0, only using kernel space */
     orr x0, x0, #(1 << 7)
     msr tcr_el1, x0

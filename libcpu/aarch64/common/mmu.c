@@ -337,7 +337,6 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
     rt_page_cleanup();
 }
 
-
 #ifdef RT_USING_SMART
 static inline void _init_region(void *vaddr, size_t size)
 {
@@ -444,6 +443,8 @@ struct page_table
     unsigned long page[512];
 };
 
+rt_align(4096) static char _free_pages[ARCH_PAGE_SIZE * 32];
+void early_printhex(rt_ubase_t number);
 static struct page_table *__init_page_array;
 static unsigned long __page_off = 0UL;
 unsigned long get_free_page(void)
@@ -451,10 +452,9 @@ unsigned long get_free_page(void)
     if (!__init_page_array)
     {
         unsigned long temp_page_start;
-        asm volatile("mov %0, sp" : "=r"(temp_page_start));
-        __init_page_array =
-            (struct page_table *)(temp_page_start & ~(ARCH_SECTION_MASK));
-        __page_off = 2; /* 0, 1 for ttbr0, ttrb1 */
+        temp_page_start = (size_t)&_free_pages;
+        __init_page_array = (struct page_table *)temp_page_start;
+        // __page_off = 2; /* 0, 1 for ttbr0, ttrb1 */
     }
     __page_off++;
     return (unsigned long)(__init_page_array[__page_off - 1].page);
@@ -675,6 +675,17 @@ int rt_hw_mmu_control(struct rt_aspace *aspace, void *vaddr, size_t size,
     return err;
 }
 
+static void *io_tbl;
+
+int rt_hw_early_ioremap(void *paddr, rt_size_t size)
+{
+    unsigned long addr = (unsigned long)paddr & ~ARCH_SECTION_MASK;
+    unsigned long off = (unsigned long)paddr & ARCH_SECTION_MASK;
+    unsigned long count = (size + off + ARCH_SECTION_MASK) >> ARCH_SECTION_SHIFT;
+    unsigned long attr = MMU_MAP_CUSTOM(MMU_AP_KAUN, DEVICE_MEM);
+    return _init_map_2M(io_tbl, addr, addr, count, attr);
+}
+
 void rt_hw_mem_setup_early(unsigned long *tbl0, unsigned long *tbl1,
                            unsigned long size, unsigned long pv_off)
 {
@@ -682,6 +693,7 @@ void rt_hw_mem_setup_early(unsigned long *tbl0, unsigned long *tbl1,
 
     /* setup pv off */
     rt_kmem_pvoff_set(pv_off);
+    io_tbl = tbl0;
 
     unsigned long va = KERNEL_VADDR_START;
     unsigned long count = (size + ARCH_SECTION_MASK) >> ARCH_SECTION_SHIFT;
@@ -701,4 +713,8 @@ void rt_hw_mem_setup_early(unsigned long *tbl0, unsigned long *tbl1,
     {
         while (1);
     }
+
+    // extern void *earlycon_base;
+    // extern size_t earlycon_size;
+    // rt_hw_early_ioremap(earlycon_base, earlycon_size);
 }
