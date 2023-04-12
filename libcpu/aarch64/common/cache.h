@@ -29,7 +29,6 @@ static inline void rt_hw_icache_invalidate_all(void)
     __asm__ volatile ("isb");
 }
 
-void rt_hw_icache_invalidate_range(unsigned long start_addr, int size);
 void rt_hw_cpu_icache_invalidate(void *addr, rt_size_t size);
 void rt_hw_cpu_dcache_clean_and_invalidate(void *addr, rt_size_t size);
 

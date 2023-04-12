@@ -206,7 +206,7 @@ static rt_err_t nrf5x_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
     index = get_pin(pin);
     if (index == RT_NULL)
     {
-        return RT_ENOSYS;
+        return -RT_ENOSYS;
     }
 
     irq_quantity = ITEM_NUM(pin_irq_hdr_tab);
@@ -225,7 +225,7 @@ static rt_err_t nrf5x_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
     }
     if(irqindex == -1)
     {
-        return RT_ENOMEM;
+        return -RT_ENOMEM;
     }
 
     level = rt_hw_interrupt_disable();
@@ -260,11 +260,11 @@ static rt_err_t nrf5x_pin_attach_irq(struct rt_device *device, rt_int32_t pin,
     switch(err_code)
     {
         case NRFX_ERROR_BUSY:
-            return RT_EBUSY;
+            return -RT_EBUSY;
         case NRFX_SUCCESS:
             return RT_EOK;
         case NRFX_ERROR_NO_MEM:
-            return RT_ENOMEM;
+            return -RT_ENOMEM;
         default:
             return -RT_ERROR;
     }
@@ -280,7 +280,7 @@ static rt_err_t nrf5x_pin_dettach_irq(struct rt_device *device, rt_int32_t pin)
     index = get_pin(pin);
     if (index == RT_NULL)
     {
-        return RT_ENOSYS;
+        return -RT_ENOSYS;
     }
 
     irq_quantity = ITEM_NUM(pin_irq_hdr_tab);
@@ -300,7 +300,7 @@ static rt_err_t nrf5x_pin_dettach_irq(struct rt_device *device, rt_int32_t pin)
     }
     if(i >= irq_quantity)
     {
-        return RT_ENOSYS;
+        return -RT_ENOSYS;
     }
     return RT_EOK;
 }
@@ -316,7 +316,7 @@ static rt_err_t nrf5x_pin_irq_enable(struct rt_device *device, rt_base_t pin,
     index = get_pin(pin);
     if (index == RT_NULL)
     {
-        return RT_ENOSYS;
+        return -RT_ENOSYS;
     }
 
     irq_quantity = ITEM_NUM(pin_irq_hdr_tab);
@@ -340,7 +340,7 @@ static rt_err_t nrf5x_pin_irq_enable(struct rt_device *device, rt_base_t pin,
 
     if(i >= irq_quantity)
     {
-        return RT_ENOSYS;
+        return -RT_ENOSYS;
     }
     return RT_EOK;
 }
