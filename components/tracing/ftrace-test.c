@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 #include <rtthread.h>
+#include "arch/aarch64.h"
 #include "ftrace.h"
 #include "internal.h"
 
@@ -21,6 +22,8 @@ static void _debug_test_fn(char *str)
 static int handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     const struct ftrace_context*ctx = context;
+
+    rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
     rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
     for (int i = 0; i < FTRACE_REG_CNT; i += 2)
         rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);

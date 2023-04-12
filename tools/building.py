@@ -367,7 +367,7 @@ def PrepareBuilding(env, root_directory, has_libcpu=False, remove_components = [
 
     # add tracing option for gcc(& clang in the future)
     if GetDepend('TRACING_FTRACE') and rtconfig.PLATFORM in ['gcc']:
-        TRACE_CONFIG = " -fpatchable-function-entry=1"
+        TRACE_CONFIG = " -fpatchable-function-entry=5,3"
         env.Append(CFLAGS=TRACE_CONFIG, CXXFLAGS=TRACE_CONFIG)
 
     # we need to seperate the variant_dir for BSPs and the kernels. BSPs could

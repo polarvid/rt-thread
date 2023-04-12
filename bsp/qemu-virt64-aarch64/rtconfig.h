@@ -60,6 +60,7 @@
 #define RT_CONSOLEBUF_SIZE 256
 #define RT_CONSOLE_DEVICE_NAME "uart0"
 #define RT_VER_NUM 0x50000
+#define RT_USING_STDC_ATOMIC
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
 #define RT_USING_HW_ATOMIC
@@ -175,7 +176,7 @@
 /* Socket is in the 'Network' category */
 
 
-/* Tracing Support */
+/* Kernel Tracing Support */
 
 #define RT_USING_TRACING
 #define TRACING_FTRACE

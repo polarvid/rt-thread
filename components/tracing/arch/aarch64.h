@@ -32,6 +32,7 @@
 #ifndef __ASSEMBLY__
 
 #include <rtthread.h>
+#include <sys/time.h>
 
 #define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 3 * 4))
 #define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 3 * 4))
@@ -40,6 +41,18 @@
 struct ftrace_context {
     rt_ubase_t args[FTRACE_REG_CNT];
 };
+
+rt_inline rt_ubase_t ftrace_timestamp(void)
+{
+    rt_ubase_t freq;
+    rt_ubase_t clock;
+
+    __asm__ volatile("mrs %0, cntfrq_el0":"=r"(freq));
+    __asm__ volatile("mrs %0, cntpct_el0":"=r"(clock));
+
+    clock = (clock * NANOSECOND_PER_SECOND) / freq;
+    return clock;
+}
 
 #else
 // #define ARCH_FTRACE_INSTRUMENT __asm__ volatile("ldr lr, [fp, 8]\nnop\nnop\nnop\nmov x10, lr\nbl mcount")

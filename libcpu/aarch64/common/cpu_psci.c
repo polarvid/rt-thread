@@ -10,7 +10,7 @@
 #include <rtthread.h>
 #include <stdint.h>
 
-#ifdef RT_USING_SMP
+#if defined(RT_USING_SMP) && defined(RT_USING_FDT)
 
 #define DBG_TAG "libcpu.aarch64.cpu_psci"
 #define DBG_LVL DBG_INFO
