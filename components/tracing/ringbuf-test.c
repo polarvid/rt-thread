@@ -12,7 +12,17 @@
 
 static void _test_ringbuf(void)
 {
-    struct ring_buf *rb = ring_buf_create(1ul << 20, 8);
+    int retval;
+    rt_ubase_t data = 0xabcd1234;
+    struct ring_buf *rb = ring_buf_create(1ul << 20, sizeof(data));
+
+    rt_kprintf("Elem cnt %d\n", buf_ring_count(rb));
+    retval = buf_ring_enqueue(rb, &data, sizeof(data));
+    rt_kprintf("enqueue %d, elem cnt %d\n", retval, buf_ring_count(rb));
+
+    data = 0x0;
+    buf_ring_dequeue_mc(rb, &data, sizeof(data));
+    rt_kprintf("dequeue 0x%lx\n", data);
 
     ring_buf_delete(rb);
     return ;

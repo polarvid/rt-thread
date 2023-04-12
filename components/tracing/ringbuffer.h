@@ -38,111 +38,123 @@
 #include <stdatomic.h>
 
 #define CACHE_LINE_SIZE 64
+#define OFF_TO_OBJ(rb, idx, objshift) ((rb)->br_ring + ((idx) << (objshift)))
 
 struct ring_buf {
     _Atomic(uint32_t)   br_prod_head;
-    _Atomic(uint32_t)   br_prod_tail;    
+    _Atomic(uint32_t)   br_prod_tail;
     int                 br_prod_size;
     int                 br_prod_mask;
     uint64_t            br_drops;
-    _Atomic(uint32_t)   br_cons_head rt_align(CACHE_LINE_SIZE);
+
+    rt_align(CACHE_LINE_SIZE)
+    _Atomic(uint32_t)   br_cons_head;
     _Atomic(uint32_t)   br_cons_tail;
     int                 br_cons_size;
     int                 br_cons_mask;
+
+    rt_align(CACHE_LINE_SIZE)
 #ifdef DEBUG_BUFRING
     struct mtx          *br_lock;
-#endif    
-    void                *br_ring[0] rt_align(CACHE_LINE_SIZE);
+#endif
+    void                *br_ring;
 };
 
-/*
+/**
  * multi-producer safe lock-free ring buffer enqueue
  *
  */
 rt_inline int
-buf_ring_enqueue(struct ring_buf *br, void *buf)
+buf_ring_enqueue(struct ring_buf *rb, void *buf, const size_t objsz)
 {
     uint32_t prod_head, prod_next, cons_tail;
 #ifdef DEBUG_BUFRING
     int i;
 
-    /*
+    /**
      * Note: It is possible to encounter an mbuf that was removed
      * via drbr_peek(), and then re-added via drbr_putback() and
      * trigger a spurious panic.
      */
-    for (i = br->br_cons_head; i != br->br_prod_head;
-         i = ((i + 1) & br->br_cons_mask))
-        if(br->br_ring[i] == buf)
+    for (i = rb->br_cons_head; i != rb->br_prod_head;
+         i = ((i + 1) & rb->br_cons_mask))
+        if(rb->br_ring[i] == buf)
             panic("buf=%p already enqueue at %d prod=%d cons=%d",
-                buf, i, br->br_prod_tail, br->br_cons_tail);
-#endif    
+                buf, i, rb->br_prod_tail, rb->br_cons_tail);
+#endif
     rt_enter_critical();
     do {
-        prod_head = br->br_prod_head;
-        prod_next = (prod_head + 1) & br->br_prod_mask;
-        cons_tail = br->br_cons_tail;
+        prod_head = rb->br_prod_head;
+        prod_next = (prod_head + 1) & rb->br_prod_mask;
+        cons_tail = rb->br_cons_tail;
 
         if (prod_next == cons_tail) {
             rt_hw_rmb();
-            if (prod_head == br->br_prod_head &&
-                cons_tail == br->br_cons_tail) {
-                br->br_drops++;
+            if (prod_head == rb->br_prod_head &&
+                cons_tail == rb->br_cons_tail) {
+                rb->br_drops++;
                 rt_critical_level();
                 return -RT_ENOBUFS;
             }
             continue;
         }
-    } while (!atomic_compare_exchange_weak(&br->br_prod_head, &prod_head, prod_next));
+    } while (!atomic_compare_exchange_weak(&rb->br_prod_head, &prod_head, prod_next));
 #ifdef DEBUG_BUFRING
-    if (br->br_ring[prod_head] != NULL)
+    if (rb->br_ring[prod_head] != NULL)
         panic("dangling value in enqueue");
 #endif
-    br->br_ring[prod_head] = buf;
 
-    /*
-     * If there are other enqueues in progress
-     * that preceded us, we need to wait for them
-     * to complete
-     */   
-    while (!atomic_compare_exchange_weak(&br->br_prod_tail, &prod_head, prod_next))
-        ;
+    const size_t loops = __builtin_clzl(objsz);
+    rt_ubase_t *src = buf;
+    rt_ubase_t *dst = OFF_TO_OBJ(rb, prod_head, loops);
+    /* give more chance for compiler optimization */
+    for (size_t i = 0; i < loops; i++)
+        *dst = *src;
+
+    /* only the outer most writer will update prod_tail to prod_head */
+    atomic_compare_exchange_strong(&rb->br_prod_tail, &prod_head, rb->br_prod_head);
 
     rt_exit_critical();
     return (0);
 }
 
-/*
- * multi-consumer safe dequeue 
+/**
+ * multi-consumer safe dequeue
  *
  */
 rt_inline void *
-buf_ring_dequeue_mc(struct ring_buf *br)
+buf_ring_dequeue_mc(struct ring_buf *rb, void *buf, const size_t objsz)
 {
     uint32_t cons_head, cons_next;
-    void *buf;
 
     rt_enter_critical();
     do {
-        cons_head = br->br_cons_head;
-        cons_next = (cons_head + 1) & br->br_cons_mask;
+        cons_head = rb->br_cons_head;
+        cons_next = (cons_head + 1) & rb->br_cons_mask;
 
-        if (cons_head == br->br_prod_tail) {
+        if (cons_head == rb->br_prod_tail) {
             rt_exit_critical();
             return (NULL);
         }
-    } while (!atomic_compare_exchange_weak(&br->br_cons_head, &cons_head, cons_next));
+    } while (!atomic_compare_exchange_weak(&rb->br_cons_head, &cons_head, cons_next));
 
-    buf = br->br_ring[cons_head];
+
+    const size_t loops = __builtin_clzl(objsz);
+    rt_ubase_t *dst = buf;
+    rt_ubase_t *src = OFF_TO_OBJ(rb, cons_head, loops);
+    /* give more chance for compiler optimization */
+    for (size_t i = 0; i < loops; i++)
+        *dst = *src;
+
 #ifdef DEBUG_BUFRING
-    br->br_ring[cons_head] = NULL;
+    rb->br_ring[cons_head] = NULL;
 #endif
-    /*
+    /**
      * If there are other dequeues in progress
      * that preceded us, we need to wait for them
-     * to complete 
-     */   
-    while (atomic_compare_exchange_weak(&br->br_cons_tail, &cons_head, cons_next))
+     * to complete
+     */
+    while (atomic_compare_exchange_weak(&rb->br_cons_tail, &cons_head, cons_next))
         ;
 
     rt_exit_critical();
@@ -152,7 +164,7 @@ buf_ring_dequeue_mc(struct ring_buf *br)
 
 #if 0
 /*
- * single-consumer dequeue 
+ * single-consumer dequeue
  * use where dequeue is protected by a lock
  * e.g. a network driver's tx queue lock
  */
@@ -185,31 +197,31 @@ buf_ring_dequeue_sc(struct ring_buf *br)
      * br->br_ring[prod_head] = buf;
      * atomic_store_rel_32(&br->br_prod_tail, ...);
      *                                                                                prod_tail = br->br_prod_tail;
-     *                                                                                if (cons_head == prod_tail) 
+     *                                                                                if (cons_head == prod_tail)
      *                                                                                        return (NULL);
-     *                                                                                <condition is false and code uses invalid(old) buf>`    
+     *                                                                                <condition is false and code uses invalid(old) buf>`
      *
      * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
-     */    
+     */
 #if defined(__arm__) || defined(__aarch64__)
     cons_head = atomic_load_acq_32(&br->br_cons_head);
 #else
     cons_head = br->br_cons_head;
 #endif
     prod_tail = atomic_load_acq_32(&br->br_prod_tail);
-    
+
     cons_next = (cons_head + 1) & br->br_cons_mask;
 #ifdef PREFETCH_DEFINED
     cons_next_next = (cons_head + 2) & br->br_cons_mask;
 #endif
-    
-    if (cons_head == prod_tail) 
+
+    if (cons_head == prod_tail)
         return (NULL);
 
-#ifdef PREFETCH_DEFINED    
-    if (cons_next != prod_tail) {        
+#ifdef PREFETCH_DEFINED
+    if (cons_next != prod_tail) {
         prefetch(br->br_ring[cons_next]);
-        if (cons_next_next != prod_tail) 
+        if (cons_next_next != prod_tail)
             prefetch(br->br_ring[cons_next_next]);
     }
 #endif
@@ -238,12 +250,12 @@ buf_ring_advance_sc(struct ring_buf *br)
 {
     uint32_t cons_head, cons_next;
     uint32_t prod_tail;
-    
+
     cons_head = br->br_cons_head;
     prod_tail = br->br_prod_tail;
-    
+
     cons_next = (cons_head + 1) & br->br_cons_mask;
-    if (cons_head == prod_tail) 
+    if (cons_head == prod_tail)
         return;
     br->br_cons_head = cons_next;
 #ifdef DEBUG_BUFRING
@@ -271,7 +283,7 @@ buf_ring_advance_sc(struct ring_buf *br)
 rt_inline void
 buf_ring_putback_sc(struct ring_buf *br, void *new)
 {
-    KASSERT(br->br_cons_head != br->br_prod_tail, 
+    KASSERT(br->br_cons_head != br->br_prod_tail,
         ("Buf-Ring has none in putback")) ;
     br->br_ring[br->br_cons_head] = new;
 }
@@ -288,7 +300,7 @@ buf_ring_peek(struct ring_buf *br)
 #ifdef DEBUG_BUFRING
     if ((br->br_lock != NULL) && !mtx_owned(br->br_lock))
         panic("lock not held on single consumer dequeue");
-#endif    
+#endif
     /*
      * I believe it is safe to not have a memory barrier
      * here because we control cons and tail is worst case
@@ -297,7 +309,7 @@ buf_ring_peek(struct ring_buf *br)
      */
     if (br->br_cons_head == br->br_prod_tail)
         return (NULL);
-    
+
     return (br->br_ring[br->br_cons_head]);
 }
 
@@ -309,7 +321,7 @@ buf_ring_peek_clear_sc(struct ring_buf *br)
 
     if (!mtx_owned(br->br_lock))
         panic("lock not held on single consumer dequeue");
-#endif    
+#endif
 
     if (br->br_cons_head == br->br_prod_tail)
         return (NULL);
