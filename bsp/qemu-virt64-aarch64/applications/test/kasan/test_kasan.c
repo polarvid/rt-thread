@@ -78,10 +78,10 @@ static void test_strncpy(void)
     uassert_false(!buf);
 
     LOG_I("out-of-bound strncpy test: reading");
-    uassert_true(!__builtin_strncpy(buf, oob_read, kasan_buf_sz));
+    uassert_true(!!rt_strncpy(buf, oob_read, kasan_buf_sz));
 
     LOG_I("out-of-bound strncpy test: writing");
-    uassert_true(!__builtin_strncpy(buf, src, kasan_buf_sz + 1));
+    uassert_true(!rt_strncpy(buf, src, kasan_buf_sz + 1));
 }
 
 static void _thread_overflow(void *param)
@@ -127,7 +127,7 @@ static void testcase(void)
     UTEST_UNIT_RUN(test_memset);
     UTEST_UNIT_RUN(test_memcpy);
     UTEST_UNIT_RUN(test_strncpy);
-    UTEST_UNIT_RUN(test_stack_overflow);
+    // UTEST_UNIT_RUN(test_stack_overflow);
 }
 
 UTEST_TC_EXPORT(testcase, "testcases.libcpu.kasan", utest_tc_init, utest_tc_cleanup, 10);

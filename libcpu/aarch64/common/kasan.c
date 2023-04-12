@@ -37,7 +37,7 @@ static const char *get_name(rt_varea_t varea)
     return "kasan-shadow-area";
 }
 
-static void on_page_fault(rt_varea_t varea, struct rt_mm_fault_msg *msg)
+static void on_page_fault(rt_varea_t varea, struct rt_aspace_fault_msg *msg)
 {
     RT_ASSERT(varea == &kasan_area);
 
@@ -88,7 +88,7 @@ static rt_bool_t handle_fault(void *start, rt_size_t length, rt_bool_t is_write,
 
 static void _handle_stack_overflow(void *sp)
 {
-    LOG_E("[KASAN] stack overflow on %s", rt_thread_self()->name);
+    LOG_E("[KASAN] stack overflow on %s", rt_thread_self()->parent.name);
 
     while (1)
     {
