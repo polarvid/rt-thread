@@ -130,7 +130,7 @@ static void _user_do_page_fault(struct rt_varea *varea,
 
             if (!(varea->flag & MMF_TEXT))
             {
-                void *cp = rt_pages_alloc(0);
+                void *cp = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE);
                 if (cp)
                 {
                     memcpy(cp, vaddr, ARCH_PAGE_SIZE);

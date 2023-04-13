@@ -1464,6 +1464,7 @@ rt_weak int rt_kprintf(const char *fmt, ...)
     va_list args;
     rt_size_t length = 0;
     static char rt_log_buf[RT_CONSOLEBUF_SIZE];
+    rt_ubase_t level = rt_hw_interrupt_disable();
 
     va_start(args, fmt);
     /* the return value of vsnprintf is the number of bytes that would be
@@ -1490,6 +1491,7 @@ rt_weak int rt_kprintf(const char *fmt, ...)
     rt_hw_console_output(rt_log_buf);
 #endif /* RT_USING_DEVICE */
     va_end(args);
+    rt_hw_interrupt_enable(level);
 
     return length;
 }
@@ -1665,6 +1667,16 @@ rt_weak void rt_system_heap_init(void *begin_addr, void *end_addr)
     _heap_lock_init();
 }
 
+#ifdef ARCH_ENABLE_SOFT_KASAN
+#include <kasan.h>
+#define UNPOISONED(ptr, size) ((ptr) ? kasan_unpoisoned((ptr), (size)) : (ptr))
+#define MASK_PTR(rmem) ((rmem) = (rmem) ? TAG2PTR((rmem), SUPER_TAG) : (rmem))
+#else
+#define UNPOISONED(ptr, size) (ptr)
+#define kasan_poisoned(ptr)
+#define MASK_PTR(rmem)
+#endif
+
 /**
  * @brief Allocate a block of memory with a minimum of 'size' bytes.
  *
@@ -1685,7 +1697,7 @@ rt_weak void *rt_malloc(rt_size_t size)
     _heap_unlock(level);
     /* call 'rt_malloc' hook */
     RT_OBJECT_HOOK_CALL(rt_malloc_hook, (ptr, size));
-    return ptr;
+    return UNPOISONED(ptr, size);
 }
 RTM_EXPORT(rt_malloc);
 
@@ -1702,14 +1714,15 @@ rt_weak void *rt_realloc(void *rmem, rt_size_t newsize)
 {
     rt_base_t level;
     void *nptr;
-
+    kasan_poisoned(rmem);
+    MASK_PTR(rmem);
     /* Enter critical zone */
     level = _heap_lock();
     /* Change the size of previously allocated memory block */
     nptr = _MEM_REALLOC(rmem, newsize);
     /* Exit critical zone */
     _heap_unlock(level);
-    return nptr;
+    return UNPOISONED(nptr, newsize);
 }
 RTM_EXPORT(rt_realloc);
 
@@ -1755,6 +1768,10 @@ rt_weak void rt_free(void *rmem)
     RT_OBJECT_HOOK_CALL(rt_free_hook, (rmem));
     /* NULL check */
     if (rmem == RT_NULL) return;
+    // ? the order here, shoule we trust dynamic memory algorithm itself?
+    // we gave him super tag to access anywhere
+    kasan_poisoned(rmem);
+    MASK_PTR(rmem);
     /* Enter critical zone */
     level = _heap_lock();
     _MEM_FREE(rmem);
@@ -2011,6 +2028,7 @@ void rt_assert_handler(const char *ex_string, const char *func, rt_size_t line)
 #endif /*RT_USING_MODULE*/
         {
             rt_kprintf("(%s) assertion failed at function:%s, line number:%d \n", ex_string, func, line);
+            rt_hw_cpu_shutdown();
             while (dummy == 0);
         }
     }

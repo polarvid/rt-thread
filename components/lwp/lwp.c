@@ -1097,6 +1097,18 @@ static void _lwp_thread_entry(void *parameter)
         icache_invalid_all();
     }
 
+    /**
+     * without ASID support, it will be a special case when trying to run application
+     * and exit multiple times and a same page frame allocated to it bound to
+     * different text segment. Then we are in a situation where icache contains
+     * out-of-dated data and must be handle by the running core itself.
+     * with ASID support, this should be a rare case that ASID & page frame both
+     * identical to previous running application.
+     *
+     * For a new application loaded into memory, icache are seen as empty. And there
+     * should be nothing in the icache entry to match. So this icache invalidation
+     * operation should have barely influence.
+     */
     rt_hw_icache_invalidate_all();
 
 #ifdef ARCH_MM_MMU

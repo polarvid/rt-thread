@@ -134,24 +134,17 @@ static int _do_named_map(rt_aspace_t aspace, void *vaddr, rt_size_t length,
     int err = RT_EOK;
 
     /* it's ensured by caller that (void*)end will not overflow */
-    void *end = vaddr + length;
     void *phyaddr = (void *)(offset << MM_PAGE_SHIFT);
-    while (vaddr != end)
+
+    /* TODO try to map with huge TLB, when flag & HUGEPAGE */
+    void *ret = rt_hw_mmu_map(aspace, vaddr, phyaddr, length, attr);
+    if (ret == RT_NULL)
     {
-        /* TODO try to map with huge TLB, when flag & HUGEPAGE */
-        rt_size_t pgsz = ARCH_PAGE_SIZE;
-        void *ret = rt_hw_mmu_map(aspace, vaddr, phyaddr, pgsz, attr);
-        if (ret == RT_NULL)
-        {
-            err = -RT_ERROR;
-            break;
-        }
-        vaddr += pgsz;
-        phyaddr += pgsz;
+        err = -RT_ERROR;
     }
 
     if (err == RT_EOK)
-        rt_hw_tlb_invalidate_range(aspace, end - length, length, ARCH_PAGE_SIZE);
+        rt_hw_tlb_invalidate_range(aspace, vaddr, length, ARCH_PAGE_SIZE);
 
     return err;
 }
@@ -450,7 +443,7 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
             err = _mm_aspace_map(aspace, varea, attr, flags, mem_obj, offset);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                mm_free(varea);
             }
         }
         else
@@ -578,7 +571,7 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             err = _mm_aspace_map_phy(aspace, varea, hint, attr, pa_off, ret_va);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                mm_free(varea);
             }
         }
         else

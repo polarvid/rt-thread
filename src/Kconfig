@@ -260,6 +260,10 @@ if RT_DEBUG
     config RT_DEBUG_MEMHEAP
         int
         default 1 if RT_DEBUG_MEMHEAP_CONFIG
+    
+    config RT_DEBUG_PAGE_LEAK
+        bool "Enable page leaking tracer"
+        default n
 
     config RT_DEBUG_MODULE_CONFIG
         bool "Enable debugging of Application Module"
