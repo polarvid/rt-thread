@@ -43,7 +43,7 @@ static int _compare_entry(const void *a, const void *b)
     return aa == bb ? 0 : (aa > bb ? 1 : -1);
 }
 
-rt_bool_t _ftrace_entry_exist(void *entry)
+rt_bool_t _ftrace_symtbl_entry_exist(void *entry)
 {
     void **entries = &__patchable_function_entries_start;
     void **end = &__patchable_function_entries_end;
@@ -54,4 +54,16 @@ rt_bool_t _ftrace_entry_exist(void *entry)
         tracing_binary_search(entries, objcnt, FTRACE_ENTRY_ORDER, &target, _compare_entry);
 
     return ret < 0 ? RT_FALSE : RT_TRUE;
+}
+
+void _ftrace_symtbl_for_each(void (*fn)(void *symbol, void *data), void *data)
+{
+    void **entries = &__patchable_function_entries_start;
+    void **end = &__patchable_function_entries_end;
+    const size_t objcnt = end - entries;
+
+    for (size_t i = 0; i < objcnt; i++)
+    {
+        fn(ENTRIES_TO_SYM(entries[i]), data);
+    }
 }

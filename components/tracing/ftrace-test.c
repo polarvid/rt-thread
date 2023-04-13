@@ -19,15 +19,18 @@ static void _debug_test_fn(char *str)
     rt_kputs(str);
 }
 
-static int handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+static size_t count = 0;
+static
+int _test_handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    const struct ftrace_context*ctx = context;
+    // const struct ftrace_context*ctx = context;
 
-    rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
-    rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
-    for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-        rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
+    // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
+    // rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
+    // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
+    //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
 
+    count++;
     return 0;
 }
 
@@ -39,8 +42,14 @@ static void _debug_ftrace(void)
     // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 1));
 
     /* init */
-    ftrace_tracer_init(&dummy_tracer, handler, RT_NULL);
-    ftrace_tracer_set_trace(&dummy_tracer, _debug_test_fn);
+    ftrace_tracer_init(&dummy_tracer, _test_handler, RT_NULL);
+
+    /* test recursion */
+    // ftrace_tracer_set_trace(&dummy_tracer, _debug_test_fn);
+    // ftrace_tracer_set_trace(&dummy_tracer, _test_handler);
+
+    /* test every functions */
+    ftrace_tracer_set_except(&dummy_tracer, NULL, 0);
 
     /* a dummy instrumentation */
     _debug_test_fn("no tracer\n");

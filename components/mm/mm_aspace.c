@@ -164,7 +164,7 @@ rt_inline void _do_page_fault(struct rt_aspace_fault_msg *msg, rt_size_t off,
     msg->fault_vaddr = vaddr;
     msg->fault_op = MM_FAULT_OP_READ;
     msg->fault_type = MM_FAULT_TYPE_PAGE_FAULT;
-    msg->response.status = -1;
+    msg->response.status = MM_FAULT_STATUS_UNRECOVERABLE;
     msg->response.vaddr = 0;
     msg->response.size = 0;
 
@@ -243,7 +243,10 @@ static int _do_prefetch(rt_aspace_t aspace, rt_varea_t varea, void *start,
         _do_page_fault(&msg, off, vaddr, varea->mem_obj, varea);
 
         if (_varea_map_with_msg(varea, &msg))
+        {
+            err = -RT_ENOMEM;
             break;
+        }
 
         /**
          * It's hard to identify the mapping pattern on a customized handler

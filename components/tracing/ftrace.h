@@ -16,7 +16,7 @@
 
 #include <rtthread.h>
 
-#define rt_notrace __attribute__((no_instrument_function))
+#define rt_notrace __attribute__((patchable_function_entry(0, 0)))
 
 typedef int (*ftrace_trace_fn_t)(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 

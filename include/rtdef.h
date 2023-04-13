@@ -851,6 +851,9 @@ struct rt_thread
     int *clear_child_tid;
 #endif
     int tid;
+#ifdef RT_USING_TRACING
+    int stacked_trace;
+#endif /* RT_USING_TRACING */
 #endif
 
     rt_ubase_t user_data;                             /**< private user data beyond this thread */

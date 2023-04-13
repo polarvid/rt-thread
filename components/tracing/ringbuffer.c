@@ -27,7 +27,7 @@
  *
  *
  ***************************************************************************/
-#define	DBG_TAG "tracing.ringbuffer"
+#define DBG_TAG "tracing.ringbuffer"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
@@ -46,50 +46,38 @@ rt_inline int clz(unsigned long number)
 }
 
 struct ring_buf *
-ring_buf_create(size_t count, size_t objsz)
+ring_buf_create(size_t count, size_t objsz, size_t bufsz)
 {
-    struct ring_buf *br;
-    void *vaddr = RT_NULL;
-	int retval;
+    struct ring_buf *rb;
 
-    /* buf ring must be size power of 2 */
     RT_ASSERT(POWER_OF_2(count));
-	/* objsz should be multiples of 8 */
-	RT_ASSERT(!(objsz & (sizeof(rt_ubase_t) - 1)));
+    RT_ASSERT(POWER_OF_2(bufsz));
+    /* objsz should be multiples of 8 */
+    RT_ASSERT(!(objsz & (sizeof(rt_ubase_t) - 1)));
+    RT_ASSERT(count * objsz > bufsz);
 
-    br = rt_malloc(sizeof(*br));
+    const size_t tblsz = (count * objsz / bufsz) * sizeof(rb->buftbl[0]);
 
-    if (!br)
+    rb = rt_malloc(sizeof(*rb) + tblsz);
+
+    if (!rb)
         return RT_NULL;
-
-    retval = rt_aspace_map(&rt_kernel_space,
-						   &vaddr,
-						   count * objsz,
-						   MMU_MAP_K_RWCB,
-						   MMF_PREFETCH,
-						   &rt_mm_dummy_mapper,
-						   0);
-	if (retval != RT_EOK)
-	{
-		LOG_W("%s: map failed with code", __func__, retval);
-		return RT_NULL;
-	}
+    rt_memset(&rb->buftbl, 0, tblsz);
+    rb->buf_mask = bufsz / objsz - 1;
 
 #ifdef DEBUG_BUFRING
-    br->br_lock = lock;
+    rb->br_lock = lock;
 #endif
-	br->br_ring = vaddr;
-    br->br_prod_size = br->br_cons_size = count;
-    br->br_prod_mask = br->br_cons_mask = count - 1;
-    br->br_prod_head = br->br_cons_head = 0;
-    br->br_prod_tail = br->br_cons_tail = 0;
-        
-    return br;
+    rb->prod_size = rb->cons_size = count;
+    rb->prod_mask = rb->cons_mask = count - 1;
+    rb->prod_head = rb->cons_head = 0;
+    rb->prod_tail = rb->cons_tail = 0;
+
+    return rb;
 }
 
 void
-ring_buf_delete(struct ring_buf *br)
+ring_buf_delete(struct ring_buf *rb)
 {
-	rt_aspace_unmap(&rt_kernel_space, br->br_ring);
-    rt_free(br);
+    rt_free(rb);
 }

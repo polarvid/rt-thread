@@ -25,6 +25,7 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
                            int (*cmp)(const void *, const void *));
 
 /* entries look up */
-rt_bool_t _ftrace_entry_exist(void *entry);
+rt_bool_t _ftrace_symtbl_entry_exist(void *entry);
+void _ftrace_symtbl_for_each(void (*fn)(void *symbol, void *data), void *data);
 
 #endif /* __TRACE_FTRACE_INTERNAL_H__ */
