@@ -347,6 +347,7 @@ RTM_EXPORT(rt_thread_init);
  *
  * @return  The self thread object.
  */
+rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP

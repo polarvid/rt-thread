@@ -17,4 +17,8 @@ config RT_USING_TRACING
 
     endif
 
+    if ARCH_ARMV8
+        config TRACING_SOFT_KASAN
+            bool "Enable software-tagged KASAN (memory usage tracer)"
+    endif
 endmenu

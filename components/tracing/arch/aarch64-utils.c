@@ -22,6 +22,7 @@ extern void mcount(void);
 #define NOP             (2)
 #define INSN(idx)       (((uint32_t *)&_ftrace_entry_insn)[idx])
 
+rt_notrace
 static uint32_t insn_gen_branch_link(void *oldpc, void *newpc)
 {
     /**
@@ -33,6 +34,7 @@ static uint32_t insn_gen_branch_link(void *oldpc, void *newpc)
     return instruction;
 }
 
+rt_notrace
 static int _patch_code(void *entry, uint32_t new, uint32_t old)
 {
     uint32_t expected = old;
@@ -47,6 +49,7 @@ static int _patch_code(void *entry, uint32_t new, uint32_t old)
         return -1;
 }
 
+rt_notrace
 int _ftrace_patch_code(void *entry, rt_bool_t enabled)
 {
     int err;
@@ -101,6 +104,7 @@ static int _hook_tracer(void *entry, uint64_t new, uint64_t old)
         return -1;
 }
 
+rt_notrace
 int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
 {
     int err;

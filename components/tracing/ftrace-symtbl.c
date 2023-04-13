@@ -36,13 +36,15 @@ static void _debug_dump(void)
 MSH_CMD_EXPORT_ALIAS(_debug_dump, dump_entries, dump patchable function entries);
 
 /* ascending order */
-static int _compare_entry(const void *a, const void *b)
+rt_notrace static
+int _compare_entry(const void *a, const void *b)
 {
     rt_uint64_t aa = *(rt_uint64_t *)a;
     rt_uint64_t bb = *(rt_uint64_t *)b;
     return aa == bb ? 0 : (aa > bb ? 1 : -1);
 }
 
+rt_notrace
 rt_bool_t _ftrace_symtbl_entry_exist(void *entry)
 {
     void **entries = &__patchable_function_entries_start;

@@ -276,8 +276,10 @@ _thread_start:
 /*
  * rt_base_t rt_hw_interrupt_disable();
  */
-.globl rt_hw_interrupt_disable
+.global rt_hw_interrupt_disable
 rt_hw_interrupt_disable:
+.global rt_hw_local_irq_disable
+rt_hw_local_irq_disable:
     MRS     X0, DAIF
     MSR     DAIFSet, #3
     DSB     SY
@@ -286,8 +288,10 @@ rt_hw_interrupt_disable:
 /*
  * void rt_hw_interrupt_enable(rt_base_t level);
  */
-.globl rt_hw_interrupt_enable
+.global rt_hw_interrupt_enable
 rt_hw_interrupt_enable:
+.global rt_hw_local_irq_enable
+rt_hw_local_irq_enable:
     DSB     SY
     AND     X0, X0, #0xc0
     MRS     X1, DAIF

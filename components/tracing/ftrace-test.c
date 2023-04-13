@@ -20,7 +20,8 @@ static void _debug_test_fn(char *str)
 }
 
 static size_t count = 0;
-static
+
+static rt_notrace
 int _test_handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     // const struct ftrace_context*ctx = context;
@@ -70,6 +71,7 @@ static void _debug_ftrace(void)
     /* ftrace disabled */
     ftrace_tracer_unregister(&dummy_tracer);
     _debug_test_fn("dummy tracer unregistered\n");
+    rt_kprintf("count 0x%lx\n", count);
 
     return ;
 

@@ -205,6 +205,7 @@ typedef __gnuc_va_list              va_list;
 #define rt_used                     __attribute__((used))
 #define rt_align(n)                 __attribute__((aligned(n)))
 #define rt_weak                     __attribute__((weak))
+#define rt_notrace                  __attribute__((patchable_function_entry(0, 0)))
 #define rt_inline                   static __inline
 #define RTT_API
 #elif defined (__ADSPBLACKFIN__)        /* for VisualDSP++ Compiler */

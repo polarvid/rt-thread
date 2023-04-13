@@ -103,6 +103,7 @@ int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn)
     return err;
 }
 
+rt_notrace
 int ftrace_tracer_remove_trace(ftrace_tracer_t tracer, void *fn)
 {
     int err;
@@ -135,11 +136,12 @@ struct _param {
     size_t notrace_cnt;
 };
 
-static void _set_trace_with_entires(void *entry, void *tracer)
+static void _set_trace_with_entires(void *entry, void *data)
 {
     // skip notrace here
+    struct _param *param = data;
     int err;
-    err = _set_trace(tracer, entry);
+    err = _set_trace(param->tracer, entry);
     if (err)
     {
         rt_kprintf("set trace failed %d\n", err);
