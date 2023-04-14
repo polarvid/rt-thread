@@ -25,7 +25,7 @@
 #define PTR2TAG(ptr) (((rt_ubase_t)(ptr) >> NON_TAG_WIDTH) & 0xff)
 #define TAG2PTR(ptr, tag) ((void *)(((rt_ubase_t)(ptr) & NON_TAG_MASK) | ((tag) << NON_TAG_WIDTH)))
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
 
 struct rt_varea;
 struct rt_mem_obj;
@@ -47,6 +47,6 @@ int kasan_poisoned(void *start);
 #else
 #define kasan_unpoisoned(ptr, sz) (ptr)
 #define kasan_poisoned(ptr)
-#endif /* ARCH_ENABLE_SOFT_KASAN */
+#endif /* TRACING_SOFT_KASAN */
 
 #endif /* __KASAN_H__ */

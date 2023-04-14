@@ -17,7 +17,7 @@ static int unwind_frame(struct bt_frame *frame)
 {
     unsigned long fp = frame->fp;
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
     fp |= 0xff00000000000000;
 #endif
 

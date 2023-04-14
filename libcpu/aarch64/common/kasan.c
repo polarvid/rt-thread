@@ -12,7 +12,7 @@
 #include "backtrace.h"
 #include "rtconfig.h"
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
 #include "mmu.h"
 #include "kasan.h"
 #include "rtdef.h"
@@ -407,4 +407,4 @@ char *strncpy(char *destination, const char *source, size_t num)
     return __stpncpy(destination, source, num);
 }
 
-#endif /* ARCH_ENABLE_SOFT_KASAN */
+#endif /* TRACING_SOFT_KASAN */
