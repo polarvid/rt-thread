@@ -68,6 +68,7 @@ ring_buf_create(size_t count, size_t objsz, size_t bufsz)
 #ifdef DEBUG_BUFRING
     rb->br_lock = lock;
 #endif
+    rb->drops = 0;
     rb->prod_size = rb->cons_size = count;
     rb->prod_mask = rb->cons_mask = count - 1;
     rb->prod_head = rb->cons_head = 0;

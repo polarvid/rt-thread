@@ -32,6 +32,7 @@
 #ifndef    _SYS_BUF_RING_H_
 #define    _SYS_BUF_RING_H_
 
+#include "rtdef.h"
 #include <rtthread.h>
 #include <rthw.h>
 #include <cpuport.h>
@@ -50,6 +51,7 @@ struct ring_buf {
     _Atomic(uint32_t)   prod_tail;
     int                 prod_size;
     int                 prod_mask;
+    /* number of dropped buffer */
     uint64_t            drops;
 
     rt_align(CACHE_LINE_SIZE)
@@ -74,11 +76,40 @@ struct ring_buf {
 #define rb_preempt_enable()     rt_hw_local_irq_enable(level)
 
 /**
+ * @brief drop a buf from ring buffer if there is no other racer
+ * assuming that the local scheduler is disable
+ */
+rt_inline rt_notrace
+int ring_buf_drop(struct ring_buf *rb)
+{
+    uint32_t cons_head, cons_next;
+    int drops;
+    cons_head = rb->cons_head;
+    cons_next = (cons_head + rb->buf_mask + 1) & rb->cons_mask;
+
+    if (cons_head == rb->prod_tail)
+    {
+        return 0;
+    }
+
+    if (atomic_compare_exchange_strong(&rb->cons_head, &cons_head, cons_next))
+    {
+        drops = rb->buf_mask + 1;
+        while (atomic_compare_exchange_weak(&rb->cons_tail, &cons_head, cons_next))
+            ;
+
+        return drops;
+    }
+    else
+        return 0;
+}
+
+/**
  * multi-producer safe lock-free ring buftbl enqueue
  *
  */
 rt_inline rt_notrace
-int ring_buf_enqueue(struct ring_buf *rb, void *buf, const size_t objsz)
+int ring_buf_enqueue(struct ring_buf *rb, void *buf, const size_t objsz, const rt_bool_t override)
 {
     uint32_t prod_head, prod_next, cons_tail;
 #ifdef DEBUG_BUFRING
@@ -112,9 +143,17 @@ int ring_buf_enqueue(struct ring_buf *rb, void *buf, const size_t objsz)
             if (prod_head == rb->prod_head &&
                 cons_tail == atomic_load_explicit(&rb->cons_tail, memory_order_acquire))
             {
-                rb->drops++;
-                rb_preempt_enable();
-                return -RT_ENOBUFS;
+                if (override)
+                {
+                    rb->drops += ring_buf_drop(rb);
+                }
+                else
+                {
+                    rt_kprintf("drop one\n");
+                    rb->drops++;
+                    rb_preempt_enable();
+                    return -RT_ENOBUFS;
+                }
             }
             continue;
         }
@@ -169,9 +208,8 @@ int ring_buf_enqueue(struct ring_buf *rb, void *buf, const size_t objsz)
 
 /**
  * multi-consumer safe dequeue
- @note Not in interrupt context, reason same as a normal spin-lock
+ * @note Not in interrupt context, reason same as a normal spin-lock
  */
-#if 1
 rt_inline rt_notrace
 void *ring_buf_dequeue_mc(struct ring_buf *rb, void *newbuf, const size_t objsz)
 {
@@ -183,7 +221,7 @@ void *ring_buf_dequeue_mc(struct ring_buf *rb, void *newbuf, const size_t objsz)
         cons_head = rb->cons_head;
         cons_next = (cons_head + rb->buf_mask + 1) & rb->cons_mask;
 
-        if (cons_head == rb->prod_tail)
+        if (cons_next > rb->prod_tail)
         {
             rb_preempt_enable();
             return (NULL);
@@ -212,7 +250,6 @@ void *ring_buf_dequeue_mc(struct ring_buf *rb, void *newbuf, const size_t objsz)
 
     return buf;
 }
-#endif
 
 #if 0
 /*
