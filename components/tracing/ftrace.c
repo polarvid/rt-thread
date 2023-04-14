@@ -112,26 +112,17 @@ rt_notrace
 int ftrace_tracer_remove_trace(ftrace_tracer_t tracer, void *fn)
 {
     int err;
-    rt_bool_t existed;
 
-    existed = _ftrace_symtbl_entry_exist(fn);
-
-    if (existed == RT_TRUE)
+    err = _ftrace_patch_code(fn, RT_FALSE);
+    if (!err)
     {
-        err = _ftrace_patch_code(fn, RT_FALSE);
+        err = _ftrace_hook_tracer(fn, tracer, RT_FALSE);
         if (!err)
         {
-            err = _ftrace_hook_tracer(fn, tracer, RT_FALSE);
-            if (!err)
-            {
-                tracer->trace_point_cnt -= 1;
-            }
+            tracer->trace_point_cnt -= 1;
         }
     }
-    else
-    {
-        err = -RT_ENOENT;
-    }
+
     return err;
 }
 
@@ -190,7 +181,7 @@ int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_add
             {
                 err = -RT_ERROR;
                 ftrace_tracer_set_status(tracer, RT_FALSE);
-                rt_kprintf("recursion detected!pc %p, called-from %p\n", pc, ret_addr);
+                rt_kprintf("recursion detected! pc %p, called-from %p\n", pc, ret_addr);
                 while (1);
             }
             rb_preempt_enable();

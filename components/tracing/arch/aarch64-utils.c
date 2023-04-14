@@ -71,15 +71,14 @@ int _ftrace_patch_code(void *entry, rt_bool_t enabled)
     }
     else
     {
-        // patch code to disable
+        // patch code to disable, noted the ordered here is different
         uint32_t new = INSN(NOP);
-        uint32_t old = INSN(MOV_TEMPX_LR);;
-        err = _patch_code(insn, new, old);
+        uint32_t old = insn_gen_branch_link(insn, &mcount);;
+        err = _patch_code(insn + 1, new, old);
 
         if (!err)
         {
-            insn++;
-            old = insn_gen_branch_link(insn, &mcount);
+            old = INSN(MOV_TEMPX_LR);
             err = _patch_code(insn, new, old);
         }
     }

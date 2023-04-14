@@ -134,6 +134,18 @@ _ftrace_disable_global:
     str     x1, [x0]
     ret
 
+.global _tracer_dummy
+_tracer_dummy:
+_tracer_dummy:
+    sub     sp, sp, #32
+    str     x0, [sp, 24]
+    str     x1, [sp, 16]
+    str     x2, [sp, 8]
+    str     x3, [sp]
+    mov     w0, 0
+    add     sp, sp, 32
+    ret
+
 .global _ftrace_entry_insn
 .balign 8
 _ftrace_entry_insn:

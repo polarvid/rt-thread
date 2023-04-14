@@ -1667,7 +1667,7 @@ rt_weak void rt_system_heap_init(void *begin_addr, void *end_addr)
     _heap_lock_init();
 }
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
 #include <kasan.h>
 #define UNPOISONED(ptr, size) ((ptr) ? kasan_unpoisoned((ptr), (size)) : (ptr))
 #define MASK_PTR(rmem) ((rmem) = (rmem) ? TAG2PTR((rmem), SUPER_TAG) : (rmem))

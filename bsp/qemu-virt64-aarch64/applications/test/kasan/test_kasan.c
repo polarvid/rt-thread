@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if defined(RT_USING_UTEST) && defined (RT_USING_SMART)
+#if defined(RT_USING_UTEST) && defined (RT_USING_SMART) && defined(TRACING_SOFT_KASAN)
 #include <utest.h>
 #include <kasan.h>
 

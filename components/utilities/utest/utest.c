@@ -266,7 +266,7 @@ static void utest_run(const char *utest_name)
     }
 }
 
-static void utest_testcase_run(int argc, char** argv)
+void utest_testcase_run(int argc, char** argv)
 {
     void *thr_param = RT_NULL;
 
