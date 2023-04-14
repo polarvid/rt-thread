@@ -15,6 +15,7 @@
 /* architecture specific */
 int _ftrace_patch_code(void *entry, rt_bool_t enabled);
 int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled);
+ftrace_tracer_t _ftrace_get_tracer(void *entry);
 void _ftrace_enable_global(void);
 void _ftrace_disable_global(void);
 

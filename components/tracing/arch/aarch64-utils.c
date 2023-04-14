@@ -9,6 +9,7 @@
  */
 #include "aarch64.h"
 #include "../ftrace.h"
+#include "rtdef.h"
 
 #include <stdatomic.h>
 #include <stddef.h>
@@ -90,6 +91,7 @@ int _ftrace_patch_code(void *entry, rt_bool_t enabled)
     return err;
 }
 
+rt_notrace
 static int _hook_tracer(void *entry, uint64_t new, uint64_t old)
 {
     uint64_t expected = old;
@@ -119,4 +121,11 @@ int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
     else
         err = _hook_tracer(entry, nopnop, (uint64_t)tracer);
     return err;
+}
+
+rt_notrace
+ftrace_tracer_t _ftrace_get_tracer(void *entry)
+{
+    entry -= 8;
+    return *(ftrace_tracer_t *)((uint64_t)entry & ~0x7);
 }

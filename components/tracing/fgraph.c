@@ -14,7 +14,7 @@
 
 static int handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    const struct ftrace_context*ctx = context;
+    // const struct ftrace_context*ctx = context;
 
     // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
     // rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
@@ -32,4 +32,6 @@ int fgraph_create()
         return -RT_ENOMEM;
 
     ftrace_tracer_init(tracer, handler, RT_NULL);
+
+    return 0;
 }

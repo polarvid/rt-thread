@@ -10,6 +10,7 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
+#include "rtdef.h"
 #ifdef ARCH_ARMV8
 #include "arch/aarch64.h"
 #endif
@@ -42,19 +43,28 @@ int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_add
 
 void ftrace_tracer_init(ftrace_tracer_t tracer, ftrace_trace_fn_t handler, void *data);
 
-rt_inline void ftrace_tracer_ctrl_skip_recursion(ftrace_tracer_t tracer, rt_bool_t enabled)
+rt_notrace rt_inline
+void ftrace_tracer_ctrl_skip_recursion(ftrace_tracer_t tracer, rt_bool_t enabled)
 {
     tracer->skip_recursion = enabled;
 }
 
-rt_inline void *ftrace_tracer_get_data(ftrace_tracer_t tracer)
+rt_notrace rt_inline
+void *ftrace_tracer_get_data(ftrace_tracer_t tracer)
 {
     return tracer->data;
 }
 
-rt_inline void ftrace_tracer_set_data(ftrace_tracer_t tracer, void *data)
+rt_notrace rt_inline
+void ftrace_tracer_set_data(ftrace_tracer_t tracer, void *data)
 {
     tracer->data = data;
+}
+
+rt_notrace rt_inline
+void ftrace_tracer_set_status(ftrace_tracer_t tracer, rt_bool_t enable)
+{
+    tracer->enabled = enable;
 }
 
 int ftrace_tracer_register(ftrace_tracer_t tracer);
