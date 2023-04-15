@@ -21,7 +21,7 @@ void ftrace_tracer_init(ftrace_tracer_t tracer, ftrace_trace_fn_t handler, void 
     RT_ASSERT(tracer);
     rt_memset(tracer, 0, sizeof(*tracer));
 
-    tracer->handler = handler;
+    tracer->on_entry = handler;
     tracer->data = data;
     rt_list_init(&tracer->node);
     return ;
@@ -166,9 +166,9 @@ int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t not
 
 /* generic entry to test if tracer is ready to handle trace event */
 rt_notrace
-int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    int err;
+    int stat = TRACER_STAT_NONE;
 
     if (tracer)
     {
@@ -179,7 +179,6 @@ int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_add
             rt_thread_t tid = rt_thread_self();
             if (tid && tid->stacked_trace > 0 && rt_interrupt_get_nest() > 1)
             {
-                err = -RT_ERROR;
                 ftrace_tracer_set_status(tracer, RT_FALSE);
                 rt_kprintf("recursion detected! pc %p, called-from %p\n", pc, ret_addr);
                 while (1);
@@ -189,7 +188,7 @@ int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_add
             if (tracer->enabled)
             {
                 tid->stacked_trace++;
-                err = tracer->handler(tracer, pc, ret_addr, context);
+                stat = tracer->on_entry(tracer, pc, ret_addr, context);
                 tid->stacked_trace--;
             }
             else
@@ -199,10 +198,19 @@ int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_add
             }
         }
     }
-    else
-    {
-        err = RT_EOK;
-    }
 
-    return err;
+    return stat;
+}
+
+void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
+{
+    /* tracer always exist & enabled */
+    /* detect recursion */
+    if (tracer->on_exit)
+    {
+        /* no need for recursion test */
+
+        tracer->on_exit(tracer, stat, context);
+    }
+    return ;
 }

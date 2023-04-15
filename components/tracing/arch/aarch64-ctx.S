@@ -11,6 +11,9 @@
 
 /* It is safe to clobber these registers by AAPCS64 */
 #define TEMPX           x9
+#define TRACERX         TEMPX
+#define RETVALX         x10
+
 /**
  * it's safe to reuse x9, because the implementation
  * guarantee that sp will not be modified until we migrate
@@ -52,7 +55,11 @@ mcount:
  */
 .local _do_ftrace
 _do_ftrace:
-    /* setup context of trace point */
+    /**
+     * Faked a call frame for trace point.
+     * Because the call is made apparently so that caller cannot notice,
+     * the callee have to save & restore the frame for caller instead.
+     */
     mov     TRACE_SP, sp
     sub     TRACE_IP, lr, #4
     mov     TRACE_FP, fp
@@ -60,7 +67,7 @@ _do_ftrace:
     /* simulate the frame of trace point */
     stp     TRACE_FP, TRACE_LR, [sp, -16]!
     mov     fp, sp
-    /* simulate the frame of _do_ftrace */
+    /* the frame of _do_ftrace */
     stp     fp, lr, [sp, -16]!
     mov     fp, sp
 
@@ -75,7 +82,7 @@ _do_ftrace:
     stp     TRACE_SP, TRACE_IP, [sp, #OFFTO(FTRACE_REG_SP)]
     stp     TRACE_FP, TRACE_LR, [sp, #OFFTO(FTRACE_REG_FP)]
 
-    /* setup the ops from the instrument buffer */
+    /* retrieve the ops from the instrument points */
     bic     x0, lr, #0x7
     ldr     x0, [x0, #-0x10]
     /* nop,nop? reduce memory access */
@@ -86,31 +93,76 @@ _do_ftrace:
     cmp     x0, x1
     /* prepare parameters for ftrace_trace_entry */
     csel    x0, x0, xzr, ne
+    str     x0, [sp, #OFFTO(FTRACE_TRACER)]
 
     mov     x1, TRACE_IP    /* PC */
     mov     x2, TRACE_LR    /* return address */
     mov     x3, sp
 
     bl      ftrace_trace_entry
+    cbz     x0, _exit_normal
 
+_watch_exit:
+    /* reserve the return value as part of the session */
+    mov     RETVALX, x0
+
+    /* restore the context and branch link */
+    ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
+    ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
+    ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
+    ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+    ldp     x8, TRACERX, [sp, #OFFTO(FTRACE_REG_X8)]
+    add     sp, sp, FTRACE_REG_CNT * REGSZ
+
+    /* prepare return to trace point */
+    ldp     fp, lr, [sp], 16
+
+    /* reserve the session of current tracer */
+    stp     TRACERX, RETVALX, [sp, -16]!
+    blr     lr
+
+    /* on exit of the trace point, reserve the return value */
+    ldp     TRACERX, RETVALX, [sp], 16
+
+    sub     sp, sp, FTRACE_REG_CNT * REGSZ
+    stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
+    stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
+    stp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
+    stp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+
+    /* restore session of caller */
+    mov     x0, TRACERX
+    mov     x1, RETVALX
+    mov     x2, sp
+    bl      ftrace_trace_exit
+
+    ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
+    ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
+    ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
+    ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+    add     sp, sp, FTRACE_REG_CNT * REGSZ
+
+    ldp     fp, lr, [sp], 16
+    ret
+
+_exit_normal:
     /* restore the context and return */
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
     ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
     ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
     ldp     x8, xzr, [sp, #OFFTO(FTRACE_REG_X8)]
-    ldp     TRACE_SP, TRACE_IP, [sp, #OFFTO(FTRACE_REG_SP)]
-    ldp     TRACE_FP, TRACE_LR, [sp, #OFFTO(FTRACE_REG_FP)]
     add     sp, sp, FTRACE_REG_CNT * REGSZ
 
-    /* rewind the frame of _do_ftrace */
+    /**
+     * rewind the frame of _do_ftrace and then
+     * destroy the frame of simulated trace point.
+     * This looks like a normal subroutine return, except that
+     * we have to recover the fp, lr from the faked frame
+     * mentioned above
+     */
     ldp     fp, lr, [sp], 16
     mov     TEMPX, lr
-
-    /**
-     * rewind the frame of trace point
-     * noted that we also restore ip & sp meanwhile
-     */
     ldp     fp, lr, [sp], 16
     br      TEMPX
 

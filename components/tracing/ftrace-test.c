@@ -29,7 +29,7 @@ static void _debug_test_fn(char *str)
 static _Atomic(size_t) count[RT_CPUS_NR * 16];
 
 static rt_notrace
-int _test_handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_ubase_t _test_handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     // const struct ftrace_context*ctx = context;
 

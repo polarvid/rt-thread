@@ -12,7 +12,8 @@
 
 #include <rtthread.h>
 
-static int handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+static rt_notrace
+rt_ubase_t handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     // const struct ftrace_context*ctx = context;
 

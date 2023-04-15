@@ -12,6 +12,9 @@
 
 #include "ftrace.h"
 
+/* ftrace entry */
+rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
+
 /* architecture specific */
 int _ftrace_patch_code(void *entry, rt_bool_t enabled);
 int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled);

@@ -20,7 +20,7 @@
 #define FTRACE_REG_X6   6
 #define FTRACE_REG_X7   7
 #define FTRACE_REG_X8   8
-/* #define FTRACE_PAD0 9 */
+#define FTRACE_TRACER   9
 #define FTRACE_REG_SP   10
 #define FTRACE_REG_IP   11
 #define FTRACE_REG_FP   12

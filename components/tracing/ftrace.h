@@ -10,14 +10,19 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
-#include "rtdef.h"
+#define TRACER_STAT_NONE        0
+#define TRACER_STAT_WATCH_EXIT  1
+
+#ifndef __ASSEMBLY__
+
+#include <rtthread.h>
+
 #ifdef ARCH_ARMV8
 #include "arch/aarch64.h"
 #endif
 
-#include <rtthread.h>
-
-typedef int (*ftrace_trace_fn_t)(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
+typedef rt_ubase_t (*ftrace_trace_fn_t)(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
+typedef void (*ftrace_exit_fn_t)(void *tracer, rt_ubase_t stat, void *context);
 
 /* user should not access this structure directly */
 typedef struct ftrace_tracer {
@@ -25,7 +30,8 @@ typedef struct ftrace_tracer {
     rt_list_t node;
 
     /* handler of tracer */
-    ftrace_trace_fn_t handler;
+    ftrace_trace_fn_t on_entry;
+    ftrace_exit_fn_t on_exit;
 
     /* custom private data */
     void *data;
@@ -38,8 +44,6 @@ typedef struct ftrace_tracer {
     unsigned int enabled:1;
     unsigned int unregistered:1;
 } *ftrace_tracer_t;
-
-int ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 
 void ftrace_tracer_init(ftrace_tracer_t tracer, ftrace_trace_fn_t handler, void *data);
 
@@ -67,6 +71,19 @@ void ftrace_tracer_set_status(ftrace_tracer_t tracer, rt_bool_t enable)
     tracer->enabled = enable;
 }
 
+/* optional */
+rt_notrace rt_inline
+void ftrace_tracer_set_on_exit(ftrace_tracer_t tracer, ftrace_exit_fn_t on_exit)
+{
+    tracer->on_exit = on_exit;
+}
+
+rt_notrace rt_inline
+ftrace_exit_fn_t ftrace_tracer_get_on_exit(ftrace_tracer_t tracer)
+{
+    return tracer->on_exit;
+}
+
 int ftrace_tracer_register(ftrace_tracer_t tracer);
 
 int ftrace_tracer_unregister(ftrace_tracer_t tracer);
@@ -74,5 +91,7 @@ int ftrace_tracer_unregister(ftrace_tracer_t tracer);
 int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn);
 
 int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t notrace_cnt);
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __TRACE_FTRACE_H__ */
