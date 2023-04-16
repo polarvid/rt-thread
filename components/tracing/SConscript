@@ -29,7 +29,7 @@ if GetDepend(['TRACING_KSYMTBL']):
 
 # Generic codes
 if len(src) > 0:
-    generic_code = {'search.c', 'ringbuffer.c', 'ringbuf-test.c'}
+    generic_code = {'search.c', 'event-ring.c', 'evt-ring-test.c'}
     src = src.union(generic_code)
 
 group = DefineGroup('tracing', list(src), depend = ['RT_USING_TRACING'], CPPPATH = CPPPATH)

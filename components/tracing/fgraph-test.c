@@ -27,12 +27,12 @@ static int _debug_test_fn2(char *str)
 static rt_notrace
 rt_ubase_t _test_graph_on_entry(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    const struct ftrace_context*ctx = context;
+    // const struct ftrace_context*ctx = context;
 
-    rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
-    rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
-    for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-        rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
+    // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
+    // rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
+    // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
+    //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
 
     return 1;
 }
@@ -40,16 +40,15 @@ rt_ubase_t _test_graph_on_entry(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr
 static rt_notrace
 void _test_graph_on_exit(void *tracer, rt_ubase_t stat, void *context)
 {
-    const struct ftrace_context*ctx = context;
+    // const struct ftrace_context*ctx = context;
 
-    rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
-    rt_kprintf("%s(%p, 0x%lx, %p)\n", __func__, tracer, stat, context);
-    for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-        rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
+    // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
+    // rt_kprintf("%s(%p, 0x%lx, %p)\n", __func__, tracer, stat, context);
+    // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
+    //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
 
     return ;
 }
-
 
 static void _debug_fgraph(void)
 {
@@ -64,11 +63,11 @@ static void _debug_fgraph(void)
     ftrace_tracer_set_on_exit(&dummy_fgraph, _test_graph_on_exit);
 
     /* test recursion */
-    ftrace_tracer_set_trace(&dummy_fgraph, _debug_test_fn2);
+    // ftrace_tracer_set_trace(&dummy_fgraph, _debug_test_fn2);
     // ftrace_tracer_set_trace(&dummy_fgraph, );
 
     /* test every functions */
-    // ftrace_tracer_set_except(&dummy_fgraph, NULL, 0);
+    ftrace_tracer_set_except(&dummy_fgraph, NULL, 0);
 
     /* a dummy instrumentation */
     _debug_test_fn2("1: no tracer\n");
@@ -85,6 +84,9 @@ static void _debug_fgraph(void)
     __asm__ volatile("mov x8, 8");
     int ret = _debug_test_fn2("2: dummy tracer enable\n");
     rt_kprintf("ret val: %x\n", ret);
+
+    void utest_testcase_run(int argc, char** argv);
+    utest_testcase_run(1,0);
 
     /* ftrace disabled */
     ftrace_tracer_unregister(&dummy_fgraph);

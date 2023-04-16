@@ -10,8 +10,10 @@
 #include <rtthread.h>
 #include <rthw.h>
 #include "arch/aarch64.h"
+#include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"
+#include "mm_page.h"
 
 #include <stdatomic.h>
 
@@ -38,20 +40,28 @@ rt_ubase_t _test_handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void 
     // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
     //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
 
-    atomic_fetch_add(&count[rt_hw_cpu_id() << 4], 1);
+    // call counter
+    // atomic_fetch_add(&count[rt_hw_cpu_id() << 4], 1);
     return 0;
 }
 
 static void _debug_ftrace(void)
 {
-    // while (1) {
-    /* test gen bl */
     extern void _ftrace_entry_insn(void);
     // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 0));
     // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 1));
 
     /* init */
-    ftrace_tracer_init(&dummy_tracer, _test_handler, RT_NULL);
+    trace_evt_ring_t ring;
+    ring = event_ring_create(RT_CPUS_NR * (4ul << 20), sizeof(rt_ubase_t), 4096);
+
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+        for (size_t j = 0; j < (4ul << 20) / 4096; j++)
+            ring->rings[i].buftbl[j] = rt_pages_alloc(0);
+
+    // while (1) {
+    /* test gen bl */
+    ftrace_tracer_init(&dummy_tracer, _test_handler, ring);
 
     /* test recursion */
     // ftrace_tracer_set_trace(&dummy_tracer, _debug_test_fn);
@@ -76,8 +86,8 @@ static void _debug_ftrace(void)
     __asm__ volatile("mov x8, 8");
     _debug_test_fn("dummy tracer enable\n");
 
-    void utest_testcase_run(int argc, char** argv);
-    utest_testcase_run(1,0);
+    // void utest_testcase_run(int argc, char** argv);
+    // utest_testcase_run(1,0);
 
     /* ftrace disabled */
     ftrace_tracer_unregister(&dummy_tracer);
@@ -91,6 +101,10 @@ static void _debug_ftrace(void)
     }
     // rt_thread_mdelay(100);
     // }
+
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+        for (size_t j = 0; j < (4ul << 20) / 4096; j++)
+            rt_pages_free(ring->rings[i].buftbl[j], 0);
     return ;
 
 }

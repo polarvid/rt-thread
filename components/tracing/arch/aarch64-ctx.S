@@ -11,7 +11,7 @@
 
 /* It is safe to clobber these registers by AAPCS64 */
 #define TEMPX           x9
-#define TRACERX         TEMPX
+#define TRACERX         x9
 #define RETVALX         x10
 
 /**
@@ -106,7 +106,7 @@ _watch_exit:
     /* reserve the return value as part of the session */
     mov     RETVALX, x0
 
-    /* restore the context and branch link */
+    /* restore the context of trace point */
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
     ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
@@ -114,16 +114,16 @@ _watch_exit:
     ldp     x8, TRACERX, [sp, #OFFTO(FTRACE_REG_X8)]
     add     sp, sp, FTRACE_REG_CNT * REGSZ
 
-    /* prepare return to trace point */
+    /* get return-to-ip (where we suspend the trace point) */
     ldp     fp, lr, [sp], 16
-
     /* reserve the session of current tracer */
     stp     TRACERX, RETVALX, [sp, -16]!
+
+    /* return to trace point */
     blr     lr
 
     /* on exit of the trace point, reserve the return value */
     ldp     TRACERX, RETVALX, [sp], 16
-
     sub     sp, sp, FTRACE_REG_CNT * REGSZ
     stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
@@ -134,14 +134,15 @@ _watch_exit:
     mov     x0, TRACERX
     mov     x1, RETVALX
     mov     x2, sp
+#if 1
     bl      ftrace_trace_exit
+#endif
 
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
     ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
     ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
     add     sp, sp, FTRACE_REG_CNT * REGSZ
-
     ldp     fp, lr, [sp], 16
     ret
 

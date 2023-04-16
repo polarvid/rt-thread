@@ -335,6 +335,7 @@ int rt_hw_cpu_init()
 #endif /* RT_USING_FDT */
 }
 
+rt_notrace
 rt_weak void rt_hw_secondary_cpu_idle_exec(void)
 {
     asm volatile("wfe" ::

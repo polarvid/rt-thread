@@ -12,6 +12,7 @@
 #include "arch/aarch64.h"
 #include "ftrace.h"
 #include "internal.h"
+#include "rtdef.h"
 #include <cpuport.h>
 
 static ftrace_tracer_t tracers_list;
@@ -202,6 +203,7 @@ rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t 
     return stat;
 }
 
+rt_notrace
 void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
 {
     /* tracer always exist & enabled */
