@@ -25,7 +25,7 @@ static int _debug_test_fn2(char *str)
 }
 
 static rt_notrace
-rt_ubase_t _test_graph_on_entry(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     // const struct ftrace_context*ctx = context;
 
@@ -38,7 +38,7 @@ rt_ubase_t _test_graph_on_entry(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr
 }
 
 static rt_notrace
-void _test_graph_on_exit(void *tracer, rt_ubase_t stat, void *context)
+void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
 {
     // const struct ftrace_context*ctx = context;
 

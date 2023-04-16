@@ -26,8 +26,8 @@ struct ksymtbl {
     rt_uint32_t off_str;
 };
 
-extern void *__ksymtbl_blob;
-static struct ksymtbl *ksymtbl = (struct ksymtbl *)&__ksymtbl_blob;
+extern struct ksymtbl __ksymtbl_blob;
+static struct ksymtbl *ksymtbl = &__ksymtbl_blob;
 #define OFT_ORDER (2)
 
 static int _compare_addroff(const void *a, const void *b)

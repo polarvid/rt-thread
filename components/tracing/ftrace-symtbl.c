@@ -27,7 +27,7 @@ static void _debug_dump(void)
         err = ksymtbl_find_by_address(address, RT_NULL, symbol_buf, 128, RT_NULL, RT_NULL);
 
         if (!err)
-            rt_kprintf("%s %p\n", symbol_buf, *entries);
+            rt_kprintf("%p %s\n", *entries, symbol_buf);
         else
             rt_kprintf("\n");
         entries++;

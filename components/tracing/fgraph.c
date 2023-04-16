@@ -13,7 +13,7 @@
 #include <rtthread.h>
 
 static rt_notrace
-rt_ubase_t handler(void *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_ubase_t handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     // const struct ftrace_context*ctx = context;
 

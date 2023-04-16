@@ -133,10 +133,34 @@ struct _param {
     size_t notrace_cnt;
 };
 
+static int _is_notrace(void *entry, struct _param *param)
+{
+    while (1)
+    {
+        if (entry < param->notrace[0])
+            return 0;
+
+        if (entry == param->notrace[0])
+        {
+            param->notrace_cnt--;
+            param->notrace++;
+            return 1;
+        }
+        else
+        {
+            param->notrace_cnt--;
+            param->notrace++;
+        }
+    }
+}
+
 static void _set_trace_with_entires(void *entry, void *data)
 {
     // skip notrace here
     struct _param *param = data;
+    if (param->notrace_cnt && _is_notrace(entry, param))
+        return ;
+
     int err;
     err = _set_trace(param->tracer, entry);
     if (err)

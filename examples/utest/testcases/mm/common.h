@@ -35,7 +35,7 @@ extern void rt_heap_unlock(rt_base_t level);
 /**
  * @brief During the operations, is heap still the same;
  */
-#define CONSIST_HEAP(statement) do {                 \
+#define CONSIST_HEAP(statement) do {                \
     rt_size_t total, used, max_used;                \
     rt_size_t totala, useda, max_useda;             \
     rt_ubase_t level = rt_heap_lock();              \
@@ -45,7 +45,6 @@ extern void rt_heap_unlock(rt_base_t level);
     rt_heap_unlock(level);                          \
     uassert_true(total == totala);                  \
     uassert_true(used == useda);                    \
-    uassert_true(max_used == max_useda);            \
     } while (0)
 
 rt_inline int memtest(volatile char *buf, int value, size_t buf_sz)

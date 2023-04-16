@@ -16,7 +16,7 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
     RT_ASSERT(objcnt > 0);
     long left = 0;
     long right = objcnt - 1;
-    long mid;
+    long mid = 0;
     int cmp_result;
 
     while (left <= right)
