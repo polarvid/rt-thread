@@ -154,19 +154,25 @@ static int _is_notrace(void *entry, struct _param *param)
     }
 }
 
-static void _set_trace_with_entires(void *entry, void *data)
+static void _set_trace_with_entires(void *symbol, void *data)
 {
     // skip notrace here
     struct _param *param = data;
-    if (param->notrace_cnt && _is_notrace(entry, param))
+    if (param->notrace_cnt && _is_notrace(symbol, param))
         return ;
 
     int err;
-    err = _set_trace(param->tracer, entry);
+    err = _set_trace(param->tracer, symbol);
     if (err)
     {
         rt_kprintf("set trace failed %d\n", err);
     }
+}
+
+#include <stdlib.h>
+static int compare_address_asc(const void *a, const void *b)
+{
+   return (*(int*)a - *(int*)b);
 }
 
 /* for several notrace points only */
@@ -177,7 +183,7 @@ int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t not
         .notrace = notrace,
         .notrace_cnt = notrace_cnt
     };
-
+    qsort(notrace, notrace_cnt, sizeof(void*), compare_address_asc);
     _ftrace_symtbl_for_each(_set_trace_with_entires, &param);
     return 0;
 }

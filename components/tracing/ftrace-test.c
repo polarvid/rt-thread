@@ -12,22 +12,17 @@
 #include "ftrace.h"
 #include "internal.h"
 
-#include <rtthread.h>
-#include <rthw.h>
+#include <dfs_file.h>
+#include <lwp.h>
 #include <mm_aspace.h>
 #include <mm_page.h>
 #include <mmu.h>
-
-#include "lwp.h"
+#include <rtthread.h>
+#include <rthw.h>
 
 #include <stdatomic.h>
 
 static struct ftrace_tracer dummy_tracer;
-
-static void _debug_test_fn(char *str)
-{
-    rt_kputs(str);
-}
 
 #ifndef RT_CPUS_NR
 #define RT_CPUS_NR 1
@@ -38,6 +33,11 @@ static void _debug_test_fn(char *str)
 typedef struct sample_event {
     void *entry_address;
 } sample_event_t;
+
+static void _debug_test_fn(char *str)
+{
+    rt_kputs(str);
+}
 
 static rt_notrace
 rt_ubase_t _test_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
@@ -86,14 +86,20 @@ static void _dump_buf(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *d
 
     /* print progress */
     static size_t stride = 0;
+    static size_t progree = 0;
     static size_t step = 0;
-    static size_t counts = 0;
     if (!stride)
     {
-        stride = event_ring_count(ring, cpuid) / 100;
+        stride = (event_ring_count(ring, cpuid) + 99) / 100;
     }
-    if (counts++ % stride == 0)
-        rt_kprintf("cpuid %d: %d%%\n", cpuid, step++);
+
+    // rt_kprintf("%p\n", event->entry_address);
+
+    if (step++ % stride == 0)
+    {
+        rt_kprintf("cpuid %d: %d%%\n", cpuid, progree);
+        progree = progree < 99 ? progree+1 : 0;
+    }
 
     ssize_t ret = write(fd, &event->entry_address, 8);
     if (ret == -1) {
@@ -171,14 +177,20 @@ static void _debug_ftrace(void)
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)
     {
         char buf[32];
-        rt_snprintf(buf, sizeof(buf), "/logging-%d.txt", cpuid);
+        rt_snprintf(buf, sizeof(buf), "/dev/shm/logging-%d.txt", cpuid);
         fds[cpuid] = open(buf, O_WRONLY | O_CREAT, 0);
     }
 
     event_ring_for_each_event_lock(ring, _dump_buf, (void *)fds);
 
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)
+    {
         close(fds[cpuid]);
+        char src[64];
+        rt_snprintf(src, sizeof(src), "/dev/shm/logging-%d.txt", cpuid);
+        void copy(const char *src, const char *dst);
+        copy(src, src + 8);
+    }
 
     event_ring_for_each_buffer_lock(ring, _free_buffer, 0);
 

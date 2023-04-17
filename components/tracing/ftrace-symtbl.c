@@ -10,6 +10,8 @@
 #include "arch/aarch64.h"
 #include "ksymtbl.h"
 #include "internal.h"
+#include <stdio.h>
+#include <lwp.h>
 
 extern void *__patchable_function_entries_start;
 extern void *__patchable_function_entries_end;
@@ -18,20 +20,31 @@ static void _debug_dump(void)
 {
     void **entries = &__patchable_function_entries_start;
     void **end = &__patchable_function_entries_end;
-    char symbol_buf[128];
+    static char symbol_buf[256];
+    static char print_buf[256];
+    int fd;
+
+    fd = open("/entries.log", O_WRONLY | O_CREAT, 0);
 
     while (entries < end)
     {
         int err;
         void *address = (void *)ENTRIES_TO_SYM(*entries);
-        err = ksymtbl_find_by_address(address, RT_NULL, symbol_buf, 128, RT_NULL, RT_NULL);
+        err = ksymtbl_find_by_address(address, RT_NULL, symbol_buf, sizeof(symbol_buf), RT_NULL, RT_NULL);
 
         if (!err)
-            rt_kprintf("%p %s\n", *entries, symbol_buf);
+        {
+            rt_snprintf(print_buf, sizeof(print_buf), "%p %s\n", *entries, symbol_buf);
+            write(fd, print_buf, strlen(print_buf));
+        }
         else
-            rt_kprintf("\n");
+        {
+            rt_kprintf("entry %p not found\n", *entries);
+        }
+
         entries++;
     }
+    close(fd);
 }
 MSH_CMD_EXPORT_ALIAS(_debug_dump, dump_entries, dump patchable function entries);
 
