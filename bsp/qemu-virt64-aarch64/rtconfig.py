@@ -31,14 +31,14 @@ if PLATFORM == 'gcc':
     LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static'
     CPATH   = ''
     LPATH   = ''
-        
+
     if BUILD == 'debug':
         CFLAGS   += ' -O0 -ggdb'
         CXXFLAGS += ' -O0 -ggdb'
         AFLAGS   += ' -ggdb'
     else:
-        CFLAGS   += ' -O2'
-        CXXFLAGS += ' -O2'
+        CFLAGS   += ' -O2 -ggdb'
+        CXXFLAGS += ' -O2 -ggdb'
     CXXFLAGS += ' -Woverloaded-virtual -fno-exceptions -fno-rtti'
 
 DUMP_ACTION = OBJDUMP + ' -D -S $TARGET > rtt.asm\n'

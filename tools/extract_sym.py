@@ -126,8 +126,6 @@ So there is a compile time processing to dealing with it
 class MapInfo:
     def __init__(self):
         self.entry_list = []
-        # symbol as key, for entry
-        self.__symbol_to_entry = {}
         # base as key, for value
         self.__oft_str_dict = {}
         self.__section_entries_dict = {}

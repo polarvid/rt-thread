@@ -27,11 +27,17 @@ while True:
             total_count = len(addresses)
 
             # Loop through the addresses and count their occurrence
+            corrupted = {}
             for address in addresses:
                 if address in objects_dict:
                     objects_dict[address]['count'] = objects_dict[address].get('count', 0) + 1
                 else:
-                    print(f'corrupted record {address:x}')
+                    address = f'{address:x}'
+                    if address not in corrupted:
+                        corrupted[address] = 1
+                    else:
+                        corrupted[address] += 1
+            print(corrupted)
 
         # Open a new file called "objects_with_counts.txt" and write the objects with their counts
         with open(f'objects_with_counts-{cpuid}.txt', 'w') as f:
