@@ -11,6 +11,7 @@
 #include <rthw.h>
 #include <rtthread.h>
 #include <cpuport.h>
+#include <mm_aspace.h>
 
 #ifdef RT_USING_VIRTIO_NET
 
@@ -106,9 +107,7 @@ static struct pbuf *virtio_net_rx(rt_device_t dev)
 #ifdef RT_USING_SMP
             level = rt_spin_lock_irqsave(&virtio_dev->spinlock);
 #endif
-            void *rx_map = (void *)VIRTIO_PA2VA(queue_rx->desc[id].addr);
-            rt_memcpy(p->payload, rx_map, len);
-            rt_iounmap(rx_map);
+            rt_memcpy(p->payload, (void *)queue_rx->desc[id].addr - PV_OFFSET, len);
 
             queue_rx->used_idx++;
 

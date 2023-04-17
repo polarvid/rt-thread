@@ -8,6 +8,7 @@
  * 2019-11-01     Jesven       The first version
  * 2022-12-13     WangXiaoyao  Hot-pluggable, extensible
  *                             page management algorithm
+ * 2023-02-20     WangXiaoyao  Multi-list page-management
  */
 #include <rtthread.h>
 
@@ -62,13 +63,13 @@ static void hint_free(rt_mm_va_hint_t hint)
 
 static void on_page_fault(struct rt_varea *varea, struct rt_aspace_fault_msg *msg)
 {
-    void *init_start = (void *)init_mpr_align_start;
-    void *init_end = (void *)init_mpr_align_end;
-    if (msg->fault_vaddr < init_end && msg->fault_vaddr >= init_start)
+    char *init_start = (void *)init_mpr_align_start;
+    char *init_end = (void *)init_mpr_align_end;
+    if ((char *)msg->fault_vaddr < init_end && (char *)msg->fault_vaddr >= init_start)
     {
-        rt_size_t offset = msg->fault_vaddr - init_start;
+        rt_size_t offset = (char *)msg->fault_vaddr - init_start;
         msg->response.status = MM_FAULT_STATUS_OK;
-        msg->response.vaddr = init_mpr_cont_start + offset;
+        msg->response.vaddr = (char *)init_mpr_cont_start + offset;
         msg->response.size = ARCH_PAGE_SIZE;
     }
     else
@@ -193,13 +194,13 @@ static void _trace_free(rt_page_t page, void *caller, size_t size_bits)
 
 static inline void *page_to_addr(rt_page_t page)
 {
-    return (void *)((page - page_start) << ARCH_PAGE_SHIFT) - PV_OFFSET;
+    return (void *)(((page - page_start) << ARCH_PAGE_SHIFT) - PV_OFFSET);
 }
 
 static inline rt_page_t addr_to_page(rt_page_t pg_start, void *addr)
 {
-    addr += PV_OFFSET;
-    return &pg_start[((uintptr_t)addr >> ARCH_PAGE_SHIFT)];
+    addr = (char *)addr + PV_OFFSET;
+    return &pg_start[((rt_ubase_t)addr >> ARCH_PAGE_SHIFT)];
 }
 
 #define FLOOR(val, align) (((rt_size_t)(val) + (align)-1) & ~((align)-1))
@@ -300,7 +301,7 @@ static void _pages_ref_inc(struct rt_page *p, rt_uint32_t size_bits)
     idx = idx & ~((1UL << size_bits) - 1);
 
     page_head = page_start + idx;
-    page_head = (void *)page_head + early_offset;
+    page_head = (void *)((char *)page_head + early_offset);
     page_head->ref_cnt++;
 }
 
@@ -323,7 +324,7 @@ static int _pages_free(rt_page_t page_list[], struct rt_page *p, rt_uint32_t siz
     struct rt_page *buddy;
 
     RT_ASSERT(p >= page_start);
-    RT_ASSERT((void *)p < rt_mpr_start + rt_mpr_size);
+    RT_ASSERT((char *)p < (char *)rt_mpr_start + rt_mpr_size);
     RT_ASSERT(rt_kmem_v2p(p));
     RT_ASSERT(p->ref_cnt > 0);
     RT_ASSERT(p->size_bits == ARCH_ADDRESS_WIDTH_BITS);
@@ -394,10 +395,10 @@ static struct rt_page *_pages_alloc(rt_page_t page_list[], rt_uint32_t size_bits
 
 static void _early_page_remove(rt_page_t page_list[], rt_page_t page, rt_uint32_t size_bits)
 {
-    rt_page_t page_cont = (void *)page + early_offset;
+    rt_page_t page_cont = (rt_page_t)((char *)page + early_offset);
     if (page_cont->pre)
     {
-        rt_page_t pre_cont = (void *)page_cont->pre + early_offset;
+        rt_page_t pre_cont = (rt_page_t)((char *)page_cont->pre + early_offset);
         pre_cont->next = page_cont->next;
     }
     else
@@ -407,7 +408,7 @@ static void _early_page_remove(rt_page_t page_list[], rt_page_t page, rt_uint32_
 
     if (page_cont->next)
     {
-        rt_page_t next_cont = (void *)page_cont->next + early_offset;
+        rt_page_t next_cont = (rt_page_t)((char *)page_cont->next + early_offset);
         next_cont->pre = page_cont->pre;
     }
 
@@ -417,13 +418,13 @@ static void _early_page_remove(rt_page_t page_list[], rt_page_t page, rt_uint32_
 static void _early_page_insert(rt_page_t page_list[], rt_page_t page, int size_bits)
 {
     RT_ASSERT((void *)page >= rt_mpr_start &&
-              (void *)page - rt_mpr_start < +rt_mpr_size);
-    rt_page_t page_cont = (void *)page + early_offset;
+              ((char *)page - (char *)rt_mpr_start) < rt_mpr_size);
+    rt_page_t page_cont = (rt_page_t)((char *)page + early_offset);
 
     page_cont->next = page_list[size_bits];
     if (page_cont->next)
     {
-        rt_page_t next_cont = (void *)page_cont->next + early_offset;
+        rt_page_t next_cont = (rt_page_t)((char *)page_cont->next + early_offset);
         next_cont->pre = page;
     }
     page_cont->pre = 0;
@@ -465,7 +466,7 @@ static struct rt_page *_early_pages_alloc(rt_page_t page_list[], rt_uint32_t siz
             level--;
         }
     }
-    rt_page_t page_cont = (void *)p + early_offset;
+    rt_page_t page_cont = (rt_page_t)((char *)p + early_offset);
     page_cont->size_bits = ARCH_ADDRESS_WIDTH_BITS;
     page_cont->ref_cnt = 1;
     return p;
@@ -512,10 +513,13 @@ void rt_page_ref_inc(void *addr, rt_uint32_t size_bits)
 
 static rt_page_t (*pages_alloc_handler)(rt_page_t page_list[], rt_uint32_t size_bits);
 
+/* if not, we skip the finding on page_list_high */
+static size_t _high_page_configured = 0;
+
 static rt_page_t *_flag_to_page_list(size_t flags)
 {
     rt_page_t *page_list;
-    if (flags & PAGE_ANY_AVAILABLE)
+    if (_high_page_configured && (flags & PAGE_ANY_AVAILABLE))
     {
         page_list = page_list_high;
     }
@@ -565,7 +569,7 @@ void *rt_pages_alloc(rt_uint32_t size_bits)
     return _do_pages_alloc(size_bits, 0);
 }
 
-void *rt_pages_alloc2(rt_uint32_t size_bits, size_t flags)
+void *rt_pages_alloc_ext(rt_uint32_t size_bits, size_t flags)
 {
     return _do_pages_alloc(size_bits, flags);
 }
@@ -615,6 +619,7 @@ void list_page(void)
         }
         rt_kprintf("\n");
     }
+
     for (i = 0; i < RT_PAGE_MAX_ORDER; i++)
     {
         struct rt_page *p = page_list_high[i];
@@ -675,6 +680,9 @@ static void _install_page(rt_page_t mpr_head, rt_region_t region, void *insert_h
     shadow.start = region.start & ~shadow_mask;
     shadow.end = FLOOR(region.end, shadow_mask + 1);
 
+    if (shadow.end > UINT32_MAX)
+        _high_page_configured = 1;
+
     rt_page_t shad_head = addr_to_page(mpr_head, (void *)shadow.start);
     rt_page_t shad_tail = addr_to_page(mpr_head, (void *)shadow.end);
     rt_page_t head = addr_to_page(mpr_head, (void *)region.start);
@@ -716,7 +724,7 @@ static void _install_page(rt_page_t mpr_head, rt_region_t region, void *insert_h
 
         /* insert to list */
         rt_page_t *page_list = _get_page_list((void *)region.start);
-        insert(page_list, (void *)p - early_offset, size_bits - ARCH_PAGE_SHIFT);
+        insert(page_list, (rt_page_t)((char *)p - early_offset), size_bits - ARCH_PAGE_SHIFT);
         region.start += (1UL << size_bits);
     }
 }
@@ -771,9 +779,9 @@ void rt_page_init(rt_region_t reg)
     rt_size_t init_mpr_npage = init_mpr_size >> ARCH_PAGE_SHIFT;
 
     init_mpr_cont_start = (void *)reg.start;
-    void *init_mpr_cont_end = init_mpr_cont_start + init_mpr_size;
-    early_offset = init_mpr_cont_start - (void *)init_mpr_align_start;
-    rt_page_t mpr_cont = rt_mpr_start + early_offset;
+    rt_size_t init_mpr_cont_end = (rt_size_t)init_mpr_cont_start + init_mpr_size;
+    early_offset = (rt_size_t)init_mpr_cont_start - init_mpr_align_start;
+    rt_page_t mpr_cont = (void *)((char *)rt_mpr_start + early_offset);
 
     /* mark init mpr pages as illegal */
     rt_page_t head_cont = addr_to_page(mpr_cont, (void *)reg.start);
@@ -783,7 +791,7 @@ void rt_page_init(rt_region_t reg)
         iter->size_bits = ARCH_ADDRESS_WIDTH_BITS;
     }
 
-    reg.start = (rt_size_t)init_mpr_cont_end;
+    reg.start = init_mpr_cont_end;
     _install_page(mpr_cont, reg, _early_page_insert);
 
     pages_alloc_handler = _early_pages_alloc;
@@ -801,7 +809,7 @@ void rt_page_init(rt_region_t reg)
 static int _load_mpr_area(void *head, void *tail)
 {
     int err = 0;
-    void *iter = (void *)((uintptr_t)head & ~ARCH_PAGE_MASK);
+    char *iter = (char *)((rt_ubase_t)head & ~ARCH_PAGE_MASK);
     tail = (void *)FLOOR(tail, ARCH_PAGE_SIZE);
 
     while (iter != tail)

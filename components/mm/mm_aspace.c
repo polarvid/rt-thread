@@ -136,7 +136,6 @@ static int _do_named_map(rt_aspace_t aspace, void *vaddr, rt_size_t length,
     /* it's ensured by caller that (void*)end will not overflow */
     void *phyaddr = (void *)(offset << MM_PAGE_SHIFT);
 
-    /* TODO try to map with huge TLB, when flag & HUGEPAGE */
     void *ret = rt_hw_mmu_map(aspace, vaddr, phyaddr, length, attr);
     if (ret == RT_NULL)
     {
@@ -173,9 +172,9 @@ int _varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg)
          * the page returned by handler is not checked
          * cause no much assumption can make on it
          */
-        void *store = msg->response.vaddr;
+        char *store = msg->response.vaddr;
         rt_size_t store_sz = msg->response.size;
-        if (msg->fault_vaddr + store_sz > varea->start + varea->size)
+        if ((char *)msg->fault_vaddr + store_sz > (char *)varea->start + varea->size)
         {
             LOG_W("%s: too much (0x%lx) of buffer on vaddr %p is provided",
                     __func__, store_sz, msg->fault_vaddr);
@@ -225,9 +224,9 @@ static int _do_prefetch(rt_aspace_t aspace, rt_varea_t varea, void *start,
     int err = RT_EOK;
 
     /* it's ensured by caller that start & size ara page-aligned */
-    void *end = start + size;
-    void *vaddr = start;
-    rt_size_t off = varea->offset + ((start - varea->start) >> ARCH_PAGE_SHIFT);
+    char *end = (char *)start + size;
+    char *vaddr = start;
+    rt_size_t off = varea->offset + ((vaddr - (char *)varea->start) >> ARCH_PAGE_SHIFT);
 
     while (vaddr != end)
     {
@@ -240,7 +239,6 @@ static int _do_prefetch(rt_aspace_t aspace, rt_varea_t varea, void *start,
             err = -RT_ENOMEM;
             break;
         }
-
         /**
          * It's hard to identify the mapping pattern on a customized handler
          * So we terminate the prefetch process on that case
@@ -382,7 +380,7 @@ rt_varea_t _varea_create(void *start, rt_size_t size)
 }
 
 #define _IS_OVERFLOW(start, length) ((length) > (0ul - (uintptr_t)(start)))
-#define _IS_OVERSIZE(start, length, limit_s, limit_sz) (((length) + (rt_size_t)((start) - (limit_start))) > (limit_size))
+#define _IS_OVERSIZE(start, length, limit_s, limit_sz) (((length) + (rt_size_t)((char *)(start) - (char *)(limit_start))) > (limit_size))
 
 static inline int _not_in_range(void *start, rt_size_t length,
                                 void *limit_start, rt_size_t limit_size)
@@ -445,6 +443,10 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
             {
                 mm_free(varea);
             }
+            else
+            {
+                *addr = varea->start;
+            }
         }
         else
         {
@@ -457,10 +459,7 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
     {
         *addr = NULL;
     }
-    else
-    {
-        *addr = varea->start;
-    }
+
     return err;
 }
 
@@ -638,7 +637,7 @@ int rt_aspace_unmap(rt_aspace_t aspace, void *addr)
     if (_not_in_range(addr, 1, aspace->start, aspace->size))
     {
         LOG_I("%s: %lx not in range of aspace[%lx:%lx]", __func__, addr,
-              aspace->start, aspace->start + aspace->size);
+              aspace->start, (char *)aspace->start + aspace->size);
         return -RT_EINVAL;
     }
 
@@ -654,7 +653,7 @@ static inline void *_lower(void *a, void *b)
 
 static inline void *_align(void *va, rt_ubase_t align_mask)
 {
-    return (void *)((rt_ubase_t)(va + ~align_mask) & align_mask);
+    return (void *)((rt_ubase_t)((char *)va + ~align_mask) & align_mask);
 }
 
 static void *_ascending_search(rt_varea_t varea, rt_size_t req_size,
@@ -663,17 +662,17 @@ static void *_ascending_search(rt_varea_t varea, rt_size_t req_size,
     void *ret = RT_NULL;
     while (varea && varea->start < limit.end)
     {
-        void *candidate = varea->start + varea->size;
+        char *candidate = (char *)varea->start + varea->size;
         candidate = _align(candidate, align_mask);
 
-        if (candidate > limit.end || limit.end - candidate + 1 < req_size)
+        if (candidate > (char *)limit.end || (char *)limit.end - candidate + 1 < req_size)
             break;
 
         rt_varea_t nx_va = ASPACE_VAREA_NEXT(varea);
         if (nx_va)
         {
             rt_size_t gap_size =
-                _lower(limit.end, nx_va->start - 1) - candidate + 1;
+                (char *)_lower(limit.end, (char *)nx_va->start - 1) - candidate + 1;
             if (gap_size >= req_size)
             {
                 ret = candidate;
@@ -699,15 +698,15 @@ static void *_find_head_and_asc_search(rt_aspace_t aspace, rt_size_t req_size,
     rt_varea_t varea = _aspace_bst_search_exceed(aspace, limit.start);
     if (varea)
     {
-        void *candidate = _align(limit.start, align_mask);
-        rt_size_t gap_size = varea->start - candidate;
+        char *candidate = _align(limit.start, align_mask);
+        rt_size_t gap_size = (char *)varea->start - candidate;
         if (gap_size >= req_size)
         {
             rt_varea_t former = _aspace_bst_search(aspace, limit.start);
             if (former)
             {
-                candidate = _align(former->start + former->size, align_mask);
-                gap_size = varea->start - candidate;
+                candidate = _align((char *)former->start + former->size, align_mask);
+                gap_size = (char *)varea->start - candidate;
 
                 if (gap_size >= req_size)
                     va = candidate;
@@ -726,12 +725,12 @@ static void *_find_head_and_asc_search(rt_aspace_t aspace, rt_size_t req_size,
     }
     else
     {
-        void *candidate;
+        char *candidate;
         rt_size_t gap_size;
 
         candidate = limit.start;
         candidate = _align(candidate, align_mask);
-        gap_size = limit.end - candidate + 1;
+        gap_size = (char *)limit.end - candidate + 1;
 
         if (gap_size >= req_size)
             va = candidate;
@@ -746,7 +745,7 @@ static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
 {
     rt_varea_t varea = NULL;
     void *va = RT_NULL;
-    struct _mm_range limit = {limit_start, limit_start + limit_size - 1};
+    struct _mm_range limit = {limit_start, (char *)limit_start + limit_size - 1};
 
     rt_ubase_t align_mask = ~0ul;
     if (flags & MMF_REQUEST_ALIGN)
@@ -758,7 +757,7 @@ static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
     {
         /* if prefer and free, just return the prefer region */
         prefer = _align(prefer, align_mask);
-        struct _mm_range range = {prefer, prefer + req_size - 1};
+        struct _mm_range range = {prefer, (char *)prefer + req_size - 1};
         varea = _aspace_bst_search_overlap(aspace, range);
 
         if (!varea)
@@ -776,7 +775,7 @@ static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
             if (va == RT_NULL)
             {
                 /* rewind to first range */
-                limit.end = varea->start - 1;
+                limit.end = (char *)varea->start - 1;
                 va = _find_head_and_asc_search(aspace, req_size, align_mask,
                                                limit);
             }
@@ -794,7 +793,7 @@ int rt_aspace_load_page(rt_aspace_t aspace, void *addr, rt_size_t npage)
 {
     int err = RT_EOK;
     rt_varea_t varea;
-    void *end = addr + (npage << ARCH_PAGE_SHIFT);
+    char *end = (char *)addr + (npage << ARCH_PAGE_SHIFT);
 
     WR_LOCK(aspace);
     varea = _aspace_bst_search(aspace, addr);
@@ -805,7 +804,7 @@ int rt_aspace_load_page(rt_aspace_t aspace, void *addr, rt_size_t npage)
         LOG_W("%s: varea not exist", __func__);
         err = -RT_ENOENT;
     }
-    else if (addr >= end || (rt_size_t)addr & ARCH_PAGE_MASK ||
+    else if ((char *)addr >= end || (rt_size_t)addr & ARCH_PAGE_MASK ||
              _not_in_range(addr, npage << ARCH_PAGE_SHIFT, varea->start,
                            varea->size))
     {
@@ -934,12 +933,12 @@ static int _dump(rt_varea_t varea, void *arg)
 {
     if (varea->mem_obj && varea->mem_obj->get_name)
     {
-        rt_kprintf("[%p - %p] %s\n", varea->start, varea->start + varea->size,
+        rt_kprintf("[%p - %p] %s\n", varea->start, (char *)varea->start + varea->size,
                    varea->mem_obj->get_name(varea));
     }
     else
     {
-        rt_kprintf("[%p - %p] phy-map\n", varea->start, varea->start + varea->size);
+        rt_kprintf("[%p - %p] phy-map\n", varea->start, (char *)varea->start + varea->size);
         rt_kprintf("\t\\_ paddr = %p\n",  varea->offset << MM_PAGE_SHIFT);
     }
     return 0;

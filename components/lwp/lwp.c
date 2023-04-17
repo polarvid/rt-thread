@@ -9,6 +9,7 @@
  * 2018-11-02     heyuanjie    fix complie error in iar
  * 2021-02-03     lizhirui     add 64-bit arch support and riscv64 arch support
  * 2021-08-26     linzhenxing  add lwp_setcwd\lwp_getcwd
+ * 2023-02-20     wangxiaoyao  inv icache before new app startup
  */
 
 #include <rthw.h>
@@ -1112,7 +1113,7 @@ static void _lwp_thread_entry(void *parameter)
     rt_hw_icache_invalidate_all();
 
 #ifdef ARCH_MM_MMU
-    arch_start_umode(lwp->args, lwp->text_entry, (void *)USER_STACK_VEND, tid->stack_addr + tid->stack_size);
+    arch_start_umode(lwp->args, lwp->text_entry, (void *)USER_STACK_VEND, (char *)tid->stack_addr + tid->stack_size);
 #else
     arch_start_umode(lwp->args, lwp->text_entry, lwp->data_entry, (void *)((uint32_t)lwp->data_entry + lwp->data_size));
 #endif /* ARCH_MM_MMU */
