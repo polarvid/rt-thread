@@ -24,7 +24,7 @@
 struct ftrace_tracer;
 
 typedef rt_ubase_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
-typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t stat, void *context);
+typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context);
 
 /* user should not access this structure directly */
 typedef struct ftrace_tracer {

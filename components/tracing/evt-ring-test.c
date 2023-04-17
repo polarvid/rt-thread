@@ -24,7 +24,7 @@ static void alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, vo
 
     RT_ASSERT(!*pbuffer);
     preloc = pbuffer;
-    *pbuffer = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE);
+    *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     // rt_kprintf("buf %p\n", *pbuffer);
     RT_ASSERT(!!*pbuffer);
 

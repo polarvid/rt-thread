@@ -115,7 +115,7 @@ _watch_exit:
     add     sp, sp, FTRACE_REG_CNT * REGSZ
 
     /* get return-to-ip (where we suspend the trace point) */
-    ldp     fp, lr, [sp], 16
+    ldp     fp, lr, [sp]
     /* reserve the session of current tracer */
     stp     TRACERX, RETVALX, [sp, -16]!
 
@@ -124,6 +124,8 @@ _watch_exit:
 
     /* on exit of the trace point, reserve the return value */
     ldp     TRACERX, RETVALX, [sp], 16
+    ldp     fp, lr, [sp], 16
+
     sub     sp, sp, FTRACE_REG_CNT * REGSZ
     stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
@@ -132,11 +134,10 @@ _watch_exit:
 
     /* restore session of caller */
     mov     x0, TRACERX
-    mov     x1, RETVALX
-    mov     x2, sp
-#if 1
+    sub     x1, lr, 4
+    mov     x2, RETVALX
+    mov     x3, sp
     bl      ftrace_trace_exit
-#endif
 
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]

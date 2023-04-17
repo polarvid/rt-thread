@@ -234,7 +234,7 @@ rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t 
 }
 
 rt_notrace
-void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
+void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context)
 {
     /* tracer always exist & enabled */
     /* detect recursion */
@@ -242,7 +242,7 @@ void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
     {
         /* no need for recursion test */
 
-        tracer->on_exit(tracer, stat, context);
+        tracer->on_exit(tracer, entry_pc, stat, context);
     }
     return ;
 }

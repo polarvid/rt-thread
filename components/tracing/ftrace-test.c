@@ -61,7 +61,7 @@ rt_ubase_t _test_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_a
 static void _alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     RT_ASSERT(!*pbuffer);
-    *pbuffer = rt_pages_alloc2(0, PAGE_ANY_AVAILABLE);
+    *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     RT_ASSERT(!!*pbuffer);
 
     /* test on event_ring_object_loc */
@@ -172,6 +172,7 @@ static void _debug_ftrace(void)
         rt_kprintf("cpu %d count %d drops %ld\n", cpuid, event_ring_count(ring, cpuid), ring->rings[cpuid].drop_events);
     // rt_thread_mdelay(100);
     // }
+
     /* output recording */
     int fds[RT_CPUS_NR];
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)

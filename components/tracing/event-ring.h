@@ -182,7 +182,7 @@ int event_ring_enqueue(trace_evt_ring_t ring, void *buf, const rt_bool_t overrid
     rt_ubase_t *dst = event_ring_object_loc(ring, prod_head, cpuid);
     /* give more chance for compiler optimization */
     for (size_t i = 0; i < (ring->objsz / sizeof(rt_ubase_t)); i++)
-        *dst = *src;
+        *dst++ = *src++;
 
     /**
      * @brief only the outer most writer will update prod_tail to prod_head

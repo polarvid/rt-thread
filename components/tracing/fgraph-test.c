@@ -8,92 +8,117 @@
  * 2023-04-15     WangXiaoyao  fgraph support
  */
 
-#include <rtthread.h>
-#include <rthw.h>
 #include "arch/aarch64.h"
+#include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"
+
+#include <mm_aspace.h>
+#include <mm_page.h>
+#include <mmu.h>
+#include <rtthread.h>
+#include <rthw.h>
 
 #include <stdatomic.h>
 
 static struct ftrace_tracer dummy_fgraph;
 
-static int _debug_test_fn2(char *str)
-{
-    rt_kputs(str);
-    return 0xabadcafe;
-}
+typedef struct sample_event {
+    void *entry_address;
+    rt_uint64_t entry_time;
+    rt_uint64_t exit_time;
+    void *tid;
+} fgraph_event_t;
 
 static rt_notrace
 rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    // const struct ftrace_context*ctx = context;
-
-    // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
-    // rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
-    // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-    //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
-
-    return 1;
+    rt_ubase_t time = ftrace_timestamp();
+    return time ? time : 1;
 }
 
 static rt_notrace
-void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t stat, void *context)
+void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context)
 {
-    // const struct ftrace_context*ctx = context;
+    rt_ubase_t entry_time = stat;
+    rt_ubase_t exit_time = ftrace_timestamp();
+    trace_evt_ring_t ring = tracer->data;
 
-    // rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
-    // rt_kprintf("%s(%p, 0x%lx, %p)\n", __func__, tracer, stat, context);
-    // for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-    //     rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
-
+    fgraph_event_t event = {
+        .entry_address = (void *)(entry_pc - 4),
+        .entry_time = entry_time,
+        .exit_time = exit_time,
+        /* use ftrace id instead */
+        .tid = rt_thread_self(),
+    };
+    event_ring_enqueue(ring, &event, 0);
     return ;
 }
 
+static void _alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+{
+    *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+    RT_ASSERT(!!*pbuffer);
+}
+
+static void _dump_buf(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
+{
+    // int *fds = data;
+    // int fd = fds[cpuid];
+    fgraph_event_t *event = pevent;
+
+    /* print progress */
+    // static size_t stride = 0;
+    // static size_t progree = 0;
+    // static size_t step = 0;
+    // if (!stride)
+    // {
+    //     stride = (event_ring_count(ring, cpuid) + 99) / 100;
+    // }
+
+    rt_thread_t tid = event->tid;
+    rt_kprintf("[%3d]-%s func %p: calltime 0x%lx rettime 0x%lx\n", cpuid, tid->parent.name,
+        event->entry_address, event->entry_time, event->exit_time);
+
+    // if (step++ % stride == 0)
+    // {
+    //     rt_kprintf("cpuid %d: %d%%\n", cpuid, progree);
+    //     progree = progree < 99 ? progree+1 : 0;
+    // }
+
+    // ssize_t ret = write(fd, &event->entry_address, 8);
+    // if (ret == -1) {
+    //     RT_ASSERT(0);
+    // }
+}
+
+
 static void _debug_fgraph(void)
 {
-    // while (1) {
-    /* test gen bl */
-    extern void _ftrace_entry_insn(void);
-    // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 0));
-    // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 1));
-
     /* init */
-    ftrace_tracer_init(&dummy_fgraph, _test_graph_on_entry, RT_NULL);
+    trace_evt_ring_t ring;
+    ring = event_ring_create(RT_CPUS_NR * (4ul << 20), sizeof(fgraph_event_t), ARCH_PAGE_SIZE);
+    event_ring_for_each_buffer_lock(ring, _alloc_buffer, NULL);
+
+    ftrace_tracer_init(&dummy_fgraph, _test_graph_on_entry, ring);
     ftrace_tracer_set_on_exit(&dummy_fgraph, _test_graph_on_exit);
 
-    /* test recursion */
-    // ftrace_tracer_set_trace(&dummy_fgraph, _debug_test_fn2);
-    // ftrace_tracer_set_trace(&dummy_fgraph, );
-
-    /* test every functions */
-    ftrace_tracer_set_except(&dummy_fgraph, NULL, 0);
-
-    /* a dummy instrumentation */
-    _debug_test_fn2("1: no tracer\n");
+    /* set trace point */
+    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, &rt_hw_spin_lock, &rt_hw_spin_unlock,
+                       &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, &rt_cpu_index};
+    ftrace_tracer_set_except(&dummy_fgraph, notrace, sizeof(notrace)/sizeof(notrace[0]));
 
     /* ftrace enabled */
     ftrace_tracer_register(&dummy_fgraph);
-    __asm__ volatile("mov x1, 1");
-    __asm__ volatile("mov x2, 2");
-    __asm__ volatile("mov x3, 3");
-    __asm__ volatile("mov x4, 4");
-    __asm__ volatile("mov x5, 5");
-    __asm__ volatile("mov x6, 6");
-    __asm__ volatile("mov x7, 7");
-    __asm__ volatile("mov x8, 8");
-    int ret = _debug_test_fn2("2: dummy tracer enable\n");
-    rt_kprintf("ret val: %x\n", ret);
 
-    void utest_testcase_run(int argc, char** argv);
-    utest_testcase_run(1,0);
+    /* do the tracing */
 
     /* ftrace disabled */
     ftrace_tracer_unregister(&dummy_fgraph);
-    _debug_test_fn2("dummy tracer unregistered\n");
 
-    // rt_thread_mdelay(100);
-    // }
+    /* report */
+    event_ring_for_each_event_lock(ring, _dump_buf, (void *)0);
+
     return ;
 }
 MSH_CMD_EXPORT_ALIAS(_debug_fgraph, fgraph_test, test ftrace feature);

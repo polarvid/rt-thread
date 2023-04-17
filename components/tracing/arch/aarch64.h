@@ -42,13 +42,15 @@ struct ftrace_context {
     rt_ubase_t args[FTRACE_REG_CNT];
 };
 
-rt_inline rt_ubase_t ftrace_timestamp(void)
+rt_notrace rt_inline
+rt_ubase_t ftrace_timestamp(void)
 {
     rt_ubase_t freq;
     rt_ubase_t clock;
 
     __asm__ volatile("mrs %0, cntfrq_el0":"=r"(freq));
     __asm__ volatile("mrs %0, cntpct_el0":"=r"(clock));
+    __asm__ volatile("isb":::"memory");
 
     clock = (clock * NANOSECOND_PER_SECOND) / freq;
     return clock;
