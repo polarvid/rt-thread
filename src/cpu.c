@@ -170,6 +170,7 @@ RTM_EXPORT(rt_spin_unlock_irqrestore)
  *
  * @return  Return a pointer to the current cpu object.
  */
+rt_notrace
 struct rt_cpu *rt_cpu_self(void)
 {
     return &_cpus[rt_hw_cpu_id()];

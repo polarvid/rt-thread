@@ -15,6 +15,7 @@
 
 extern unsigned int __bss_start;
 extern unsigned int __bss_end;
+struct rt_thread;
 
 #ifndef RT_USING_SMART
 #define KERNEL_VADDR_START 0x0

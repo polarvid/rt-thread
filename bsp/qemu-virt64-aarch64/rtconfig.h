@@ -43,12 +43,8 @@
 /* Memory Management */
 
 #define RT_PAGE_MAX_ORDER 11
-#define RT_USING_MEMPOOL
-#define RT_USING_SMALL_MEM
-#define RT_USING_MEMHEAP
-#define RT_MEMHEAP_FAST_MODE
-#define RT_USING_MEMHEAP_AS_HEAP
-#define RT_USING_MEMHEAP_AUTO_BINDING
+#define RT_USING_SLAB
+#define RT_USING_SLAB_AS_HEAP
 #define RT_USING_MEMTRACE
 #define RT_USING_HEAP
 
@@ -63,6 +59,7 @@
 #define RT_VER_NUM 0x50000
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
+#define RT_USING_CPU_FFS
 #define ARCH_MM_MMU
 #define ARCH_ARM
 #define ARCH_ARM_MMU
@@ -80,7 +77,7 @@
 #define FINSH_USING_MSH
 #define FINSH_THREAD_NAME "tshell"
 #define FINSH_THREAD_PRIORITY 20
-#define FINSH_THREAD_STACK_SIZE 4096
+#define FINSH_THREAD_STACK_SIZE 8192
 #define FINSH_USING_HISTORY
 #define FINSH_HISTORY_LINES 10
 #define FINSH_USING_SYMTAB
@@ -111,6 +108,7 @@
 #define RT_DFS_ELM_MUTEX_TIMEOUT 3000
 #define RT_USING_DFS_DEVFS
 #define RT_USING_DFS_ROMFS
+#define RT_USING_DFS_TMPFS
 #define RT_USING_LWP
 #define RT_LWP_MAX_NR 30
 #define LWP_TASK_STACK_SIZE 16384
@@ -176,6 +174,12 @@
 /* Socket is in the 'Network' category */
 
 
+/* Kernel Tracing Support */
+
+#define RT_USING_TRACING
+#define TRACING_FTRACE
+#define TRACING_KSYMTBL
+
 /* Network */
 
 #define RT_USING_SAL
@@ -238,9 +242,28 @@
 
 /* Utilities */
 
+#define RT_USING_UTEST
+#define UTEST_THR_STACK_SIZE 8192
+#define UTEST_THR_PRIORITY 20
 #define RT_USING_ADT
 
 /* RT-Thread Utestcases */
+
+#define RT_USING_UTESTCASES
+
+/* Utest Self Testcase */
+
+
+/* Kernel Testcase */
+
+
+/* CPP11 Testcase */
+
+
+/* Utest Serial Testcase */
+
+
+/* RTT Posix Testcase */
 
 
 /* RT-Thread online packages */

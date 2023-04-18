@@ -23,22 +23,22 @@ if PLATFORM == 'gcc':
     STRIP   = PREFIX + 'strip'
     CFPFLAGS = ' '
     AFPFLAGS = ' '
-    DEVICE   = ' -march=armv8-a -mtune=cortex-a53 -ftree-vectorize -ffast-math -funwind-tables -fno-strict-aliasing'
+    DEVICE   = ' -march=armv8-a -mtune=cortex-a53 -ftree-vectorize -ffast-math -fno-strict-aliasing -nostartfiles'
 
     CXXFLAGS= DEVICE + CFPFLAGS + ' -Wall -fdiagnostics-color=always'
-    CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -std=gnu99 -fdiagnostics-color=always'
-    AFLAGS  = ' -c' + AFPFLAGS + ' -x assembler-with-cpp'
+    CFLAGS  = DEVICE + CFPFLAGS + ' -Wall -Wno-cpp -fdiagnostics-color=always'
+    AFLAGS  = ' -c' + AFPFLAGS + ' -D__ASSEMBLY__ -x assembler-with-cpp'
     LFLAGS  = DEVICE + ' -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,system_vectors -T link.lds' + ' -lsupc++ -lgcc -static'
     CPATH   = ''
     LPATH   = ''
 
     if BUILD == 'debug':
-        CFLAGS   += ' -O0 -gdwarf-2'
-        CXXFLAGS += ' -O0 -gdwarf-2'
-        AFLAGS   += ' -gdwarf-2'
+        CFLAGS   += ' -O0 -ggdb'
+        CXXFLAGS += ' -O0 -ggdb'
+        AFLAGS   += ' -ggdb'
     else:
-        CFLAGS   += ' -Os'
-        CXXFLAGS += ' -Os'
+        CFLAGS   += ' -O2 -ggdb'
+        CXXFLAGS += ' -O2 -ggdb'
     CXXFLAGS += ' -Woverloaded-virtual -fno-exceptions -fno-rtti'
 
 DUMP_ACTION = OBJDUMP + ' -D -S $TARGET > rtt.asm\n'

@@ -197,6 +197,7 @@ typedef __gnuc_va_list              va_list;
 #define rt_used                     __attribute__((used))
 #define rt_align(n)                 __attribute__((aligned(n)))
 #define rt_weak                     __attribute__((weak))
+#define rt_notrace                  __attribute__((patchable_function_entry(0, 0)))
 #define rt_inline                   static __inline
 #define RTT_API
 #elif defined (__ADSPBLACKFIN__)        /* for VisualDSP++ Compiler */
@@ -362,6 +363,7 @@ typedef int (*init_fn_t)(void);
 #define RT_ETRAP                        11              /**< Trap event */
 #define RT_ENOENT                       12              /**< No entry */
 #define RT_ENOSPC                       13              /**< No space left */
+#define RT_ENOBUFS                      14              /**< No buffer space is available */
 
 /**@}*/
 
@@ -859,6 +861,10 @@ struct rt_thread
     int *clear_child_tid;
 #endif
     int tid;
+#ifdef RT_USING_TRACING
+    int stacked_trace;
+    int trace_recorded:1;
+#endif /* RT_USING_TRACING */
 #endif
 
     rt_ubase_t user_data;                             /**< private user data beyond this thread */

@@ -655,7 +655,11 @@ const char *rt_strerror(rt_err_t error);
 #endif
 #endif
 
+#ifndef RT_USING_CPU_FFS
 int __rt_ffs(int value);
+#else
+#include <cpuport.h>
+#endif
 
 #ifndef RT_KSERVICE_USING_STDLIB_MEMORY
 void *rt_memset(void *src, int c, rt_ubase_t n);

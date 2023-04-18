@@ -1212,6 +1212,7 @@ static rt_err_t _rt_mutex_take(rt_mutex_t mutex, rt_int32_t timeout, int suspend
 
             if (mutex->ceiling_priority != 0xFF)
             {
+                /* will this branch possible to be entry ? */
                 /* set the priority of thread to the ceiling priority */
                 if (mutex->ceiling_priority < mutex->owner->current_priority)
                     _thread_update_priority(mutex->owner, mutex->ceiling_priority, suspend_flag);
@@ -1235,6 +1236,7 @@ static rt_err_t _rt_mutex_take(rt_mutex_t mutex, rt_int32_t timeout, int suspend
             }
             else
             {
+                /* mutex already taken, suspend current thread */
                 rt_uint8_t priority = thread->current_priority;
 
                 /* mutex is unavailable, push to suspend list */

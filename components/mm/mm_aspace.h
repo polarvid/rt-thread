@@ -22,6 +22,37 @@
 #define MM_PA_TO_OFF(pa) ((uintptr_t)(pa) >> MM_PAGE_SHIFT)
 #define PV_OFFSET        (rt_kmem_pvoff())
 
+// #define DEBUG_MEM
+
+#ifdef DEBUG_MEM
+#include <kasan.h>
+
+extern void *mm_buf;
+extern const size_t mm_size;
+extern rt_slab_t mm_slab;
+
+static inline void *mm_malloc(rt_size_t size)
+{
+    void *_buf;
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    _buf = rt_slab_alloc(mm_slab, size);
+    rt_hw_interrupt_enable(level);
+    return _buf;
+}
+
+static inline void mm_free(void *buf)
+{
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    rt_slab_free(mm_slab, buf);
+    /* TODO: complete this to detect use after free */
+    // kasan_poisoned(buf, length);
+    rt_hw_interrupt_enable(level);
+}
+#else
+#define mm_malloc rt_malloc
+#define mm_free rt_free
+#endif
+
 #ifndef RT_USING_SMP
 typedef rt_spinlock_t mm_spinlock;
 
@@ -90,7 +121,7 @@ typedef struct rt_mm_va_hint
 typedef struct rt_mem_obj
 {
     void (*hint_free)(rt_mm_va_hint_t hint);
-    void (*on_page_fault)(struct rt_varea *varea, struct rt_mm_fault_msg *msg);
+    void (*on_page_fault)(struct rt_varea *varea, struct rt_aspace_fault_msg *msg);
 
     /* do pre open bushiness like inc a ref */
     void (*on_varea_open)(struct rt_varea *varea);
@@ -127,8 +158,7 @@ enum rt_mmu_cntl
 
 rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl);
 
-rt_aspace_t rt_aspace_init(rt_aspace_t aspace, void *start, rt_size_t length,
-                           void *pgtbl);
+rt_err_t rt_aspace_init(rt_aspace_t aspace, void *start, rt_size_t length, void *pgtbl);
 
 void rt_aspace_delete(rt_aspace_t aspace);
 
@@ -182,12 +212,11 @@ int rt_aspace_map_phy_static(rt_aspace_t aspace, rt_varea_t varea,
  *
  * @param aspace
  * @param addr
- * @param length
  * @return int
  */
-int rt_aspace_unmap(rt_aspace_t aspace, void *addr, rt_size_t length);
+int rt_aspace_unmap(rt_aspace_t aspace, void *addr);
 
-int mm_aspace_control(rt_aspace_t aspace, void *addr, enum rt_mmu_cntl cmd);
+int rt_aspace_control(rt_aspace_t aspace, void *addr, enum rt_mmu_cntl cmd);
 
 int rt_aspace_load_page(rt_aspace_t aspace, void *addr, rt_size_t npage);
 
@@ -198,11 +227,35 @@ int rt_aspace_traversal(rt_aspace_t aspace,
 
 void rt_aspace_print_all(rt_aspace_t aspace);
 
-void rt_varea_insert_page(rt_varea_t varea, void *page_addr);
+/**
+ * @brief Map one page to varea
+ *
+ * @param varea target varea
+ * @param addr user address
+ * @param page the page frame to be mapped
+ * @return int
+ */
+int rt_varea_map_page(rt_varea_t varea, void *vaddr, void *page);
 
-void rt_varea_free_pages(rt_varea_t varea);
+/**
+ * @brief Map a range of physical address to varea
+ *
+ * @param varea target varea
+ * @param vaddr user address
+ * @param paddr physical address
+ * @param length map range
+ * @return int
+ */
+int rt_varea_map_range(rt_varea_t varea, void *vaddr, void *paddr, rt_size_t length);
 
-void rt_varea_offload_page(rt_varea_t varea, void *vaddr, rt_size_t size);
+/**
+ * @brief Insert page to page manager of varea
+ * The page will be freed by varea on uninstall automatically
+ *
+ * @param varea target varea
+ * @param page_addr the page frame to be added
+ */
+void rt_varea_pgmgr_insert(rt_varea_t varea, void *page_addr);
 
 rt_ubase_t rt_kmem_pvoff(void);
 
@@ -211,5 +264,7 @@ void rt_kmem_pvoff_set(rt_ubase_t pvoff);
 int rt_kmem_map_phy(void *va, void *pa, rt_size_t length, rt_size_t attr);
 
 void *rt_kmem_v2p(void *vaddr);
+
+void rt_kmem_list(void);
 
 #endif /* __MM_ASPACE_H__ */

@@ -132,7 +132,10 @@ static rt_uint64_t _read_be_number(void *start, int size)
 {
     rt_uint64_t buf = 0;
     for (; size > 0; size--)
-        buf = (buf << 32) | fdt32_to_cpu(*(uint32_t *)start++);
+    {
+        buf = (buf << 32) | fdt32_to_cpu(*(uint32_t *)start);
+        start = (uint32_t *)start + 1;
+    }
     return buf;
 }
 
@@ -335,6 +338,7 @@ int rt_hw_cpu_init()
 #endif /* RT_USING_FDT */
 }
 
+rt_notrace
 rt_weak void rt_hw_secondary_cpu_idle_exec(void)
 {
     asm volatile("wfe" ::
@@ -361,7 +365,7 @@ rt_weak void rt_hw_cpu_shutdown()
     level = rt_hw_interrupt_disable();
     while (level)
     {
-        RT_ASSERT(0);
+        __asm__ volatile("wfe"); // brk 0x00
     }
 }
 MSH_CMD_EXPORT_ALIAS(rt_hw_cpu_shutdown, shutdown, shutdown machine);

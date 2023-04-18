@@ -77,6 +77,17 @@ rt_hw_get_gtimer_frq:
     MRS X0,CNTFRQ_EL0
     RET
 
+.cfi_sections .debug_frame, .eh_frame
+.global _thread_start
+.cfi_startproc
+_thread_start:
+    .cfi_undefined x30
+    /* x0 - thread entry parameter */
+    blr x19
+    mov x29, #0
+    blr x20
+.cfi_endproc
+
 .macro SAVE_CONTEXT
     /* Save the entire context. */
     SAVE_FPU SP
@@ -265,8 +276,10 @@ rt_hw_get_gtimer_frq:
 /*
  * rt_base_t rt_hw_interrupt_disable();
  */
-.globl rt_hw_interrupt_disable
+.global rt_hw_interrupt_disable
 rt_hw_interrupt_disable:
+.global rt_hw_local_irq_disable
+rt_hw_local_irq_disable:
     MRS     X0, DAIF
     MSR     DAIFSet, #3
     DSB     SY
@@ -275,8 +288,10 @@ rt_hw_interrupt_disable:
 /*
  * void rt_hw_interrupt_enable(rt_base_t level);
  */
-.globl rt_hw_interrupt_enable
+.global rt_hw_interrupt_enable
 rt_hw_interrupt_enable:
+.global rt_hw_local_irq_enable
+rt_hw_local_irq_enable:
     DSB     SY
     AND     X0, X0, #0xc0
     MRS     X1, DAIF

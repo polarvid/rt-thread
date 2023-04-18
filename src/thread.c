@@ -263,6 +263,11 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     thread->signal_mask_bak = 0;
     thread->signal_in_process = 0;
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
+
+#ifdef RT_USING_TRACING
+    thread->stacked_trace = 0;
+    thread->trace_recorded = 0;
+#endif
 #endif
 
 #ifdef RT_USING_CPU_USAGE
@@ -343,15 +348,16 @@ RTM_EXPORT(rt_thread_init);
  *
  * @return  The self thread object.
  */
+rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP
-    rt_base_t lock;
+    // rt_base_t lock;
     rt_thread_t self;
 
-    lock = rt_hw_local_irq_disable();
+    // lock = rt_hw_local_irq_disable();
     self = rt_cpu_self()->current_thread;
-    rt_hw_local_irq_enable(lock);
+    // rt_hw_local_irq_enable(lock);
     return self;
 #else
     extern rt_thread_t rt_current_thread;

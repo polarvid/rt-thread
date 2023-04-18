@@ -1,0 +1,24 @@
+menu "Kernel Tracing Support"
+
+config RT_USING_TRACING
+    bool "Enable tracing feature inside kernel"
+    default n
+
+    if RT_USING_TRACING
+
+        config TRACING_FTRACE
+        bool "Enable function tracing"
+        select TRACING_KSYMTBL
+        default y
+
+        config TRACING_KSYMTBL
+        bool "Enable run-time kernel symbol table"
+        default n
+
+    endif
+
+    if ARCH_ARMV8
+        config TRACING_SOFT_KASAN
+            bool "Enable software-tagged KASAN (memory usage tracer)"
+    endif
+endmenu
