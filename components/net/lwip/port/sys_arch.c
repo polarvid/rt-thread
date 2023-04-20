@@ -17,6 +17,7 @@
  * 2022-02-20     Meco Man     integrate v1.4.1 v2.0.3 and v2.1.2 porting layer
  */
 
+#include "rtdef.h"
 #include <rtthread.h>
 #include <rthw.h>
 

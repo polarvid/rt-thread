@@ -81,11 +81,8 @@ typedef struct trace_evt_ring
 #define XCPU(num)   ((num) * RT_CPUS_NR)
 
 /* current implementation of enter/exit critical is unreasonable */
-// rt_enter_critical();
-#define rb_preempt_disable()    rt_ubase_t level = rt_hw_local_irq_disable();
-
-// rt_exit_critical();
-#define rb_preempt_enable()     rt_hw_local_irq_enable(level)
+#define rb_preempt_disable()    rt_preempt_disable()
+#define rb_preempt_enable()     rt_preempt_enable()
 
 rt_inline rt_notrace
 void *event_ring_object_loc(trace_evt_ring_t ring, const int index, const int cpuid)
@@ -259,23 +256,31 @@ void *event_ring_dequeue_mc(trace_evt_ring_t ring, void *newbuf)
         ;
 
     rb_preempt_enable();
-
     return buf;
 }
 
 rt_inline int event_ring_is_full(trace_evt_ring_t ring, const size_t cpuid)
 {
+    atomic_thread_fence(memory_order_acquire);
     return ((_R(ring)->prod_head + 1) & _R(ring)->prod_mask) == _R(ring)->cons_tail;
 }
 
 rt_inline int event_ring_is_empty(trace_evt_ring_t ring, const size_t cpuid)
 {
+    atomic_thread_fence(memory_order_acquire);
     return _R(ring)->cons_head == _R(ring)->prod_tail;
 }
 
 rt_inline int event_ring_count(trace_evt_ring_t ring, const size_t cpuid)
 {
+    atomic_thread_fence(memory_order_acquire);
     return (_R(ring)->prod_size + _R(ring)->prod_tail - _R(ring)->cons_tail) & _R(ring)->prod_mask;
+}
+
+rt_inline int event_ring_capability_percpu(trace_evt_ring_t ring)
+{
+    const size_t cpuid = 0;
+    return _R(ring)->prod_size;
 }
 
 /**
@@ -308,6 +313,7 @@ rt_inline void event_ring_for_each_event_lock(
 {
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)
     {
+        atomic_thread_fence(memory_order_acquire);
         size_t first_ready = ring->rings[cpuid].cons_tail;
         size_t counts = event_ring_count(ring, cpuid);
 

@@ -7,11 +7,13 @@
  * Date           Author       Notes
  * 2022-12-13     WangXiaoyao  the first version
  */
+#define DBG_LVL DBG_INFO
+#define DBG_TAG "rmem"
+#include <rtdbg.h>
 
 #include <rtthread.h>
 #include <mmu.h>
 #include "rmem.h"
-#include "rtdef.h"
 #include "uthash.h"
 
 struct rmem_list_node {

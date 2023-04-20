@@ -29,12 +29,12 @@ static void alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, vo
     RT_ASSERT(!!*pbuffer);
 
     /* test on event_ring_object_loc */
-    void *preobj = 0;
+    char *preobj = 0;
     static size_t index = 0;
     for (size_t i = 0; i < ring->objs_per_buf; i++)
     {
-        void *obj = event_ring_object_loc(ring, index, cpuid);
-        RT_ASSERT(obj >= *pbuffer && obj < *pbuffer + 4096);
+        char *obj = event_ring_object_loc(ring, index, cpuid);
+        RT_ASSERT(obj >= *(char **)pbuffer && obj < *(char **)pbuffer + 4096);
         RT_ASSERT(!preobj || obj == preobj + 8);
         preobj = obj;
         index += 1;

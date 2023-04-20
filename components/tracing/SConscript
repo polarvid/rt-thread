@@ -23,7 +23,7 @@ if GetDepend(['TRACING_FTRACE']):
     # append arch prefix
     for file in arch_file[arch]:
         src.add('arch/' + file)
-    src = src.union({'ftrace.c', 'ftrace-symtbl.c', 'fgraph.c', 'ftrace-test.c', 'fgraph-test.c'})
+    src = src.union({'ftrace.c', 'ftrace-symtbl.c', 'fgraph.c', 'ftrace-test.c', 'fgraph-app-test.c'})
 if GetDepend(['TRACING_KSYMTBL']):
     src = src.union({'ksymtbl.c'})
 

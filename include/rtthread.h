@@ -707,6 +707,42 @@ void rt_assert_handler(const char *ex, const char *func, rt_size_t line);
 #include <finsh.h>
 #endif
 
+/*
+ * disable scheduler
+ */
+rt_inline void rt_preempt_disable(void)
+{
+    struct rt_thread *current_thread;
+
+    current_thread = rt_thread_self();
+    if (current_thread)
+    {
+        /* lock scheduler for local cpu */
+        atomic_fetch_add_explicit(&current_thread->scheduler_lock_nest, 1, memory_order_relaxed);
+    }
+}
+
+/*
+ * enable scheduler
+ */
+rt_inline void rt_preempt_enable(void)
+{
+    struct rt_thread *current_thread;
+
+    current_thread = rt_thread_self();
+    if (current_thread)
+    {
+        /* unlock scheduler for local cpu */
+        int nest =
+            atomic_fetch_add_explicit(&current_thread->scheduler_lock_nest, -1, memory_order_relaxed);
+        if (nest <= 1)
+        {
+            RT_ASSERT(nest == 1);
+            rt_schedule();
+        }
+    }
+}
+
 /**@}*/
 
 #ifdef __cplusplus

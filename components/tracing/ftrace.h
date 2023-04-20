@@ -21,6 +21,10 @@
 #include "arch/aarch64.h"
 #endif
 
+#ifndef RT_CPUS_NR
+#define RT_CPUS_NR 1
+#endif
+
 struct ftrace_tracer;
 
 typedef rt_ubase_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
@@ -77,6 +81,7 @@ void ftrace_tracer_set_status(ftrace_tracer_t tracer, rt_bool_t enable)
 rt_notrace rt_inline
 void ftrace_tracer_set_on_exit(ftrace_tracer_t tracer, ftrace_exit_fn_t on_exit)
 {
+    /* relaxed ordering */
     tracer->on_exit = on_exit;
 }
 

@@ -1,0 +1,21 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Apr 20 2023 11:14:23
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (4)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+msh />hello rt-thread
+
+msh />QEMU: Terminated
+

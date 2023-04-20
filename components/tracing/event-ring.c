@@ -40,8 +40,6 @@ trace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz)
     const size_t tblsz_per_ring = bufs_per_ring * sizeof(ring->buftbl[0]);
     const size_t tblsz_total = RT_CPUS_NR * tblsz_per_ring;
 
-    rt_kprintf("%lx\n", tblsz_total);
-
     ring = rt_malloc(sizeof(*ring) + tblsz_total);
 
     if (!ring)

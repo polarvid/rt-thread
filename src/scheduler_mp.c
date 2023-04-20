@@ -680,7 +680,7 @@ void rt_enter_critical(void)
         RT_ASSERT(current_thread->cpus_lock_nest != 0);
         if (lock_nest == 0)
         {
-            current_thread->scheduler_lock_nest ++;
+            atomic_fetch_add(&current_thread->scheduler_lock_nest, 1);
             rt_hw_spin_lock(&_cpus_lock);
         }
     }
@@ -688,8 +688,7 @@ void rt_enter_critical(void)
     current_thread->critical_lock_nest ++;
 
     /* lock scheduler for local cpu */
-    current_thread->scheduler_lock_nest ++;
-
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, 1);
     /* enable interrupt */
     rt_hw_local_irq_enable(level);
 }
@@ -713,7 +712,7 @@ void rt_exit_critical(void)
         return;
     }
 
-    current_thread->scheduler_lock_nest --;
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, -1);
 
     current_thread->critical_lock_nest --;
 
@@ -721,13 +720,14 @@ void rt_exit_critical(void)
     current_thread->cpus_lock_nest--;
     if (current_thread->cpus_lock_nest == 0)
     {
-        current_thread->scheduler_lock_nest --;
+        atomic_fetch_add(&current_thread->scheduler_lock_nest, -1);
         rt_hw_spin_unlock(&_cpus_lock);
     }
 
-    if (current_thread->scheduler_lock_nest <= 0)
+    if (atomic_load(&current_thread->scheduler_lock_nest) <= 0)
     {
-        current_thread->scheduler_lock_nest = 0;
+        atomic_store(&current_thread->scheduler_lock_nest, 0);
+
         /* enable interrupt */
         rt_hw_local_irq_enable(level);
 

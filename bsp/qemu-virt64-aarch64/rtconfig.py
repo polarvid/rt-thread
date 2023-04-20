@@ -6,7 +6,7 @@ CPU         ='cortex-a'
 CROSS_TOOL  = 'gcc'
 PLATFORM    = 'gcc'
 EXEC_PATH   = os.getenv('RTT_EXEC_PATH') or '/usr/bin'
-BUILD       = 'release'
+BUILD       = 'debug'
 
 if PLATFORM == 'gcc':
     # toolchains

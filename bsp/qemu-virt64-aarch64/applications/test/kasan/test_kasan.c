@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if defined(RT_USING_UTEST) && defined (RT_USING_SMART) && defined(TRACING_SOFT_KASAN)
+#if defined(RT_USING_UTEST) && defined(RT_USING_SMART) && defined(TRACING_SOFT_KASAN)
 #include <utest.h>
 #include <kasan.h>
 
@@ -127,7 +127,7 @@ static void testcase(void)
     UTEST_UNIT_RUN(test_memset);
     UTEST_UNIT_RUN(test_memcpy);
     UTEST_UNIT_RUN(test_strncpy);
-    // UTEST_UNIT_RUN(test_stack_overflow);
+    UTEST_UNIT_RUN(test_stack_overflow);
 }
 
 UTEST_TC_EXPORT(testcase, "testcases.libcpu.kasan", utest_tc_init, utest_tc_cleanup, 10);

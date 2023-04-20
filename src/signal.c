@@ -60,7 +60,7 @@ static void _signal_entry(void *parameter)
         pcpu->current_thread->cpus_lock_nest--;
         if (pcpu->current_thread->cpus_lock_nest == 0)
         {
-            pcpu->current_thread->scheduler_lock_nest--;
+            atomic_fetch_add(&pcpu->current_thread->scheduler_lock_nest, -1);
         }
 
     }

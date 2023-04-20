@@ -226,7 +226,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     thread->oncpu = RT_CPU_DETACHED;
 
     /* lock init */
-    thread->scheduler_lock_nest = 0;
+    atomic_store(&thread->scheduler_lock_nest, 0);
     thread->cpus_lock_nest = 0;
     thread->critical_lock_nest = 0;
 #endif /* RT_USING_SMP */
@@ -266,6 +266,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
 
 #ifdef RT_USING_TRACING
     thread->stacked_trace = 0;
+    thread->trace_recorded = 0;
 #endif
 #endif
 
@@ -351,12 +352,12 @@ rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP
-    // rt_base_t lock;
+    rt_base_t lock;
     rt_thread_t self;
 
-    // lock = rt_hw_local_irq_disable();
+    lock = rt_hw_local_irq_disable();
     self = rt_cpu_self()->current_thread;
-    // rt_hw_local_irq_enable(lock);
+    rt_hw_local_irq_enable(lock);
     return self;
 #else
     extern rt_thread_t rt_current_thread;

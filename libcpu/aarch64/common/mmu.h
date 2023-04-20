@@ -94,7 +94,7 @@ static inline void *rt_hw_mmu_tbl_get()
 {
     uintptr_t tbl;
     __asm__ volatile("MRS %0, TTBR0_EL1" : "=r"(tbl));
-    return (void *)(tbl & ((1ul << 48) - 2));
+    return (void *)((tbl & ((1ul << 48) - 2)) - PV_OFFSET);
 }
 
 static inline void *rt_hw_mmu_kernel_v2p(void *v_addr)

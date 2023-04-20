@@ -9,6 +9,7 @@
  */
 #include <rthw.h>
 #include <rtthread.h>
+#include <stdatomic.h>
 
 #ifdef RT_USING_SMART
 #include <lwp.h>
@@ -37,7 +38,7 @@ static void _cpu_preempt_disable(void)
     }
 
     /* lock scheduler for local cpu */
-    current_thread->scheduler_lock_nest ++;
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, 1);
 
     /* enable interrupt */
     rt_hw_local_irq_enable(level);
@@ -62,7 +63,7 @@ static void _cpu_preempt_enable(void)
     }
 
     /* unlock scheduler for local cpu */
-    current_thread->scheduler_lock_nest --;
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, -1);
 
     rt_schedule();
     /* enable interrupt */
@@ -208,7 +209,7 @@ rt_base_t rt_cpus_lock(void)
         pcpu->current_thread->cpus_lock_nest++;
         if (lock_nest == 0)
         {
-            pcpu->current_thread->scheduler_lock_nest++;
+            atomic_fetch_add(&pcpu->current_thread->scheduler_lock_nest, 1);
             rt_hw_spin_lock(&_cpus_lock);
         }
     }
@@ -233,7 +234,7 @@ void rt_cpus_unlock(rt_base_t level)
 
         if (pcpu->current_thread->cpus_lock_nest == 0)
         {
-            pcpu->current_thread->scheduler_lock_nest--;
+            atomic_fetch_add(&pcpu->current_thread->scheduler_lock_nest, -1);
             rt_hw_spin_unlock(&_cpus_lock);
         }
     }

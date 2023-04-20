@@ -359,8 +359,14 @@ void __asan_storeN(void *p, size_t size)
 void __asan_storeN_noabort(void *p, size_t size)
 __attribute__((alias("__asan_storeN")));
 
+void __asan_handle_no_return(void) {}
+
 #ifdef RT_KSERVICE_USING_STDLIB_MEMORY
 #error "Don't config this for KASAN as it limits the capability of bugs catching"
+#endif
+
+#ifdef RT_USING_OVERFLOW_CHECK
+#error "Don't use overflow check with KASAN. Current implementation is conflicted"
 #endif
 
 #undef memset

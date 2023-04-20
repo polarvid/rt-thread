@@ -1,0 +1,137 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Apr 20 2023 11:14:23
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (4)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+msh />hello rt-thread
+db
+dbkit_client.elf
+dbkit.elf
+msh />dbkit &
+msh />db  fg
+fgraph_test
+fgraph_test_stop
+msh />fgraph_test db
+dbkit_client.elf
+dbkit.elf
+msh />fgraph_test dbkit  _
+msh />fgraph_test dbkit_client.elf
+msh />[31m[E/mcf.link.tcp.client] connect() ERROR[0m
+[31m[E/mcf.link.tcp.client] failed to initialize tcp socket.[0m
+UserAPP: (g_start_ok) assertion failed at function:urpc_svc_exec, line number:241 
+[32m[I/tracing.fgraph] tracing stop[0m
+fg
+fgraph_test
+fgraph_test_stop
+msh />fgraph_test_
+fgraph_test_stop
+msh />fgraph_test_stop
+[32m[I/tracing.fgraph] ==> Summary:[0m
+[32m[I/tracing.fgraph] cpu-000 count 0x14cae/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-001 count 0x209e/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-002 count 0x11c6/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-003 count 0x36e8/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] ==> Recording to file system:[0m
+[32m[I/tracing.fgraph] cpu-0: 0x1/0x14cae[0m
+tcb 0xffff0000001d48e0 lwp 0x0 name tidle0
+tcb 0xffff000000330f58 lwp 0x0 name tshell
+[32m[I/tracing.fgraph] cpu-0: 0x14cc/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x2997/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x3e62/0x14cae[0m
+tcb 0xffff0000002fdbb8 lwp 0x0 name tcpip
+[32m[I/tracing.fgraph] cpu-0: 0x532d/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x67f8/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x7cc3/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x918e/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0xa659/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0xbb24/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0xcfef/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0xe4ba/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0xf985/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x10e50/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x1231b/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-0: 0x137e6/0x14cae[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1/0x209e[0m
+tcb 0xffff0000001d4aa8 lwp 0x0 name tidle1
+tcb 0xffff0000003c36c8 lwp 0x0 name 
+[32m[I/tracing.fgraph] cpu-1: 0x20b/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x415/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x61f/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x829/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0xa33/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0xc3d/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0xe47/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1051/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x125b/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1465/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x166f/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1879/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1a83/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1c8d/0x209e[0m
+[32m[I/tracing.fgraph] cpu-1: 0x1e97/0x209e[0m
+[32m[I/tracing.fgraph] cpu-2: 0x1/0x11c6[0m
+tcb 0xffff0000001d4c70 lwp 0x0 name tidle2
+[32m[I/tracing.fgraph] cpu-2: 0x11e/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x23b/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x358/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x475/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x592/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x6af/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x7cc/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x8e9/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xa06/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xb23/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xc40/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xd5d/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xe7a/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0xf97/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-2: 0x10b4/0x11c6[0m
+[32m[I/tracing.fgraph] cpu-3: 0x1/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x370/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x6df/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0xa4e/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0xdbd/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x112c/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x149b/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x180a/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x1b79/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x1ee8/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x2257/0x36e8[0m
+tcb 0xffff0000001d4e38 lwp 0x0 name tidle3
+[32m[I/tracing.fgraph] cpu-3: 0x25c6/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x2935/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x2ca4/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x3013/0x36e8[0m
+[32m[I/tracing.fgraph] cpu-3: 0x3382/0x36e8[0m
+msh />dum
+dump_entries
+dump_ksymtbl
+msh />dump_k
+dump_ksymtbl
+msh />dump_ksymtbl
+header
+0x20233202
+0xe57
+0x1a5bc
+0x0
+0xffff0000
+0x28
+0x1cd8
+0x3988
+0x72e4
+0xac40
+kallsyms
+msh />QEMU: Terminated
+

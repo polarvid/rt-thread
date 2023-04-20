@@ -24,10 +24,6 @@
 
 static struct ftrace_tracer dummy_tracer;
 
-#ifndef RT_CPUS_NR
-#define RT_CPUS_NR 1
-#endif
-
 // static _Atomic(size_t) count[RT_CPUS_NR * 16];
 
 typedef struct sample_event {
@@ -133,9 +129,9 @@ static void _debug_ftrace(void)
     // ftrace_tracer_set_trace(&dummy_tracer, _test_handler);
 
     /* test every functions */
-    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, &rt_hw_spin_lock, &rt_hw_spin_unlock,
-                       &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, &rt_cpu_index,
-                       &rt_cpus_lock, &rt_cpus_unlock};
+    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, /* &rt_hw_spin_lock, &rt_hw_spin_unlock, */
+                       &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, /* &rt_cpu_index, */
+                       /* &rt_cpus_lock, &rt_cpus_unlock */};
     ftrace_tracer_set_except(&dummy_tracer, notrace, sizeof(notrace)/sizeof(notrace[0]));
 
     /* a dummy instrumentation */

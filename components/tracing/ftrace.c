@@ -7,6 +7,11 @@
  * Date           Author       Notes
  * 2023-03-30     WangXiaoyao  ftrace support
  */
+
+#define DBG_TAG "tracing.ftrace"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
+
 #include <rtthread.h>
 #include <rthw.h>
 #include "arch/aarch64.h"
@@ -14,6 +19,9 @@
 #include "internal.h"
 #include "rtdef.h"
 #include <cpuport.h>
+
+/* for qsort utility */
+#include <stdlib.h>
 
 static ftrace_tracer_t tracers_list;
 
@@ -45,12 +53,12 @@ int ftrace_tracer_register(ftrace_tracer_t tracer)
     tracer->enabled = RT_TRUE;
     /* cache flush smp, mb */
     rt_hw_dmb();
+    rt_hw_isb();
     return 0;
 }
 
 int ftrace_tracer_unregister(ftrace_tracer_t tracer)
 {
-    RT_ASSERT(tracer->enabled == 1);
     tracer->enabled = 0;
     /* free to remove the trace point */
     tracer->unregistered = 1;
@@ -165,12 +173,11 @@ static void _set_trace_with_entires(void *symbol, void *data)
     err = _set_trace(param->tracer, symbol);
     if (err)
     {
-        rt_kprintf("set trace failed %d\n", err);
+        LOG_W("set trace failed %d", err);
     }
 }
 
-#include <stdlib.h>
-static int compare_address_asc(const void *a, const void *b)
+static int _compare_address_asc(const void *a, const void *b)
 {
    return (*(int*)a - *(int*)b);
 }
@@ -183,36 +190,43 @@ int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t not
         .notrace = notrace,
         .notrace_cnt = notrace_cnt
     };
-    qsort(notrace, notrace_cnt, sizeof(void*), compare_address_asc);
+    qsort(notrace, notrace_cnt, sizeof(void*), _compare_address_asc);
     _ftrace_symtbl_for_each(_set_trace_with_entires, &param);
     return 0;
 }
 
 /* current implementation of enter/exit critical is unreasonable */
 // rt_enter_critical();
+#if 1
 #define rb_preempt_disable()    rt_ubase_t level = rt_hw_local_irq_disable();
 
 // rt_exit_critical();
 #define rb_preempt_enable()     rt_hw_local_irq_enable(level)
+#else
+#define rb_preempt_disable()    rt_enter_critical()
+#define rb_preempt_enable()     rt_exit_critical()
+#endif
+#define stack_prot_threshold    128
 
 /* generic entry to test if tracer is ready to handle trace event */
 rt_notrace
 rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    int stat = TRACER_STAT_NONE;
+    rt_ubase_t stat = TRACER_STAT_NONE;
 
     if (tracer)
     {
         if (tracer->enabled || tracer->unregistered)
         {
             /* detect recursion */
-            rb_preempt_disable();
             rt_thread_t tid = rt_thread_self();
-            if (tid && tid->stacked_trace > 0 && rt_interrupt_get_nest() > 1)
+            rb_preempt_disable();
+            if (tid && (
+                (tid->stacked_trace > 0 && rt_interrupt_get_nest() > 1) ||
+                ((char *)tid->stack_addr > (char *)tid->sp - stack_prot_threshold)))
             {
-                ftrace_tracer_set_status(tracer, RT_FALSE);
-                rt_kprintf("recursion detected! pc %p, called-from %p\n", pc, ret_addr);
-                while (1);
+                rb_preempt_enable();
+                return 0;
             }
             rb_preempt_enable();
 

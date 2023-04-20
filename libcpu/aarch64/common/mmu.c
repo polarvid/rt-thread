@@ -340,7 +340,7 @@ void rt_hw_aspace_switch(rt_aspace_t aspace)
     if (aspace != &rt_kernel_space)
     {
         void *pgtbl = aspace->page_table;
-        pgtbl = rt_kmem_v2p(pgtbl);
+        pgtbl = rt_hw_mmu_kernel_v2p(pgtbl);
         rt_ubase_t tcr;
 
         __asm__ volatile("msr ttbr0_el1, %0" ::"r"(pgtbl) : "memory");
@@ -424,9 +424,9 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
     rt_page_cleanup();
 }
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
 #include "kasan.h"
-#endif /* ARCH_ENABLE_SOFT_KASAN */
+#endif /* TRACING_SOFT_KASAN */
 
 #ifdef RT_USING_SMART
 static void _init_region(void *vaddr, size_t size)
@@ -435,7 +435,7 @@ static void _init_region(void *vaddr, size_t size)
     rt_ioremap_size = size;
     rt_mpr_start = (char *)rt_ioremap_start - rt_mpr_size;
 
-#ifdef ARCH_ENABLE_SOFT_KASAN
+#ifdef TRACING_SOFT_KASAN
     kasan_area_start = rt_mpr_start - KASAN_AREA_SIZE;
     int ret;
     ret = rt_aspace_map_static(&rt_kernel_space, &kasan_area, (void **)&kasan_area_start,
@@ -449,7 +449,7 @@ static void _init_region(void *vaddr, size_t size)
     {
         kasan_init();
     }
-#endif /* ARCH_ENABLE_SOFT_KASAN */
+#endif /* TRACING_SOFT_KASAN */
 }
 #else
 

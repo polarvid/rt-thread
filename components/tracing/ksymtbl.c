@@ -10,6 +10,9 @@
 #include "ksymtbl.h"
 #include "internal.h"
 #include "rtthread.h"
+#include <lwp.h>
+
+#include <stdio.h>
 
 struct ksymtbl {
     rt_uint32_t magic_number;
@@ -117,6 +120,11 @@ static void _dump_all_symbols_offasc(void)
     rt_ubase_t base = (ksymtbl->base_low |
                         ((rt_ubase_t)ksymtbl->base_high << 32));
 
+    /* open file */
+    int fd;
+    fd = open("/smart-ksymtbl.txt", O_WRONLY | O_CREAT, 0);
+    static char buf[128];
+
     const size_t counts = ksymtbl->symbol_counts;
     char *iter = GET_SECTION(off_str);
     rt_uint32_t *symbol_table = GET_SECTION(off_syt);
@@ -132,8 +140,10 @@ static void _dump_all_symbols_offasc(void)
         size_t str_off = symbol_table[sym_idx];
         char *pclass = &iter[str_off];
         char *symbol = &iter[str_off + 1];
-        rt_kprintf("%lx %c %s\n", addr, *pclass, symbol);
+        snprintf(buf, sizeof(buf), "%lx %c %s\n", addr, *pclass, symbol);
+        write(fd, buf, strlen(buf));
     }
+    close(fd);
 }
 
 static void _debug_dump(void)

@@ -29,6 +29,8 @@
 
 #define FTRACE_ENTRY_ORDER 3
 
+#define TRACING_INSN_BYTES 4
+
 #ifndef __ASSEMBLY__
 
 #include <rtthread.h>
@@ -50,7 +52,7 @@ rt_ubase_t ftrace_timestamp(void)
 
     __asm__ volatile("mrs %0, cntfrq_el0":"=r"(freq));
     __asm__ volatile("mrs %0, cntpct_el0":"=r"(clock));
-    __asm__ volatile("isb":::"memory");
+    // __asm__ volatile("isb":::"memory");
 
     clock = (clock * NANOSECOND_PER_SECOND) / freq;
     return clock;

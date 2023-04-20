@@ -123,7 +123,7 @@ void rt_hw_board_init(void)
 
     rt_components_board_init();
 
-    rt_thread_idle_sethook(idle_wfi);
+    // rt_thread_idle_sethook(idle_wfi);
 
 #ifdef RT_USING_SMP
     /* install IPI handle */

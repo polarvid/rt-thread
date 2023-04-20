@@ -1,0 +1,166 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Apr 19 2023 21:08:59
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (4)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+hello rt-threadmsh />
+
+msh />dum
+dump_entries
+dump_ksymtbl
+msh />dump_k
+dump_ksymtbl
+msh />dump_ksymtbl
+header
+0x20233202
+0xbdd
+0x15e14
+0x0
+0xffff0000
+0x28
+0x17e4
+0x2fa0
+0x5f14
+0x8e88
+kallsyms
+msh />ls
+Directory /:
+a.jpg               44384                    
+dbkit_client.elf    494712                   
+dbkit.elf           1661384                  
+platform_test_suite 257312                   
+aarch64             <DIR>                    
+b.jpg               32022                    
+tc_rvv.elf          6538616                  
+vi.elf              517552                   
+lib                 <DIR>                    
+entries.log         77016                    
+hdc_test.elf        278520                   
+testcase-v.elf      5550464                  
+elmFATKit.elf       386720                   
+egl.elf             36144                    
+pthread_tc.elf      333336                   
+hello.elf           278304                   
+root                <DIR>                    
+riscv64             <DIR>                    
+tc_normal.elf       5470344                  
+pipe_normal.elf     6086792                  
+looping.elf         282416                   
+md5.elf             293784                   
+assets              <DIR>                    
+bin                 <DIR>                    
+smart-ksymtbl.txt   107798                   
+msh />fg
+fgraph_test_stop
+fgraph_test
+msh />fgraph_test g aar
+msh />fgraph_test aarch64/get
+msh />fgraph_test aarch64/getcwd.elf
+msh />Current working directory: /
+[32m[I/tracing.fgraph] tracing stop[0m
+fg
+fgraph_test_stop
+fgraph_test
+msh />fgraph_test_
+fgraph_test_stop
+msh />fgraph_test_stop
+[32m[I/tracing.fgraph] ==> Summary:[0m
+[32m[I/tracing.fgraph] cpu-000 count 0x17cf/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-001 count 0xa/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-002 count 0x163/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] cpu-003 count 0xa/0x40000 drops 0[0m
+[32m[I/tracing.fgraph] ==> Recording to file system:[0m
+[32m[I/tracing.fgraph] cpu-0: 0x1/0x17cf[0m
+tcb 0xffff0000002faf68 lwp 0x0 name tshell
+[32m[I/tracing.fgraph] cpu-0: 0x17e/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x2fb/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x478/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x5f5/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x772/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x8ef/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0xa6c/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0xbe9/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0xd66/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0xee3/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x1060/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x11dd/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x135a/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x14d7/0x17cf[0m
+[32m[I/tracing.fgraph] cpu-0: 0x1654/0x17cf[0m
+tcb 0xffff00000019e930 lwp 0x0 name tidle0
+[32m[I/tracing.fgraph] cpu-1: 0x1/0xa[0m
+tcb 0xffff00000019eaf8 lwp 0x0 name tidle1
+[32m[I/tracing.fgraph] cpu-1: 0x2/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x3/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x4/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x5/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x6/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x7/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x8/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0x9/0xa[0m
+[32m[I/tracing.fgraph] cpu-1: 0xa/0xa[0m
+[32m[I/tracing.fgraph] cpu-2: 0x1/0x163[0m
+tcb 0xffff00000019ecc0 lwp 0x0 name tidle2
+tcb 0xffff000000314170 lwp 0x525b0d620 name 
+[32m[I/tracing.fgraph] cpu-2: 0x18/0x163[0m
+tcb 0xffff000000314170 lwp 0x525bc47b0 name 
+tcb 0xffff000000314170 lwp 0x525c0ab70 name 
+[32m[I/tracing.fgraph] cpu-2: 0x2f/0x163[0m
+tcb 0xffff000000314170 lwp 0x525c1d7e0 name 
+[32m[I/tracing.fgraph] cpu-2: 0x46/0x163[0m
+tcb 0xffff000000314170 lwp 0x525d77550 name 
+tcb 0xffff000000314170 lwp 0x525e0fd80 name 
+[32m[I/tracing.fgraph] cpu-2: 0x5d/0x163[0m
+tcb 0xffff000000314170 lwp 0x525e37870 name 
+[32m[I/tracing.fgraph] cpu-2: 0x74/0x163[0m
+tcb 0xffff000000314170 lwp 0x525e44be0 name 
+tcb 0xffff000000314170 lwp 0x525e57c90 name 
+[32m[I/tracing.fgraph] cpu-2: 0x8b/0x163[0m
+tcb 0xffff000000314170 lwp 0x525e65930 name 
+[32m[I/tracing.fgraph] cpu-2: 0xa2/0x163[0m
+tcb 0xffff000000314170 lwp 0x525faff70 name 
+[32m[I/tracing.fgraph] cpu-2: 0xb9/0x163[0m
+tcb 0xffff000000314170 lwp 0x525fbd0a0 name 
+tcb 0xffff000000314170 lwp 0x525fedc60 name 
+[32m[I/tracing.fgraph] cpu-2: 0xd0/0x163[0m
+tcb 0xffff000000314170 lwp 0x526021520 name 
+[32m[I/tracing.fgraph] cpu-2: 0xe7/0x163[0m
+tcb 0xffff000000314170 lwp 0x526030360 name 
+tcb 0xffff000000314170 lwp 0x52603aa50 name 
+[32m[I/tracing.fgraph] cpu-2: 0xfe/0x163[0m
+tcb 0xffff000000314170 lwp 0x526045980 name 
+[32m[I/tracing.fgraph] cpu-2: 0x115/0x163[0m
+tcb 0xffff000000314170 lwp 0x526058870 name 
+tcb 0xffff000000314170 lwp 0x526061e70 name 
+[32m[I/tracing.fgraph] cpu-2: 0x12c/0x163[0m
+tcb 0xffff000000314170 lwp 0x52606c840 name 
+[32m[I/tracing.fgraph] cpu-2: 0x143/0x163[0m
+tcb 0xffff000000314170 lwp 0x526076eb0 name 
+tcb 0xffff000000314170 lwp 0x52607eab0 name 
+[32m[I/tracing.fgraph] cpu-2: 0x15a/0x163[0m
+[32m[I/tracing.fgraph] cpu-3: 0x1/0xa[0m
+tcb 0xffff00000019ee88 lwp 0x0 name tidle3
+[32m[I/tracing.fgraph] cpu-3: 0x2/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x3/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x4/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x5/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x6/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x7/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x8/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0x9/0xa[0m
+[32m[I/tracing.fgraph] cpu-3: 0xa/0xa[0m
+msh />
+msh />QEMU: Terminated
+
