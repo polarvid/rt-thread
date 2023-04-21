@@ -80,9 +80,13 @@ typedef struct trace_evt_ring
 
 #define XCPU(num)   ((num) * RT_CPUS_NR)
 
-/* current implementation of enter/exit critical is unreasonable */
+#if 0
 #define rb_preempt_disable()    rt_preempt_disable()
 #define rb_preempt_enable()     rt_preempt_enable()
+#else
+#define rb_preempt_disable()    rt_ubase_t level = rt_hw_local_irq_disable();
+#define rb_preempt_enable()     rt_hw_local_irq_enable(level)
+#endif
 
 rt_inline rt_notrace
 void *event_ring_object_loc(trace_evt_ring_t ring, const int index, const int cpuid)

@@ -853,8 +853,9 @@ struct rt_thread
 #endif
     int tid;
 #ifdef RT_USING_TRACING
-    int stacked_trace;
-    int trace_recorded:1;
+    atomic_short stacked_trace;
+    atomic_short stacked_exit;
+    atomic_char trace_recorded;
 #endif /* RT_USING_TRACING */
 #endif
 

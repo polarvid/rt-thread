@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
+#include <stdatomic.h>
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
@@ -15,9 +16,9 @@
 #include <rtthread.h>
 #include <rthw.h>
 #include "arch/aarch64.h"
+#include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"
-#include "rtdef.h"
 #include <cpuport.h>
 
 /* for qsort utility */
@@ -196,17 +197,7 @@ int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t not
 }
 
 /* current implementation of enter/exit critical is unreasonable */
-// rt_enter_critical();
-#if 1
-#define rb_preempt_disable()    rt_ubase_t level = rt_hw_local_irq_disable();
-
-// rt_exit_critical();
-#define rb_preempt_enable()     rt_hw_local_irq_enable(level)
-#else
-#define rb_preempt_disable()    rt_enter_critical()
-#define rb_preempt_enable()     rt_exit_critical()
-#endif
-#define stack_prot_threshold    128
+#define stack_prot_threshold    0x2000
 
 /* generic entry to test if tracer is ready to handle trace event */
 rt_notrace
@@ -218,12 +209,12 @@ rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t 
     {
         if (tracer->enabled || tracer->unregistered)
         {
-            /* detect recursion */
+            /* detect recursion & stack overflow */
             rt_thread_t tid = rt_thread_self();
             rb_preempt_disable();
             if (tid && (
-                (tid->stacked_trace > 0 && rt_interrupt_get_nest() > 1) ||
-                ((char *)tid->stack_addr > (char *)tid->sp - stack_prot_threshold)))
+                    (tid->stacked_trace > 0 && rt_interrupt_get_nest() > 1)
+                    || ((char *)tid->sp - stack_prot_threshold < (char *)tid->stack_addr)))
             {
                 rb_preempt_enable();
                 return 0;
@@ -232,9 +223,9 @@ rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t 
 
             if (tracer->enabled)
             {
-                tid->stacked_trace++;
+                atomic_fetch_add_explicit(&tid->stacked_trace, 1, memory_order_relaxed);
                 stat = tracer->on_entry(tracer, pc, ret_addr, context);
-                tid->stacked_trace--;
+                atomic_fetch_add_explicit(&tid->stacked_trace, -1, memory_order_relaxed);
             }
             else
             {
@@ -251,7 +242,6 @@ rt_notrace
 void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context)
 {
     /* tracer always exist & enabled */
-    /* detect recursion */
     if (tracer->on_exit)
     {
         /* no need for recursion test */

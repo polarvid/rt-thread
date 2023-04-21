@@ -42,8 +42,7 @@ static pid_t pid;
 static rt_notrace
 rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    rt_ubase_t time = ftrace_timestamp();
-    // struct ftrace_context *ctx = context;
+    rt_ubase_t retval;
 
     /* maybe disable tracer on lwp_free & compare pid */
     if ((char *)&sys_exit == (char *)FTRACE_PC_TO_SYM(pc) ||
@@ -52,12 +51,20 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
         ftrace_tracer_set_status(tracer, RT_FALSE);
         /* not to trace exit */
         LOG_I("tracing stop");
-        time = 0;
+        retval = 0;
+    }
+    else if (pc >= 0xffff0000000ed158 && pc <= 0xffff0000000ed81c)
+    {
+        retval = 0;
     }
     else
+    {
+        rt_ubase_t time = ftrace_timestamp();
         time = time ? time : 1;
+        retval = time;
+    }
 
-    return time;
+    return retval;
 }
 
 static rt_notrace
@@ -148,7 +155,7 @@ static void _debug_fgraph(int argc, char **argv)
     ftrace_tracer_set_on_exit(&fgraph_app, _test_graph_on_exit);
 
     /* set trace point */
-    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, /* &rt_hw_spin_lock, &rt_hw_spin_unlock, */
+    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, &rt_hw_spin_lock, &rt_hw_spin_unlock,
                        &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, &rt_cpu_index,
                        &rt_cpus_lock, &rt_cpus_unlock};
     ftrace_tracer_set_except(&fgraph_app, notrace, sizeof(notrace)/sizeof(notrace[0]));
@@ -204,7 +211,7 @@ static void _fgraph_stop(int argc, char **argv)
      */
     event_ring_for_each_buffer_lock(ring, _free_buffer, 0);
     event_ring_delete(ring);
-    // rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)RT_CPUS_NR);
+
     return ;
 }
 MSH_CMD_EXPORT_ALIAS(_fgraph_stop, fgraph_test_stop, test ftrace feature);

@@ -185,9 +185,7 @@
 
 /* Kernel Tracing Support */
 
-#define RT_USING_TRACING
-#define TRACING_FTRACE
-#define TRACING_KSYMTBL
+#define TRACING_SOFT_KASAN
 
 /* Network */
 

@@ -36,6 +36,7 @@
 
 #include <rthw.h>
 #include <rtthread.h>
+#include <stdatomic.h>
 #include <stddef.h>
 
 #ifndef __on_rt_thread_inited_hook
@@ -265,8 +266,9 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
 
 #ifdef RT_USING_TRACING
-    thread->stacked_trace = 0;
-    thread->trace_recorded = 0;
+    atomic_store_explicit(&thread->stacked_trace, 0, memory_order_relaxed);
+    atomic_store_explicit(&thread->stacked_exit, 0, memory_order_relaxed);
+    atomic_store_explicit(&thread->trace_recorded, 0, memory_order_relaxed);
 #endif
 #endif
 
