@@ -26,11 +26,10 @@
 #include "riscv_mmu.h"
 #include "stack.h"
 
-typedef rt_size_t (*syscallfunc_t)(rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t);
+typedef rt_size_t (*syscallfunc_t)(rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t, rt_size_t);
 
 void syscall_handler(struct rt_hw_stack_frame *regs)
 {
-    const char *syscall_name;
     int syscallid = regs->a7;
 
     if (syscallid == 0)
@@ -44,19 +43,23 @@ void syscall_handler(struct rt_hw_stack_frame *regs)
 
     if (syscallfunc == RT_NULL)
     {
-        LOG_E("unsupported syscall!\n");
+        LOG_E("unsupported syscall %d\n", syscallid);
         sys_exit(-1);
     }
 
 #if DBG_LVL >= DBG_INFO
+    const char *syscall_name;
     syscall_name = lwp_get_syscall_name(syscallid);
 #endif
 
     LOG_I("[0x%lx] %s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx)", rt_thread_self(), syscall_name,
         regs->a0, regs->a1, regs->a2, regs->a3, regs->a4, regs->a5, regs->a6);
-    regs->a0 = syscallfunc(regs->a0, regs->a1, regs->a2, regs->a3, regs->a4, regs->a5, regs->a6);
+    regs->a0 = syscallfunc(regs->a0, regs->a1, regs->a2, regs->a3, regs->a4, regs->a5, regs->a6, regs->a7);
     regs->a7 = 0;
     regs->epc += 4; // skip ecall instruction
+
+#if DBG_LVL >= DBG_INFO
     LOG_I("[0x%lx] %s ret: 0x%lx", rt_thread_self(), syscall_name, regs->a0);
+#endif
 }
 #endif /* RT_USING_SMART */

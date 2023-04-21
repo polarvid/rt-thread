@@ -12,6 +12,7 @@
  * 2021-02-20     lizhirui     fix some warnings
  * 2023-03-13     WangXiaoyao  Format & fix syscall return value
  */
+#include <stddef.h>
 #define _GNU_SOURCE
 /* RT-Thread System call */
 #include <rtthread.h>
@@ -474,7 +475,7 @@ off_t sys_lseek(int fd, off_t offset, int whence)
 }
 
 /* syscall: "open" ret: "int" args: "const char *" "int" "..." */
-sysret_t sys_open(const char *name, int flag, ...)
+SYSCALL_DEFINE_VARG(open, const char *, name, int, flag)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -4759,7 +4760,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_read),
     SYSCALL_SIGN(sys_write),
     SYSCALL_SIGN(sys_lseek),
-    SYSCALL_SIGN(sys_open),            /* 05 */
+    SYSCALL_SIGN_EXT(sys_open),            /* 05 */
     SYSCALL_SIGN(sys_close),
     SYSCALL_SIGN(sys_ioctl),
     SYSCALL_SIGN(sys_fstat),
@@ -4972,7 +4973,7 @@ const static struct rt_syscall_def func_table[] =
 
 const void *lwp_get_sys_api(rt_uint32_t number)
 {
-    const void *func = (const void *)sys_notimpl;
+    const void *func = (const void *)NULL;
 
     if (number == 0xff)
     {
@@ -4990,6 +4991,7 @@ const void *lwp_get_sys_api(rt_uint32_t number)
     return func;
 }
 
+#ifdef TRACING_SYSCALL
 const char *lwp_get_syscall_name(rt_uint32_t number)
 {
     const char *name = "sys_notimpl";
@@ -5010,3 +5012,40 @@ const char *lwp_get_syscall_name(rt_uint32_t number)
     // skip sys_
     return name;
 }
+
+#ifdef TRACING_SYSCALL_EXT
+const int lwp_get_syscall_param_list(rt_uint32_t number, const char ***ptypes, const char ***pargs)
+{
+    int retval = -1;
+
+    if (number == 0xff)
+    {
+        // name = "sys_log";
+    }
+    else
+    {
+        const char **types, **args;
+        number -= 1;
+        if (number < sizeof(func_table) / sizeof(func_table[0]))
+        {
+            types = func_table[number].param_list_types;
+            if (types)
+            {
+                args = func_table[number].param_list_name;
+
+                if (ptypes)
+                    *ptypes = types;
+                if (pargs)
+                    *pargs = args;
+
+                retval = func_table[number].param_cnt;
+            }
+        }
+    }
+
+    // skip sys_
+    return retval;
+}
+#endif /* TRACING_SYSCALL_EXT */
+
+#endif /* TRACING_SYSCALL */

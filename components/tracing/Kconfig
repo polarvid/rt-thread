@@ -20,5 +20,16 @@ config RT_USING_TRACING
     if ARCH_ARMV8
         config TRACING_SOFT_KASAN
             bool "Enable software-tagged KASAN (memory usage tracer)"
+            default n
+    endif
+
+    config TRACING_SYSCALL
+        bool "Kernel space syscall tracing"
+        default n
+
+    if TRACING_SYSCALL
+        config TRACING_SYSCALL_EXT
+            bool "Embedded extra meta including parameter list"
+            default n
     endif
 endmenu

@@ -41,7 +41,14 @@ typedef uint32_t id_t;          /* may contain pid, uid or gid */
 #define	PRIO_PGRP	    1
 #define	PRIO_USER	    2
 
+#ifdef TRACING_SYSCALL
 const char *lwp_get_syscall_name(rt_uint32_t number);
+
+#ifdef TRACING_SYSCALL_EXT
+const int lwp_get_syscall_param_list(rt_uint32_t number, const char ***ptypes, const char ***pargs);
+#endif /* TRACING_SYSCALL_EXT */
+#endif /* TRACING_SYSCALL */
+
 const void *lwp_get_sys_api(rt_uint32_t number);
 
 void sys_exit(int value);

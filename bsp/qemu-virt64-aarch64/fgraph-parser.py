@@ -1,10 +1,11 @@
 
 class Event:
-    def __init__(self, arr):
+    def __init__(self, cpuid, arr):
         self.entry_address = arr[0]
         self.entry_time = arr[1]
         self.exit_time = arr[2]
         self.tid = arr[3]
+        self.cpuid = cpuid
 
 
 class FGraphRecord:
@@ -89,29 +90,28 @@ class RawFGraphText:
 
 cpuid = 0
 fgraph = RawFGraphText()
+events = []
 while True:
     try:
         # Open the logging.txt file and read the addresses
         with open(f'/home/rtthread-smart/kernel/bsp/qemu-virt64-aarch64/logging-{cpuid}.bin', 'rb') as f:
-            events = []
             while True:
                 # Read 32 bytes event
-                event = f.read(32)
-                values = [int.from_bytes(event[i:i+8], byteorder='little', signed=False) for i in range(0, 32, 8)]
-                if not event:
+                event_bytes = f.read(32)
+                values = [int.from_bytes(event_bytes[i:i+8], byteorder='little', signed=False) for i in range(0, 32, 8)]
+                if not event_bytes:
                     break
-                events.append(Event(values))
+                events.append(Event(cpuid, values))
             total_count = len(events)
-
-        events = sorted(events, key=lambda x: x.entry_time, reverse=False)
-        for event in events:
-            fgraph.append(cpuid, event)
 
     except:
         break
     print(f'cpu {cpuid} is done')
     cpuid += 1
 
+events.sort(key=lambda x: x.entry_time)
+for event in events:
+    fgraph.append(event.cpuid, event)
 # Sort the records in fgraph.records by timestamp
 fgraph.records.sort(key=lambda x: x.timestamp)
     

@@ -109,7 +109,7 @@ int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn)
 
     if (existed == RT_TRUE)
     {
-        _set_trace(tracer, fn);
+        err = _set_trace(tracer, fn);
     }
     else
     {

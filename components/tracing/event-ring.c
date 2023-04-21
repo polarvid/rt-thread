@@ -33,7 +33,7 @@ trace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz)
     RT_ASSERT(POWER_OF_2(bufsz));
     /* objsz should be multiples of 8 */
     RT_ASSERT(!(objsz & (sizeof(rt_ubase_t) - 1)));
-    RT_ASSERT(ringsz > bufsz);
+    RT_ASSERT(ringsz >= bufsz);
 
     const size_t objs_per_ring = ringsz / objsz;
     const size_t bufs_per_ring = ringsz / bufsz;

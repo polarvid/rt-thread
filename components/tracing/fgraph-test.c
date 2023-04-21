@@ -94,9 +94,6 @@ static void _report_buf(trace_evt_ring_t ring, size_t cpuid, void *pevent, void 
         rt_kprintf("cpu-%d: %lx/%lx\n", cpuid, step, total);
     }
 
-    rt_thread_t tid = event->tid;
-    if (tid->trace_recorded == 0 && (tid->trace_recorded = 1))
-        rt_kprintf("tcb %p name %s\n", tid, tid->parent.name);
     // rt_kprintf("[%3d]-%s func %p: calltime 0x%lx rettime 0x%lx\n", cpuid, tid->parent.name,
     //     event->entry_address, event->entry_time, event->exit_time);
 
@@ -163,6 +160,8 @@ static void _debug_fgraph(void)
         rt_snprintf(buf, sizeof(buf), "/dev/shm/logging-%d.bin", cpuid);
         fds[cpuid] = open(buf, O_WRONLY | O_CREAT, 0);
     }
+
+    atomic_thread_fence(memory_order_acquire);
     event_ring_for_each_event_lock(ring, _report_buf, (void *)fds);
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)
     {

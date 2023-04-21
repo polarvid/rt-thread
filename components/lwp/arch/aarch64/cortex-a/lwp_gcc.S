@@ -217,6 +217,8 @@ SVC_Handler:
     ldp x2, x3, [sp, #(CONTEXT_OFFSET_X2)]
     ldp x4, x5, [sp, #(CONTEXT_OFFSET_X4)]
     ldp x6, x7, [sp, #(CONTEXT_OFFSET_X6)]
+    ldp x8, x9, [sp, #(CONTEXT_OFFSET_X8)]
+    mov x7, x8
     blr x30
     /* jump explictly, make this code position independant */
     b arch_syscall_exit
