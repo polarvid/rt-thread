@@ -384,6 +384,9 @@ def PrepareBuilding(env, root_directory, has_libcpu=False, remove_components = [
     if GetDepend('TRACING_FTRACE') and rtconfig.PLATFORM in ['gcc']:
         TRACE_CONFIG = " -fpatchable-function-entry=5,3"
         env.Append(CFLAGS=TRACE_CONFIG, CXXFLAGS=TRACE_CONFIG)
+    if GetDepend('TRACING_SOFT_KASAN'):
+        SANITIZER = ' -fsanitize=kernel-address'
+        env.Append(CFLAGS=SANITIZER, CXXFLAGS=SANITIZER)
 
     # we need to seperate the variant_dir for BSPs and the kernels. BSPs could
     # have their own components etc. If they point to the same folder, SCons
