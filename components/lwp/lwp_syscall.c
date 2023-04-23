@@ -378,7 +378,7 @@ void sys_exit_group(int status)
 }
 
 /* syscall: "read" ret: "ssize_t" args: "int" "void *" "size_t" */
-ssize_t sys_read(int fd, void *buf, size_t nbyte)
+SYSCALL_DEFINE(read, int, fd, void *, buf, size_t, nbyte)
 {
 #ifdef ARCH_MM_MMU
     void *kmem = RT_NULL;
@@ -425,7 +425,7 @@ ssize_t sys_read(int fd, void *buf, size_t nbyte)
 }
 
 /* syscall: "write" ret: "ssize_t" args: "int" "const void *" "size_t" */
-ssize_t sys_write(int fd, const void *buf, size_t nbyte)
+SYSCALL_DEFINE(write, int, fd, const void *, buf, size_t, nbyte)
 {
 #ifdef ARCH_MM_MMU
     void *kmem = RT_NULL;
@@ -468,7 +468,7 @@ ssize_t sys_write(int fd, const void *buf, size_t nbyte)
 }
 
 /* syscall: "lseek" ret: "off_t" args: "int" "off_t" "int" */
-off_t sys_lseek(int fd, off_t offset, int whence)
+SYSCALL_DEFINE(lseek, int, fd, off_t, offset, int, whence)
 {
     off_t ret = lseek(fd, offset, whence);
     return (ret < 0 ? GET_ERRNO() : ret);
@@ -527,13 +527,13 @@ sysret_t sys_close(int fd)
 }
 
 /* syscall: "ioctl" ret: "int" args: "int" "u_long" "..." */
-sysret_t sys_ioctl(int fd, unsigned long cmd, void* data)
+SYSCALL_DEFINE(ioctl, int, fd, unsigned long, cmd, void *, data)
 {
     int ret = ioctl(fd, cmd, data);
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-sysret_t sys_fstat(int file, struct stat *buf)
+SYSCALL_DEFINE(fstat, int, file, struct stat *, buf)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -825,7 +825,7 @@ quit:
 #endif
 }
 
-sysret_t sys_unlink(const char *pathname)
+SYSCALL_DEFINE(unlink, const char *, pathname)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -2530,7 +2530,7 @@ sysret_t sys_log(const char* log, int size)
     return 0;
 }
 
-sysret_t sys_stat(const char *file, struct stat *buf)
+SYSCALL_DEFINE(stat, const char *, file, struct stat *, buf)
 {
     int ret = 0;
     int err;
@@ -4757,13 +4757,13 @@ sysret_t sys_fstatfs64(int fd, size_t sz, struct statfs *buf)
 const static struct rt_syscall_def func_table[] =
 {
     SYSCALL_SIGN(sys_exit),            /* 01 */
-    SYSCALL_SIGN(sys_read),
-    SYSCALL_SIGN(sys_write),
-    SYSCALL_SIGN(sys_lseek),
+    SYSCALL_SIGN_EXT(sys_read),
+    SYSCALL_SIGN_EXT(sys_write),
+    SYSCALL_SIGN_EXT(sys_lseek),
     SYSCALL_SIGN_EXT(sys_open),            /* 05 */
     SYSCALL_SIGN(sys_close),
-    SYSCALL_SIGN(sys_ioctl),
-    SYSCALL_SIGN(sys_fstat),
+    SYSCALL_SIGN_EXT(sys_ioctl),
+    SYSCALL_SIGN_EXT(sys_fstat),
     SYSCALL_SIGN(sys_poll),
     SYSCALL_SIGN(sys_nanosleep),       /* 10 */
     SYSCALL_SIGN(sys_gettimeofday),
@@ -4838,7 +4838,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_device_read),    /* 65 */
     SYSCALL_SIGN(sys_device_write),
 
-    SYSCALL_SIGN(sys_stat),
+    SYSCALL_SIGN_EXT(sys_stat),
     SYSCALL_SIGN(sys_thread_find),
 
     SYSCALL_NET(SYSCALL_SIGN(sys_accept)),
@@ -4907,7 +4907,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_rt_timer_control),  /* 115 */
     SYSCALL_SIGN(sys_getcwd),
     SYSCALL_SIGN(sys_chdir),
-    SYSCALL_SIGN(sys_unlink),
+    SYSCALL_SIGN_EXT(sys_unlink),
     SYSCALL_SIGN(sys_mkdir),
     SYSCALL_SIGN(sys_rmdir),          /* 120 */
     SYSCALL_SIGN(sys_getdents),

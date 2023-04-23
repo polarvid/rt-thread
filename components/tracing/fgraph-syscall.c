@@ -37,7 +37,7 @@ static struct ftrace_tracer syscall_tracer;
 typedef struct fgraph_session {
 } *fgraph_session_t;
 
-static rt_hw_spinlock_t print_lock;
+static struct rt_spinlock print_lock;
 
 rt_inline void _log_param(struct ftrace_context *ctx, const char **types, const char **names, size_t i)
 {
@@ -65,11 +65,11 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
         return 0;
 
     const int param_cnt = lwp_get_syscall_param_list(syscall, &types, &names);
-    rt_hw_spin_lock(&print_lock);
+    rt_spin_lock(&print_lock);
     if (param_cnt != -1)
     {
         dbg_log_prologue(DBG_INFO);
-        dbg_raw("[%s] %s(", tcb->parent.name, lwp_get_syscall_name(syscall));
+        dbg_raw("[%s:%x] %s(", tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall));
 
         for (size_t i = 0; i < param_cnt - 1; i++)
         {
@@ -83,12 +83,12 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
     }
     else
     {
-        LOG_I("[%s] %s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx)",
-            tcb->parent.name, lwp_get_syscall_name(syscall), ctx->args[FTRACE_REG_X0],
+        LOG_I("[%s:%x] %s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx)",
+            tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall), ctx->args[FTRACE_REG_X0],
             ctx->args[FTRACE_REG_X1], ctx->args[FTRACE_REG_X2], ctx->args[FTRACE_REG_X3],
             ctx->args[FTRACE_REG_X4], ctx->args[FTRACE_REG_X5], ctx->args[FTRACE_REG_X6]);
     }
-    rt_hw_spin_unlock(&print_lock);
+    rt_spin_unlock(&print_lock);
 
     return syscall;
 }
@@ -98,12 +98,16 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
 {
     rt_thread_t tcb = rt_thread_self();
     struct ftrace_context *ctx = context;
+    rt_ubase_t retval = ctx->args[FTRACE_REG_X0];
 
-    rt_hw_spin_lock(&print_lock);
-    LOG_I("[%s] %s() => 0x%lx",
-        tcb->parent.name, lwp_get_syscall_name(stat),
-        ctx->args[FTRACE_REG_X0]);
-    rt_hw_spin_unlock(&print_lock);
+    rt_spin_lock(&print_lock);
+    if (retval > -4096ul)
+        LOG_W("[%s:%x] %s() => 0x%lx (-%ld)", tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(stat), retval, -retval);
+    else
+        LOG_I("[%s:%x] %s() => 0x%lx", tcb->parent.name, 
+              (rt_ubase_t)tcb, lwp_get_syscall_name(stat), retval);
+
+    rt_spin_unlock(&print_lock);
     return ;
 }
 
@@ -114,7 +118,7 @@ static void syscall_trace_start(int argc, char **argv)
     session = rt_malloc(sizeof(*session));
     RT_ASSERT(session);
 
-    rt_hw_spin_lock_init(&print_lock);
+    rt_spin_lock_init(&print_lock);
 
     ftrace_tracer_init(&syscall_tracer, _test_graph_on_entry, session);
     ftrace_tracer_set_on_exit(&syscall_tracer, _test_graph_on_exit);

@@ -37,13 +37,17 @@
 #define __PARAM_LIST(narg, ...)     _SEL##narg(_SIGNATURE, __VA_ARGS__)
 #define _PARAM_LIST(narg, ...)      __PARAM_LIST(narg, __VA_ARGS__)
 
-#define _SYSCALL_METADATA(name, ...) \
-const char *_sys_##name##_param_type[] = {_META_TYPES(_NARGS(__VA_ARGS__), __VA_ARGS__)}; \
+#define _SYSCALL_METADATA(name, ...)                                                        \
+const char *_sys_##name##_param_type[] = {_META_TYPES(_NARGS(__VA_ARGS__), __VA_ARGS__)};   \
 const char *_sys_##name##_param_name[] = {_META_ARGS(_NARGS(__VA_ARGS__), __VA_ARGS__)}
 
-#define SYSCALL_DEFINE_VARG(name, ...)  \
-_SYSCALL_METADATA(name, __VA_ARGS__);   \
+#define SYSCALL_DEFINE_VARG(name, ...)                                  \
+_SYSCALL_METADATA(name, __VA_ARGS__);                                   \
 sysret_t sys_##name(_PARAM_LIST(_NARGS(__VA_ARGS__), __VA_ARGS__), ...)
+
+#define SYSCALL_DEFINE(name, ...)                                   \
+_SYSCALL_METADATA(name, __VA_ARGS__);                               \
+sysret_t sys_##name(_PARAM_LIST(_NARGS(__VA_ARGS__), __VA_ARGS__))
 
 typedef long sysret_t;
 
@@ -85,6 +89,8 @@ struct rt_syscall_def
  * Each syscall is described by a signature as `rt_syscall_def`
  * in syscall table. This make it easy to locate every syscall's
  * metadata by syscall id.
+ *
+ * TODO: all switch to SYSCALL_SIGN_EXT
  */
 #define SYSCALL_SIGN(func) {    \
     (void *)(func),             \
