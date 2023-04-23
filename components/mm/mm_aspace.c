@@ -447,6 +447,10 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
             {
                 *addr = varea->start;
             }
+            else
+            {
+                *addr = varea->start;
+            }
         }
         else
         {

@@ -271,6 +271,12 @@ if RT_DEBUG
             default n
     endif
 
+    if ARCH_MM_MMU
+        config RT_DEBUG_PAGE_LEAK
+            bool "Enable page leaking tracer"
+            default n
+    endif
+
     config RT_DEBUG_MODULE_CONFIG
         bool "Enable debugging of Application Module"
         default n

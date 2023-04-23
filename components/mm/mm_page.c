@@ -619,7 +619,6 @@ void list_page(void)
         }
         rt_kprintf("\n");
     }
-
     for (i = 0; i < RT_PAGE_MAX_ORDER; i++)
     {
         struct rt_page *p = page_list_high[i];
