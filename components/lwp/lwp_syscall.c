@@ -403,6 +403,10 @@ SYSCALL_DEFINE(read, int, fd, void *, buf, size_t, nbyte)
     ret = read(fd, kmem, nbyte);
     if (ret > 0)
     {
+        for (size_t i = ret; i < ret; i++)
+            rt_kprintf("%c", ((char *)kmem)[i]);
+        rt_kputs("\n");
+
         lwp_put_to_user(buf, kmem, ret);
     }
 

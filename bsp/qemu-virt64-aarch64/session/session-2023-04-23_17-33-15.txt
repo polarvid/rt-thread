@@ -1,0 +1,403 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Apr 23 2023 17:33:07
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (4)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+msh />hello rt-thread
+
+msh />ls
+Directory /:
+bin                 <DIR>                    
+employee.db         8192                     
+aarch64             <DIR>                    
+msh />a rm emp
+msh />rm employee.db
+msh />aar
+msh />aarch64/dbk
+msh />aarch64/dbkit &
+msh />stra
+strace
+strace_stop
+msh />strace
+[32m[I/tracing.syscall] 174 syscalls registered[0m
+msh />aar
+msh />aarch64/dbc
+msh />aarch64/dbclient
+msh />[32m[I/tracing.syscall] [dbclient:3b5668] set_tid_address(0x22c2c0, 0x0, 0x8, 0x0, 0xff, 0x8, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] set_tid_address() => 0xf[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk(0x0, 0x0, 0x17, 0x0, 0x0, 0x0, 0x7c)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk() => 0xffff80000000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk(0xffff80001000, 0x0, 0x80000000, 0x0, 0x0, 0x7c, 0x34)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk() => 0xffff80001000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] getpid(0x211090, 0x3e8, 0xffff80000458, 0x0, 0xffff80000460, 0x18, 0x34)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] getpid() => 0x2[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] socket(0x2, 0x1, 0x0, 0x1, 0x2, 0x210960, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] socket() => 0x3[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] connect(0x3, 0xffff800004ec, 0x10, 0xffff800004ec, 0x0, 0x2, 0x210920)[0m
+[32m[I/tracing.syscall] [dbkit:344800] accept(0x3, 0xffff800000a0, 0xffff800000b4, 0xffff800000a0, 0x0, 0x5e, 0x2f0310)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] connect() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask(0x1, 0xffff7ffffe30, 0x0, 0x8, 0x0, 0xffff0000003175d8, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] mmap2(0x0, 0x23000, 0x0, 0x22, 0xffffffffffffffff, 0x0, 0xffffffff)[0m
+[32m[I/tracing.syscall] [dbkit:344800] accept() => 0x4[0m
+[32m[I/tracing.syscall] [dbkit:344800] brk(0xffff80019000, 0x0, 0x2015, 0x0, 0xffff80014988, 0x18, 0x45)[0m
+[32m[I/tracing.syscall] [dbkit:344800] brk() => 0xffff80019000[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] mmap2() => 0x22d000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask(0x0, 0x229380, 0xffff7ffffe30, 0x8, 0xffff7ffffe30, 0xf8, 0xff)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] clone(0xffff7ffffd30, 0x24fed0, 0x7d0f00, 0x24fee0, 0x24ff40, 0x24ffe8, 0x22c2c0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] clone() => 0x10[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sigprocmask(0x2, 0x24ff00, 0x0, 0x8, 0x0, 0xffff0000003bd640, 0x40)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask(0x2, 0xffff7ffffe30, 0x0, 0x8, 0x0, 0xffff0000003be768, 0xc8)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x3, 0x22a380, 0x100b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create(0x225ab8, 0x0, 0x0, 0x20, 0x380, 0x68, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create() => 0xffff0000003c7ac0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create(0xffff7ffffea0, 0x0, 0x0, 0x20, 0x380, 0x4, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create() => 0xffff0000003c7b88[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create(0xffff7ffffea0, 0x0, 0x0, 0x20, 0x380, 0x4, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sem_create() => 0xffff0000003c7c50[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk(0xffff80004000, 0x0, 0x2015, 0x0, 0x0, 0x0, 0x12)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk() => 0xffff80004000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x1, 0x10, 0xffff800025c0, 0x0, 0xffff800025d0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb8d[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_create(0x226028, 0x0, 0x21, 0x20, 0x22bac0, 0x18, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_create() => 0xffff0000003c80f0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_create(0x226038, 0x0, 0x21, 0x20, 0x22bac0, 0x18, 0x1a)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_create() => 0xffff0000003c81b8[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] mmap2(0x0, 0x23000, 0x0, 0x22, 0xffffffffffffffff, 0x0, 0xffffffff)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] mmap2() => 0x250000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask(0x0, 0x229380, 0xffff7ffffe50, 0x8, 0xffff7ffffe50, 0xf8, 0xff)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] clone(0xffff7ffffd50, 0x272ed0, 0x7d0f00, 0x272ee0, 0x272f40, 0x272fe8, 0x22c2c0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] clone() => 0x11[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sigprocmask(0x2, 0x272f00, 0x0, 0x8, 0x0, 0xffff0000003bd640, 0x40)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask(0x2, 0xffff7ffffe50, 0x0, 0x8, 0x0, 0xffff0000003c83c8, 0xc8)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sigprocmask() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0xffff0000003c7ac0, 0xffffffff, 0x80000000, 0x0, 0x0, 0x40, 0x68)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x2a, 0x2262, 0xffff80002fc9, 0x1, 0x2, 0x0, 0x8)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb8f[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk(0xffff80005000, 0x0, 0x17, 0x0, 0xffff80003fd8, 0x6, 0x1)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk() => 0xffff80005000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk(0xffff80007000, 0x0, 0x100a, 0x0, 0xffff80004138, 0x18, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] brk() => 0xffff80007000[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto(0x3, 0xffff80004160, 0x35, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto() => 0x35[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x3, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb8f[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x22b6e0, 0x22bb20, 0x22b6d4, 0x0, 0x458, 0x84, 0x61)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb8f[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv(0xffff0000003c80f0, 0x1, 0x6, 0xc350, 0xffff7ffffe44, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[32m[I/tracing.syscall] [dbkit:344800] read() => 0x35[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send(0xffff0000003552d8, 0xffff80014920, 0x20000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get(0x6, 0x10, 0xffff80017a60, 0x0, 0xffff80017a70, 0xffff800149c0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get() => 0xb90[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv(0xffff0000003552d8, 0x4eee38, 0xffffffff, 0x0, 0x50, 0x83, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db", buf=0x3d6ae0)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid(0x2f0aa0, 0xffff80017440, 0x106, 0x3d6c18, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid(0x2f0aa0, 0x2efeb0, 0x80000000, 0x0, 0x84, 0x84, 0xf)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:36a328] open(name="/employee.db", flag=0xa8042)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] open() => 0x5[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x2, data=0x1)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] ioctl() => 0xffffffffffffffda (-38)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x5, buf=0x3d6750)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x5, buf=0x3d6530)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8001b000, 0x0, 0x100f, 0x0, 0x0, 0x2, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8001b000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x5, offset=0x0, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] read(fd=0x5, buf=0x3d6c18, nbyte=0x64)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] read() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8001c000, 0x0, 0x3f, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8001c000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8001d000, 0x0, 0x5f, 0x0, 0x0, 0xffff8001b1b0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8001d000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8001e000, 0x0, 0x5f, 0x0, 0x0, 0xffff800179d0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8001e000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8002a000, 0x0, 0xbb87, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8002a000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff8002c000, 0x0, 0x100a, 0x0, 0xffff80018c38, 0x18, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff8002c000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto(0x4, 0xffff80029a60, 0x21, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0x21[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release(0xffff0000003c7ac0, 0x2104a0, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x3, 0x22a380, 0x100b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send(0xffff0000003c80f0, 0x1, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0xffff0000003c7ac0, 0xffffffff, 0x22b6d4, 0x0, 0x3c8, 0x84, 0x1c)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto() => 0x21[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get(0x4, 0x3272e0, 0x10, 0x0, 0x68, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get() => 0xb94[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0x22bcf8, nbyte=0x12)
+[0mConnection Success[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0x12[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0xffff7fffff4f, nbyte=0x1)
+[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0x1[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x89, 0x223b2972, 0xffff80003108, 0x1, 0x0, 0x4, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb95[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto(0x3, 0xffff800042a0, 0x94, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto() => 0x94[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x3, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb95[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x22b6e0, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x84, 0x61)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb95[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[32m[I/tracing.syscall] [dbclient:3b5668] event_recv(0xffff0000003c80f0, 0x2, 0x6, 0xc350, 0xffff7ffffe54, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] read() => 0x94[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send(0xffff0000003552d8, 0xffff80014920, 0x20000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get(0x4, 0xffff80017a80, 0x60000000, 0x0, 0x0, 0xffff800149c0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get() => 0xb95[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv(0xffff0000003552d8, 0x4eee38, 0xffffffff, 0x0, 0x3c8, 0x83, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d5c30)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d5c30)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d5c30)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-journal", buf=0x3d5c20)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-wal", buf=0x3d5c20)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x5, buf=0x3d5bf0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff80042000, 0x0, 0x154a7, 0x0, 0x0, 0x2, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff80042000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d5920)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-journal", buf=0x3d6870)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x5, offset=0x18, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x18[0m
+[32m[I/tracing.syscall] [dbkit:36a328] read(fd=0x5, buf=0x3d6940, nbyte=0x10)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] read() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-wal", buf=0x3d6870)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x5, buf=0x3d6840)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6910)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid(0x2f0aa0, 0xffff80017530, 0x806, 0x0, 0x276c00, 0x321f70, 0xffff800175c2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db", buf=0x3d6450)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] stat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] open(name="/employee.db-journal", flag=0xa8042)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] open() => 0x6[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x6, cmd=0x2, data=0x1)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] ioctl() => 0xffffffffffffffda (-38)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x6, buf=0x3d6330)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid(0x2f0aa0, 0xe8, 0x3d6898, 0x0, 0x3d68a0, 0x18, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] getpid() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:36a328] open(name="/dev/urandom", flag=0xa0000)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] open() => 0x7[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x7, cmd=0x2, data=0x1)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] read(fd=0x7, buf=0x3d67a0, nbyte=0x100)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] read() => 0x2[0m
+[32m[I/tracing.syscall] [dbkit:36a328] close(0x7, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2effd0)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] close() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x6, offset=0x0, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] write(fd=0x6, buf=0xffff80019008, nbyte=0x200)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] write() => 0x200[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d68d0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d68d0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x6, offset=0x200, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x200[0m
+[32m[I/tracing.syscall] [dbkit:36a328] read(fd=0x6, buf=0x3d6868, nbyte=0x8)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] read() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] open(name="/", flag=0xa0000)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] open() => 0xffffffffffffffea (-22)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x6, offset=0x0, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] write(fd=0x6, buf=0x3d6870, nbyte=0xc)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] write() => 0xc[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x5, offset=0x0, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] write(fd=0x5, buf=0xffff8003e1e0, nbyte=0x1000)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] write() => 0x1000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x5, offset=0x1000, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x1000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] write(fd=0x5, buf=0xffff8003d0d8, nbyte=0x1000)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] write() => 0x1000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] close(0x6, 0x0, 0x0, 0x0, 0x0, 0xff, 0x2effd0)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] close() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] unlink(pathname="/employee.db-journal")
+[0m[32m[I/tracing.syscall] [dbkit:36a328] unlink() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d68a0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d68a0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d68c0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk(0xffff80044000, 0x0, 0x100a, 0x0, 0xffff80029a38, 0x18, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] brk() => 0xffff80044000[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto(0x4, 0xffff80041900, 0xd, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0xd[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release(0xffff0000003c7ac0, 0x2104a0, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x3, 0x22a380, 0x100b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send(0xffff0000003c80f0, 0x2, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0xffff0000003c7ac0, 0xffffffff, 0x22b6d4, 0x0, 0x3c8, 0x84, 0x1c)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto() => 0xd[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get(0x4, 0x3272e0, 0x10, 0x0, 0x68, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get() => 0xb9d[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0x22bcf8, nbyte=0xe)
+[0mCreate Success[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0xe[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0xffff7fffff4f, nbyte=0x1)
+[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0x1[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x60, 0x7d223b29, 0xffff800030c0, 0x0, 0x0, 0x4, 0x8)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb9d[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto(0x3, 0xffff80004260, 0x6b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto() => 0x6b[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x3, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb9d[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x22b6e0, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x84, 0x61)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xb9d[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[32m[I/tracing.syscall] [dbclient:3b5668] event_recv(0xffff0000003c80f0, 0x4, 0x6, 0xc350, 0xffff7ffffe54, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] read() => 0x6b[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send(0xffff0000003552d8, 0xffff80014920, 0x20000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get(0x4, 0xffff80017a80, 0x60000000, 0x0, 0x0, 0xffff800149c0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get() => 0xb9e[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv(0xffff0000003552d8, 0x4eee38, 0xffffffff, 0x0, 0x80, 0x83, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6880)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-journal", buf=0x3d6870)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] lseek(fd=0x5, offset=0x18, whence=0x0)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] lseek() => 0x18[0m
+[32m[I/tracing.syscall] [dbkit:36a328] read(fd=0x5, buf=0x3d6940, nbyte=0x10)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] read() => 0x10[0m
+[32m[I/tracing.syscall] [dbkit:36a328] stat(file="/employee.db-wal", buf=0x3d6870)
+[0m[33m[W/tracing.syscall] [dbkit:36a328] stat() => 0xfffffffffffffffe (-2)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] fstat(file=0x5, buf=0x3d6840)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] fstat() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] ioctl(fd=0x5, cmd=0x6, data=0x3d6910)
+[0m[32m[I/tracing.syscall] [dbkit:36a328] ioctl() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto(0x4, 0xffff80041900, 0xd, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0xd[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release(0xffff0000003c7ac0, 0x2104a0, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x3, 0x22a380, 0x100b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send(0xffff0000003c80f0, 0x4, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0xffff0000003c7ac0, 0xffffffff, 0x22b6d4, 0x0, 0x3c8, 0x84, 0x1c)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto() => 0xd[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get(0x4, 0x3273a0, 0x1000, 0x0, 0x128, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get() => 0xba2[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x26, 0x7d36, 0xffff80002fa6, 0x0, 0x2, 0x4, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xba2[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto(0x3, 0xffff80004140, 0x31, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] sendto() => 0x31[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x3, 0x22bb08, 0x22b6d4, 0x0, 0x440, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xba2[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get(0x22b6e0, 0x22bb20, 0x22b6d4, 0x0, 0x458, 0x84, 0x61)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] tick_get() => 0xba2[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv(0xffff0000003c80f0, 0x8, 0x6, 0x1388, 0xffff7ffffe54, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[32m[I/tracing.syscall] [dbkit:344800] read() => 0x31[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send(0xffff0000003552d8, 0xffff80014920, 0x20000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:344800] mb_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get(0x4, 0xffff80017a80, 0x60000000, 0x0, 0x0, 0xffff800149c0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] tick_get() => 0xba2[0m
+[32m[I/tracing.syscall] [dbkit:3ac888] mb_recv(0xffff0000003552d8, 0x4eee38, 0xffffffff, 0x0, 0x3c8, 0x83, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto(0x4, 0xffff80041900, 0x38, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0x38[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release(0xffff0000003c7ac0, 0x2104a0, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] sem_release() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x3, 0x22a380, 0x100b, 0x0, 0x0, 0x0, 0x0)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send(0xffff0000003c80f0, 0x8, 0x60000000, 0x0, 0x0, 0x84, 0x84)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] event_send() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0xffff0000003c7ac0, 0xffffffff, 0x22b6d4, 0x0, 0x3c8, 0x84, 0x1c)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] event_recv() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:36a328] sendto() => 0x38[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get(0x4, 0x327370, 0x400, 0x0, 0xf8, 0x0, 0x84)[0m
+[32m[I/tracing.syscall] [dbkit:36a328] tick_get() => 0xba4[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0x22bcf8, nbyte=0x4f)
+[0mError executing INSERT statement: {"errmsg":"database disk image is malformed"}[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0x4f[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write(fd=0x1, buf=0x224aac, nbyte=0x1)
+[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] write() => 0x1[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] exit_group(0x1, 0x22b630, 0x80000000, 0x50, 0x0, 0x3, 0x3)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] exit_group() => 0x1[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] exit(0x1, 0x2104a0, 0x80000000, 0x0, 0x3, 0x3, 0x62)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] exit(0x22c2c0, 0x1, 0x1, 0x0, 0x0, 0x0, 0x62)[0m
+[32m[I/tracing.syscall] [dbclient:3b5668] exit() => 0x0[0m
+[33m[W/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0xfffffffffffffff5 (-11)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x0, 0x2, 0x2104a0, 0x80000000, 0x0, 0x0, 0xffff0000000e157c)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom(0x22c2c0, 0x1, 0x1, 0x0, 0x0, 0x0, 0xffff0000000e157c)[0m
+[32m[I/tracing.syscall] [dbclient:3be6b8] recvfrom() => 0x0[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x9[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0x0, 0x2, 0x2104a0, 0x60000000, 0x0, 0x0, 0x1c)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take(0x22c2c0, 0x1, 0x1, 0x0, 0x0, 0x0, 0x1c)[0m
+[32m[I/tracing.syscall] [dbclient:3c8318] sem_take() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[32m[I/tracing.syscall] [dbkit:344800] read() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+[32m[I/tracing.syscall] [dbkit:344800] select() => 0x1[0m
+[32m[I/tracing.syscall] [dbkit:344800] read(fd=0x4, buf=0x3258a0, nbyte=0x100b)
+[0m[33m[W/tracing.syscall] [dbkit:344800] read() => 0xffffffffffffff95 (-107)[0m
+[32m[I/tracing.syscall] [dbkit:344800] close(0x4, 0x0, 0x0, 0x0, 0x0, 0x2, 0x2effd0)[0m
+[32m[I/tracing.syscall] [dbkit:344800] close() => 0x0[0m
+[32m[I/tracing.syscall] [dbkit:344800] select(0x5, 0x34ad50, 0x0, 0x0, 0x0, 0x0, 0x34ad50)[0m
+printf("SELECT * Success\n");[2Kmsh />aarch64/dbclientQEMU: Terminated
+

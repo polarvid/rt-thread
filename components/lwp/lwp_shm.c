@@ -196,9 +196,7 @@ int lwp_shmget(size_t key, size_t size, int create)
 {
     int ret = 0;
 
-    rt_mm_lock();
     ret = _lwp_shmget(key, size, create);
-    rt_mm_unlock();
     return ret;
 }
 
@@ -352,9 +350,7 @@ int lwp_shm_ref_inc(struct rt_lwp *lwp, void *shm_vaddr)
 {
     int ret = 0;
 
-    rt_mm_lock();
     ret = _lwp_shm_ref_inc(lwp, shm_vaddr);
-    rt_mm_unlock();
 
     return ret;
 }
@@ -375,9 +371,7 @@ int lwp_shm_ref_dec(struct rt_lwp *lwp, void *shm_vaddr)
 {
     int ret = 0;
 
-    rt_mm_lock();
     ret = _lwp_shm_ref_dec(lwp, shm_vaddr);
-    rt_mm_unlock();
 
     return ret;
 }
@@ -407,9 +401,7 @@ int lwp_shmdt(void *shm_vaddr)
 {
     int ret = 0;
 
-    rt_mm_lock();
     ret = _lwp_shmdt(shm_vaddr);
-    rt_mm_unlock();
 
     return ret;
 }
@@ -436,9 +428,7 @@ void *lwp_shminfo(int id)
 {
     void *vaddr = RT_NULL;
 
-    rt_mm_lock();
     vaddr = _lwp_shminfo(id);
-    rt_mm_unlock();
     return vaddr;
 }
 
@@ -457,9 +447,8 @@ void list_shm(void)
 {
     rt_kprintf("   key        paddr      size       id\n");
     rt_kprintf("---------- ---------- ---------- --------\n");
-    rt_mm_lock();
+    /* check lock here */
     lwp_avl_traversal(shm_tree_key, _shm_info, NULL);
-    rt_mm_unlock();
 }
 MSH_CMD_EXPORT(list_shm, show share memory info);
 #endif
