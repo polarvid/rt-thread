@@ -36,8 +36,13 @@ typedef struct ftrace_tracer {
     rt_list_t node;
 
     /* handler of tracer */
-    ftrace_trace_fn_t on_entry;
-    ftrace_exit_fn_t on_exit;
+    union {
+        struct {
+            ftrace_trace_fn_t on_entry;
+            ftrace_exit_fn_t on_exit;
+        };
+        ftrace_trace_fn_t on_
+    };
 
     /* custom private data */
     void *data;

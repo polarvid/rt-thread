@@ -89,7 +89,7 @@ typedef struct trace_evt_ring
 #endif
 
 rt_inline rt_notrace
-void *event_ring_object_loc(trace_evt_ring_t ring, const int index, const int cpuid)
+void *event_ring_event_loc(trace_evt_ring_t ring, const int index, const int cpuid)
 {
     const size_t objshift = __builtin_ffsl(ring->objsz) - 1;
     return OFF_TO_OBJ(ring, index, objshift, cpuid);
@@ -180,7 +180,7 @@ int event_ring_enqueue(trace_evt_ring_t ring, void *buf, const rt_bool_t overrid
     } while (!atomic_compare_exchange_weak(&_R(ring)->prod_head, &prod_head, prod_next));
 
     rt_ubase_t *src = buf;
-    rt_ubase_t *dst = event_ring_object_loc(ring, prod_head, cpuid);
+    rt_ubase_t *dst = event_ring_event_loc(ring, prod_head, cpuid);
     /* give more chance for compiler optimization */
     for (size_t i = 0; i < (ring->objsz / sizeof(rt_ubase_t)); i++)
         *dst++ = *src++;
@@ -325,7 +325,7 @@ rt_inline void event_ring_for_each_event_lock(
         {
             if (!*event_ring_buffer_loc(ring, index, cpuid))
                 return ;
-            handler(ring, cpuid, event_ring_object_loc(ring, index, cpuid), data);
+            handler(ring, cpuid, event_ring_event_loc(ring, index, cpuid), data);
         }
     }
 }

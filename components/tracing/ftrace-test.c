@@ -60,12 +60,12 @@ static void _alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, v
     *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     RT_ASSERT(!!*pbuffer);
 
-    /* test on event_ring_object_loc */
+    /* test on event_ring_event_loc */
     void *preobj = 0;
     for (size_t i = 0; i < ring->objs_per_buf; i++)
     {
         size_t index = i + (pbuffer - (void **)&ring->buftbl[cpuid * ring->bufs_per_ring]) * ring->objs_per_buf;
-        void *obj = event_ring_object_loc(ring, index, cpuid);
+        void *obj = event_ring_event_loc(ring, index, cpuid);
         RT_ASSERT(obj >= *pbuffer && obj < *pbuffer + 4096);
         RT_ASSERT(!preobj || obj == preobj + 8);
         preobj = obj;
