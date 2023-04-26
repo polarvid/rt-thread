@@ -7,7 +7,6 @@
  * Date           Author       Notes
  * 2023-03-30     WangXiaoyao  ftrace support
  */
-#include "arch/aarch64.h"
 #include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"

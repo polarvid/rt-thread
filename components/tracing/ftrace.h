@@ -18,7 +18,7 @@
 #include <rtthread.h>
 
 #ifdef ARCH_ARMV8
-#include "arch/aarch64.h"
+#include "arch/aarch64/aarch64.h"
 #endif
 
 #ifndef RT_CPUS_NR
@@ -41,7 +41,7 @@ typedef struct ftrace_tracer {
             ftrace_trace_fn_t on_entry;
             ftrace_exit_fn_t on_exit;
         };
-        ftrace_trace_fn_t on_
+        ftrace_trace_fn_t around;
     };
 
     /* custom private data */

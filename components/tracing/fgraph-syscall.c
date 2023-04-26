@@ -15,7 +15,6 @@
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
-#include "arch/aarch64.h"
 #include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"

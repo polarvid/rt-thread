@@ -58,6 +58,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <sys/types.h>
 #endif /* RT_USING_LIBC */
 

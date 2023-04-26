@@ -8,7 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 #include "aarch64.h"
-#include "../ftrace.h"
+#include "../../ftrace.h"
 #include "rtdef.h"
 
 #include <stdatomic.h>

@@ -7,22 +7,22 @@ CPPPATH = [cwd]
 
 # for arch specified routines
 arch_file = {
-    "aarch64": ["aarch64-ctx.S", "aarch64-utils.c"],
-    "riscv64": ["riscv64.S"],
+    "aarch64": ["aarch64-abi.S", "aarch64-utils.c"],
+    "riscv64": ["riscv64-abi.S", "riscv64-utils.c"],
 }
 arch    = rtconfig.ARCH
 cpu     = rtconfig.CPU
 
 # fix the cpu for risc-v
 if arch == 'risc-v':
-    rv64 = ['virt64', 'c906']
-    if cpu in rv64:
+    riscv64 = ['virt64', 'c906']
+    if cpu in riscv64:
         arch = 'riscv64'
 
 if GetDepend(['TRACING_FTRACE']):
     # append arch prefix
     for file in arch_file[arch]:
-        src.add('arch/' + file)
+        src.add(f'arch/{arch}/{file}')
     src = src.union({'ftrace.c', 'ftrace-symtbl.c', 'fgraph.c', 'ftrace-test.c', 'fgraph-app-test.c', 'fgraph-syscall.c'})
 if GetDepend(['TRACING_KSYMTBL']):
     src = src.union({'ksymtbl.c'})

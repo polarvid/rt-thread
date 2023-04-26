@@ -2595,7 +2595,7 @@ void sys_hw_interrupt_enable(uint32_t level)
 }
 
 #ifdef ARCH_MM_MMU
-sysret_t sys_shmget(size_t key, size_t size, int create)
+SYSCALL_DEFINE(shmget, size_t, key, size_t, size, int, create)
 {
     return lwp_shmget(key, size, create);
 }
@@ -3203,7 +3203,7 @@ out:
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t size)
+SYSCALL_DEFINE(sigprocmask, int, how, const sigset_t *, sigset, sigset_t *, oset, size_t, size)
 {
     int ret = -1;
     lwp_sigset_t *pnewset = RT_NULL, *poldset = RT_NULL;
@@ -3800,7 +3800,7 @@ sysret_t sys_set_thread_area(void *p)
     return 0;
 }
 
-sysret_t sys_set_tid_address(int *tidptr)
+SYSCALL_DEFINE(set_tid_address, int *, tidptr)
 {
     rt_thread_t thread;
 
@@ -4816,7 +4816,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_USPACE(SYSCALL_SIGN(sys_mmap2)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_munmap)),
 #ifdef ARCH_MM_MMU
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_shmget)), /* 55 */
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_shmget)), /* 55 */
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmrm)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmat)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmdt)),
@@ -4890,7 +4890,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_notimpl),    //rt_wqueue_wakeup,
     SYSCALL_SIGN(sys_thread_mdelay),
     SYSCALL_SIGN(sys_sigaction),
-    SYSCALL_SIGN(sys_sigprocmask),
+    SYSCALL_SIGN_EXT(sys_sigprocmask),
     SYSCALL_SIGN(sys_tkill),             /* 105 */
     SYSCALL_SIGN(sys_thread_sigprocmask),
 #ifdef ARCH_MM_MMU
@@ -4918,7 +4918,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_get_errno),
 #ifdef ARCH_MM_MMU
     SYSCALL_SIGN(sys_set_thread_area),
-    SYSCALL_SIGN(sys_set_tid_address),
+    SYSCALL_SIGN_EXT(sys_set_tid_address),
 #else
     SYSCALL_SIGN(sys_notimpl),
     SYSCALL_SIGN(sys_notimpl),

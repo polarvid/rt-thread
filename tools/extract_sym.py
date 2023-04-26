@@ -14,6 +14,85 @@ Usage:
 python extract_sym.py rtthread.nm > ksymtbl.c
 """
 
+class CompressToken:
+    def __init__(self, symbol_bytes):
+        # occurrence of CompressNode
+        self.symbol_bytes = symbol_bytes
+        self.occurrence = []
+
+class CompressNode:
+    def __init__(self, symbol_bytes:bytearray, parent=None, start_idx=-1):
+        self.symbol_bytes = symbol_bytes
+        self.literal = symbol_bytes.decode('utf-8', 'backslashreplace')
+        self.parent = parent
+        self.start_idx = start_idx
+        self.substrings = []
+    def get_symbol_bytes(self) -> bytearray:
+        return self.symbol_bytes
+    def get_literal(self) -> str:
+        return self.literal
+    def split(self) -> bool:
+        rc = False
+        underline = ord('_')
+        # find all meaningful underline
+        meaningful_split = []
+        for i in range(len(self.symbol_bytes)):
+            # skip prefix underline
+            if self.symbol_bytes[i] != underline:
+                split_idx = i
+                while True:
+                    # find all meaningful split
+                    split_idx = self.symbol_bytes.find(underline, split_idx + 1)
+                    if split_idx != -1:
+                        meaningful_split.append(split_idx)
+                    else:
+                        break
+                break
+            else:
+                continue
+
+        # find last meaningful substring
+        start_index = 0
+        if meaningful_split:
+            for start_iter in range(len(meaningful_split)):
+                for end_iter in range(start_iter, len(meaningful_split)):
+                    end_index = meaningful_split[end_iter]
+
+                    # skip the case of 'bb__aa'
+                    # skip the case that last item is underline, like 'hear__'
+                    # the 'hear_' is acceptable, but 'hear__' is not
+                    if start_index + 1 == end_index or end_index == len(self.symbol_bytes) - 1:
+                        break
+
+                    substring = self.symbol_bytes[start_index:end_index + 1]
+                    self.substrings.append(CompressNode(substring, self, start_index))
+                    rc = True
+                start_index = meaningful_split[start_iter]
+        return rc
+
+
+class CompressDict:
+    def __init__(self):
+        self.token_dict = {}
+    def record(self, node:CompressNode):
+        symbol_bytes = node.get_symbol_bytes()
+        literal = node.literal
+        if literal in self.token_dict:
+            token = self.token_dict[literal]
+        else:
+            token = CompressToken(symbol_bytes)
+            self.token_dict[literal] = token
+        token.occurrence.append(node)
+    def remove(self, node:CompressNode):
+        literal = node.literal
+        token = self.token_dict[literal]
+        token.occurrence.remove(node)
+        if len(token.occurrence) == 0:
+            self.token_dict.pop(literal)
+    def get_tokens(self) -> list:
+        return self.token_dict.values()
+
+
 class SymbolEntry:
     # (system V format): Name Value Class Type Size Line Section
     def __init__(self, symbol, addr, class_char, type, size, line, section):
@@ -35,6 +114,13 @@ class SymbolEntry:
         self.__syt_idx = idx
     def get_syt_idx(self):
         return self.__syt_idx
+    # symbol_bytes: bytearray of symbol
+    def set_symbol_bytes(self, symbol):
+        self.__comp_node = CompressNode(bytearray(symbol, 'utf-8'))
+    def get_symbol_bytes(self):
+        return self.__comp_node.get_symbol_bytes()
+    def get_comp_node(self) -> CompressNode:
+        return self.__comp_node
 
 """
 BLOB generator
@@ -151,6 +237,70 @@ class MapInfo:
     def __section_str_sec_size_set(self, base, str_sec_sz):
         self.__section_str_sec_sz_dict[base] = str_sec_sz
 
+    def compress_symbol_bytes(self, base):
+        # enqueue all symbols
+        entries = self.__section_entries_dict[base]
+        process_queue = []
+        token_dict = CompressDict()
+        for entry in entries:
+            entry: SymbolEntry
+            process_queue.append(entry.get_comp_node())
+
+        # for each entry in process queue
+        while process_queue:
+            node = process_queue.pop()
+            node: CompressNode
+            # record symbol byte
+            token_dict.record(node)
+
+            if not node.parent and node.split():
+                for subs in node.substrings:
+                    token_dict.record(subs)
+
+        for i in range(128, 255):
+            # find most frequency token
+            best = max(token_dict.get_tokens(), key=lambda token: len(token.occurrence) * len(token.symbol_bytes))
+            best: CompressToken
+            # decrease counts from best and re-split
+            for node in best.occurrence:
+                parent: CompressNode
+                parent = node.parent
+                start_idx = node.start_idx
+                # locate node as a substring in parent bytearray
+                if not parent:
+                    parent = node
+                    start_idx = 0
+                    end_idx = len(node.symbol_bytes)
+                else:
+                    end_idx = len(node.symbol_bytes) + start_idx
+                # drop parent from token_dict
+                # drop all records of substrings in token_dict
+                for subs in parent.substrings:
+                    subs: CompressNode
+                    token_dict.remove(subs)
+                token_dict.remove(parent)
+
+                # modify bytearray
+                if start_idx > 0:
+                    former = parent.symbol_bytes[0:start_idx]
+                else:
+                    former = bytearray()
+                if end_idx < len(parent.symbol_bytes):
+                    latter = parent.symbol_bytes[end_idx:]
+                else:
+                    latter = bytearray()
+                former.append(i)
+                former.extend(latter)
+                parent.symbol_bytes = former
+                parent.substrings = []
+                parent.literal = former.decode(encoding='utf-8', errors='backslashreplace')
+
+                # re-split substring
+                parent.split()
+                token_dict.record(parent)
+                for subs in parent.substrings:
+                    token_dict.record(subs)
+
     def compile(self):
         # TODO: we only deal with the 4G section first text entry located currently
         first_text_base = None
@@ -171,14 +321,20 @@ class MapInfo:
             self.__section_symbols_insert(base, entry)
             # 1.4. record the oft_idx in entry
             entry.set_oft_idx(len(self.__section_entries_dict[base]))
+            # 1.5. record the byte array in entry
+            entry.set_symbol_bytes(entry.symbol)
 
         # TODO: we only deal with the 4G section first text entry located currently
         self.__oft_str = self.__oft_str_dict[base]
 
         # 2. compile symbol table & string section
         # The 2 describe all symbols in ascending order in simply
+
+        # 2.0. the compression is apply if needed
+        self.compress_symbol_bytes(base)
+
         syt_str = '\n'
-        str_str = ''
+        str_bytes = bytearray()
         offset = 0
         # TODO: we only deal with the 4G section first text entry located currently
         sec_symbols_asc = sorted(self.__section_symbols_dict[base], key=lambda x: x.symbol)
@@ -189,14 +345,15 @@ class MapInfo:
         sym_2_off_list = [] # {idx} -> {offset_of_symbol}
         for entry in sec_symbols_asc:
             entry:SymbolEntry
-            symbol = entry.symbol
+            symbol_bytes = entry.get_symbol_bytes()
             # 2.1. append entry symbol table
             str_off_list.append(offset)
+            offset += 1 + len(symbol_bytes) + 1 # next entry in symbol table
 
             # 2.2. entry for the string section
-            sym_entry_str = '{0}{1}\0'.format(entry.class_char, symbol)
-            offset += len(sym_entry_str)    # next entry in symbol table
-            str_str += sym_entry_str
+            str_bytes.extend(bytearray(entry.class_char, 'utf-8'))
+            str_bytes.extend(symbol_bytes)
+            str_bytes.append(0)
 
             # 2.3. record index in syt
             entry.set_syt_idx(len(sym_2_off_list))
@@ -209,17 +366,16 @@ class MapInfo:
             syt_str += '0x{0:x},\n'.format(str_off_list[i])
 
         # 2.4. convert string section to array of uint32_t
-        bytes = bytearray(str_str, 'utf-8')
         str_str = ''
-        remainder = (4 - len(bytes) % 4) % 4
+        remainder = (4 - len(str_bytes) % 4) % 4
         while remainder > 0:
             # padding with '\0'
-            bytes.append(0)
+            str_bytes.append(0)
             remainder -= 1
         # record string section size of current section
-        self.__section_str_sec_size_set(first_text_base, len(bytes))
-        for i in range(0, len(bytes), 4):
-            value32 = bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24
+        self.__section_str_sec_size_set(first_text_base, len(str_bytes))
+        for i in range(0, len(str_bytes), 4):
+            value32 = str_bytes[i] | str_bytes[i + 1] << 8 | str_bytes[i + 2] << 16 | str_bytes[i + 3] << 24
             str_str += '0x{0:x},\n'.format(value32)
 
         # 3. compile the S2O mapping

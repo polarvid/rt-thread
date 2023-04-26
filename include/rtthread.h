@@ -710,6 +710,7 @@ void rt_assert_handler(const char *ex, const char *func, rt_size_t line);
 /*
  * disable scheduler
  */
+ #include <stdatomic.h>
 rt_inline void rt_preempt_disable(void)
 {
     struct rt_thread *current_thread;

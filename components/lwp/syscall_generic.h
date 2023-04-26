@@ -79,6 +79,9 @@ struct rt_syscall_def
     #define SYSCALL_META()
 #endif
 
+#define SYSCALL_SIGN(func) {(void *)(func)}
+#define SYSCALL_SIGN_EXT(func) SYSCALL_SIGN(func)
+
 /**
  * @brief signature for syscall, used to locate syscall metadata.
  *
@@ -92,15 +95,21 @@ struct rt_syscall_def
  *
  * TODO: all switch to SYSCALL_SIGN_EXT
  */
+#ifdef TRACING_SYSCALL
+#undef SYSCALL_SIGN
 #define SYSCALL_SIGN(func) {    \
     (void *)(func),             \
     &RT_STRINGIFY(func)[4],     \
 }
 
-#define SYSCALL_SIGN_EXT(func) {    \
-    (void *)(func),                 \
-    SYSCALL_META(func),             \
-}
+#ifdef TRACING_SYSCALL_EXT
+    #undef SYSCALL_SIGN_EXT
+    #define SYSCALL_SIGN_EXT(func) {    \
+        (void *)(func),                 \
+        SYSCALL_META(func),             \
+    }
+#endif /* TRACING_SYSCALL_EXT */
+#endif /* TRACING_SYSCALL */
 
 #define SET_ERRNO(no) rt_set_errno(-(no))
 #define GET_ERRNO() ({int _errno = rt_get_errno(); _errno > 0 ? -_errno : _errno;})

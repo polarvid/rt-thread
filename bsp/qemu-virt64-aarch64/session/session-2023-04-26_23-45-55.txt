@@ -1,0 +1,79 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Apr 26 2023 22:44:03
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (5)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+msh />hello rt-thread
+
+msh />hel
+msh />hello.elf
+msh />this is parent thread
+
+Running getcwd
+[31m[E/LWP] ERROR: Can't open elf file ./getcwd.elf![0m
+execve error
+: Invalid argument
+
+msh />
+msh />aar
+msh />aarch64/
+memtest_nosmall.elf
+memtest.elf
+getcwd.elf
+mem_alloc_stress.elf
+sigtimewait.elf
+signal_test.elf
+mmap.elf
+pong.elf
+timer_thread.elf
+fork
+ping.elf
+fork_example
+execve.elf
+hello.elf
+syslog.elf
+dbkit
+syslogd.elf
+dbclient
+msh />aarch64/ge
+msh />aarch64/getcwd.elf
+msh />Current working directory: /
+
+msh />
+msh />[2Kmsh />aarch64/getcwd.elf          for
+fork
+fork_example
+msh />aarch64/fork
+msh />this is parent thread
+
+Running getcwd
+[31m[E/LWP] ERROR: Can't open elf file ./getcwd.elf![0m
+execve error
+: Invalid argument
+
+msh />cd aar
+msh />cd aarch64/
+msh /aarch64>for
+fork
+fork_example
+msh /aarch64>fork
+msh /aarch64>this is parent thread
+
+Running getcwd
+Current working directory: /aarch64
+
+msh /aarch64>
+msh /aarch64>QEMU: Terminated
+

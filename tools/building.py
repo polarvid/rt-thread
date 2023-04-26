@@ -942,7 +942,7 @@ def EndBuilding(target, program = None):
         Env['dist_handle'] = rtconfig.dist_handle
 
     # for ftrace
-    if GetDepend('TRACING_FTRACE') and rtconfig.PLATFORM in ['gcc']:
+    if GetDepend('TRACING_KSYMTBL') and rtconfig.PLATFORM in ['gcc']:
         extract = rtconfig.PREFIX + 'nm -f sysv -n rtthread.elf > rtthread.nm\n'
         extract += 'python ' + Rtt_Root + '/tools/extract_sym.py rtthread.nm > ./ksymtbl.c\n'
         extract += 'rm rtthread.nm'

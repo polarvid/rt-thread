@@ -7,8 +7,8 @@
  * Date           Author       Notes
  * 2023-03-30     WangXiaoyao  ftrace support
  */
-#include "arch/aarch64.h"
 #include "ksymtbl.h"
+#include "ftrace.h"
 #include "internal.h"
 #include <stdio.h>
 #include <lwp.h>
