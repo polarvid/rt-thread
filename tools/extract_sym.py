@@ -13,6 +13,20 @@ Usage:
 ```bash
 python extract_sym.py rtthread.nm > ksymtbl.c
 """
+import sys
+
+def progress_bar(percentage, step):
+    old = int(percentage)
+    percentage += step
+    new = int(percentage)
+    if new != old:
+        sys.stderr.write("\r")
+        times = int(percentage // 2)
+        sys.stderr.write(f"Compressing: {percentage:.1f}%: " + "▋" * times)
+        if (percentage == 100):
+            sys.stderr.write('\n')
+        sys.stderr.flush()
+    return percentage
 
 class CompressToken:
     def __init__(self, symbol_bytes):
@@ -31,45 +45,95 @@ class CompressNode:
         return self.symbol_bytes
     def get_literal(self) -> str:
         return self.literal
-    def split(self) -> bool:
+    def split_legacy(self) -> bool:
         rc = False
         underline = ord('_')
         # find all meaningful underline
         meaningful_split = []
-        for i in range(len(self.symbol_bytes)):
+        length = len(self.symbol_bytes)
+        for i in range(length):
             # skip prefix underline
             if self.symbol_bytes[i] != underline:
                 split_idx = i
                 while True:
+                    found = False
                     # find all meaningful split
-                    split_idx = self.symbol_bytes.find(underline, split_idx + 1)
-                    if split_idx != -1:
+                    for j in range(split_idx, length):
+                        if self.symbol_bytes[j] == underline or self.symbol_bytes[j] > 127:
+                            split_idx = j
+                            found = True
+                            break
+                    if found:
                         meaningful_split.append(split_idx)
+                        split_idx += 1
                     else:
                         break
                 break
             else:
                 continue
 
-        # find last meaningful substring
-        start_index = 0
+        # index to previous meaningful split, it's -1 by default
+        # The {0(head) - 1} is seen to be the first split
+        start_index = -1
         if meaningful_split:
-            for start_iter in range(len(meaningful_split)):
-                for end_iter in range(start_iter, len(meaningful_split)):
+            meaningful_split.append(len(self.symbol_bytes))
+            length = len(meaningful_split)
+            for start_iter in range(length):
+                for end_iter in range(start_iter, length):
                     end_index = meaningful_split[end_iter]
-
                     # skip the case of 'bb__aa'
                     # skip the case that last item is underline, like 'hear__'
                     # the 'hear_' is acceptable, but 'hear__' is not
-                    if start_index + 1 == end_index or end_index == len(self.symbol_bytes) - 1:
+                    if start_index + 2 >= end_index or end_index == len(self.symbol_bytes) - 1:
                         break
-
-                    substring = self.symbol_bytes[start_index:end_index + 1]
+                    substring = self.symbol_bytes[start_index + 1:end_index + 1]
                     self.substrings.append(CompressNode(substring, self, start_index))
                     rc = True
                 start_index = meaningful_split[start_iter]
         return rc
+    def split_smallest(self) -> bool:
+        rc = False
+        symbol_len = len(self.symbol_bytes)
+        if symbol_len > 2:
+            for start_idx in range(symbol_len - 1):
+                for end_idx in range(start_idx + 2, symbol_len):
+                    substring = self.symbol_bytes[start_idx:end_idx]
+                    self.substrings.append(CompressNode(substring, self, start_idx))
+            rc = True
+        return rc
+    def split_limit(self, limit) -> bool:
+        rc = False
+        symbol_len = len(self.symbol_bytes)
+        if symbol_len > 2:
+            for start_idx in range(symbol_len - 1):
+                # optimize for speed
+                range_end = start_idx + 2 + limit
+                if range_end > symbol_len:
+                    range_end = symbol_len
+                # split substrings
+                for end_idx in range(start_idx + 2, range_end):
+                    substring = self.symbol_bytes[start_idx:end_idx]
+                    self.substrings.append(CompressNode(substring, self, start_idx))
+            rc = True
+        return rc
+    def resplit(self, start_idx, limit) -> bool:
+        start = start_idx - limit + 1
+        if start < 0:
+            start = 0
+        end = start_idx + limit
+        if end > len(self.symbol_bytes):
+            end = len(self.symbol_bytes)
 
+        for idx in range(start, end + 1):
+            if idx < start_idx:
+                # from idx to start_idx + 1
+                if start_idx - idx > 0:
+                    substring = self.symbol_bytes[idx:start_idx + 1]
+                    self.substrings.append(CompressNode(substring, self, idx))
+            else:
+                if idx - start_idx > 1:
+                    substring = self.symbol_bytes[start_idx:idx]
+                    self.substrings.append(CompressNode(substring, self, idx))
 
 class CompressDict:
     def __init__(self):
@@ -86,8 +150,9 @@ class CompressDict:
     def remove(self, node:CompressNode):
         literal = node.literal
         token = self.token_dict[literal]
+        token: CompressToken
         token.occurrence.remove(node)
-        if len(token.occurrence) == 0:
+        if not len(token.occurrence):
             self.token_dict.pop(literal)
     def get_tokens(self) -> list:
         return self.token_dict.values()
@@ -242,27 +307,44 @@ class MapInfo:
         entries = self.__section_entries_dict[base]
         process_queue = []
         token_dict = CompressDict()
+        # status watcher
+        total_before = 0
+        total_reduce = 0
         for entry in entries:
             entry: SymbolEntry
+            total_before += len(entry.get_comp_node().literal)
             process_queue.append(entry.get_comp_node())
+        # progress bar
+        percentage = 0
+        step = 50 / len(process_queue)
 
         # for each entry in process queue
         while process_queue:
             node = process_queue.pop()
             node: CompressNode
-            # record symbol byte
-            token_dict.record(node)
-
-            if not node.parent and node.split():
+            # split to substring/subset(include itself) and record them all
+            if not node.parent and node.split_limit(5):
                 for subs in node.substrings:
                     token_dict.record(subs)
+            percentage = progress_bar(percentage, step)
 
+        # reset step
+        step = 50 / 128
         for i in range(128, 255):
             # find most frequency token
             best = max(token_dict.get_tokens(), key=lambda token: len(token.occurrence) * len(token.symbol_bytes))
+            total_reduce += len(best.occurrence) * (len(best.symbol_bytes) - 1)
+            # print(f'{i}: {best.symbol_bytes.decode("utf-8", "backslashreplace")} weight {cur}\n')
+
+            percentage = progress_bar(percentage, step)
             best: CompressToken
             # decrease counts from best and re-split
-            for node in best.occurrence:
+            while True:
+                try:
+                    node = best.occurrence[0]
+                except:
+                    break
+
                 parent: CompressNode
                 parent = node.parent
                 start_idx = node.start_idx
@@ -273,12 +355,14 @@ class MapInfo:
                     end_idx = len(node.symbol_bytes)
                 else:
                     end_idx = len(node.symbol_bytes) + start_idx
-                # drop parent from token_dict
                 # drop all records of substrings in token_dict
+                new_subs = []
                 for subs in parent.substrings:
                     subs: CompressNode
+                    if subs.start_idx >= end_idx or start_idx >= subs.start_idx + len(subs.symbol_bytes):
+                        new_subs.append(subs)
+                        continue
                     token_dict.remove(subs)
-                token_dict.remove(parent)
 
                 # modify bytearray
                 if start_idx > 0:
@@ -292,14 +376,17 @@ class MapInfo:
                 former.append(i)
                 former.extend(latter)
                 parent.symbol_bytes = former
-                parent.substrings = []
                 parent.literal = former.decode(encoding='utf-8', errors='backslashreplace')
-
-                # re-split substring
-                parent.split()
-                token_dict.record(parent)
+                # re-split
+                del(parent.substrings)
+                parent.substrings = []
+                parent.resplit(start_idx, 3)
                 for subs in parent.substrings:
                     token_dict.record(subs)
+                parent.substrings += new_subs
+        percentage = 0
+        progress_bar(percentage, 100)
+        sys.stderr.write(f'Compress-rate: {total_before - total_reduce}/{total_before} {100 * (total_before - total_reduce)/total_before:.2f}%\n')
 
     def compile(self):
         # TODO: we only deal with the 4G section first text entry located currently
@@ -331,8 +418,7 @@ class MapInfo:
         # The 2 describe all symbols in ascending order in simply
 
         # 2.0. the compression is apply if needed
-        self.compress_symbol_bytes(base)
-
+        # self.compress_symbol_bytes(base)
         syt_str = '\n'
         str_bytes = bytearray()
         offset = 0

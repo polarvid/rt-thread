@@ -154,5 +154,6 @@ static void _debug_dump(void)
         rt_kprintf("0x%x\n", *iter++);
     rt_kputs("kallsyms\n");
     _dump_all_symbols_offasc();
+    rt_kputs("done\n");
 }
 MSH_CMD_EXPORT_ALIAS(_debug_dump, dump_ksymtbl, dump kernel symbol table);
