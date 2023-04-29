@@ -24,7 +24,7 @@
 #define FTRACE_REG_SP   10
 #define FTRACE_REG_IP   11
 #define FTRACE_REG_FP   12
-#define FTRACE_REG_LR   13
+#define FTRACE_REG_RA   13
 #define FTRACE_REG_CNT  14
 
 #define FTRACE_ENTRY_ORDER 3
@@ -39,10 +39,6 @@
 #define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 3 * 4))
 #define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 3 * 4))
 #define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_ubase_t)(pc) - 4))
-
-struct ftrace_context {
-    rt_ubase_t args[FTRACE_REG_CNT];
-};
 
 rt_notrace rt_inline
 rt_ubase_t ftrace_timestamp(void)

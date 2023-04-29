@@ -707,10 +707,11 @@ void rt_assert_handler(const char *ex, const char *func, rt_size_t line);
 #include <finsh.h>
 #endif
 
+#ifdef RT_USING_SMP
 /*
  * disable scheduler
  */
- #include <stdatomic.h>
+#include <stdatomic.h>
 rt_inline void rt_preempt_disable(void)
 {
     struct rt_thread *current_thread;
@@ -743,6 +744,7 @@ rt_inline void rt_preempt_enable(void)
         }
     }
 }
+#endif
 
 /**@}*/
 

@@ -40,22 +40,27 @@ static struct rt_spinlock print_lock;
 
 rt_inline void _log_param(struct ftrace_context *ctx, const char **types, const char **names, size_t i)
 {
+    /* use a more generic way */
     if (!strstr(types[i], "char *"))
     {
-        dbg_raw("%s=0x%lx", names[i], ctx->args[FTRACE_REG_X0 + i]);
+        dbg_raw("%s=0x%lx", names[i], ctx->args[i]);
     }
     else
     {
-        dbg_raw("%s=\"%s\"", names[i], ctx->args[FTRACE_REG_X0 + i]);
+        dbg_raw("%s=\"%s\"", names[i], ctx->args[i]);
     }
 }
+
+#ifndef TRACING_SYSCALL_EXT
+#define lwp_get_syscall_param_list(syscall, types, names)   (-1)
+#endif
 
 static rt_notrace
 rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     rt_thread_t tcb = rt_thread_self();
     struct ftrace_context *ctx = context;
-    rt_ubase_t syscall = ctx->args[FTRACE_REG_X7];
+    rt_ubase_t syscall = ctx->args[7];
     const char **types;
     const char **names;
 
@@ -83,9 +88,8 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
     else
     {
         LOG_I("[%s:%x] %s(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx)",
-            tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall), ctx->args[FTRACE_REG_X0],
-            ctx->args[FTRACE_REG_X1], ctx->args[FTRACE_REG_X2], ctx->args[FTRACE_REG_X3],
-            ctx->args[FTRACE_REG_X4], ctx->args[FTRACE_REG_X5], ctx->args[FTRACE_REG_X6]);
+            tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall), ctx->args[0],
+            ctx->args[1], ctx->args[2], ctx->args[3], ctx->args[4], ctx->args[5], ctx->args[6]);
     }
     rt_spin_unlock(&print_lock);
 
@@ -97,7 +101,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
 {
     rt_thread_t tcb = rt_thread_self();
     struct ftrace_context *ctx = context;
-    rt_ubase_t retval = ctx->args[FTRACE_REG_X0];
+    rt_ubase_t retval = ctx->args[0];
 
     rt_spin_lock(&print_lock);
     if (retval > -4096ul)

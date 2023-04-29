@@ -9,6 +9,16 @@
  */
 #include "internal.h"
 
+/**
+ * @brief Generic binary search routine
+ * 
+ * @param arr 
+ * @param objcnt 
+ * @param objsz_order 
+ * @param target 
+ * @param cmp 
+ * @return long the index of the symbol if matched, otherwise (-1 - index_to_nearest_lower_symbol)
+ */
 rt_notrace
 long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *target,
                             int (*cmp)(const void *, const void *))
@@ -37,5 +47,7 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
             right = mid - 1;
         }
     }
+
+    mid = mid < right ? mid : right;
     return -1 - mid;
 }

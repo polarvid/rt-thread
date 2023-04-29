@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
+#include "ksymtbl.h"
 #include <stdatomic.h>
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_INFO
@@ -83,18 +84,22 @@ int ftrace_tracer_unregister(ftrace_tracer_t tracer)
 static int _set_trace(ftrace_tracer_t tracer, void *fn)
 {
     int err;
-    err = _ftrace_patch_code(fn, RT_TRUE);
+    err = ftrace_arch_hook_tracer(fn, tracer, RT_TRUE);
     if (!err)
     {
-        err = _ftrace_hook_tracer(fn, tracer, RT_TRUE);
+        err = ftrace_arch_patch_code(fn, RT_TRUE);
         if (!err)
         {
             tracer->trace_point_cnt += 1;
         }
     }
-    else if (tracer == _ftrace_get_tracer(fn))
+    else if (tracer == ftrace_arch_get_tracer(fn))
     {
         err = RT_EOK;
+    }
+    else
+    {
+        LOG_I("%s: Tracer already existed at (%p)", __func__, fn);
     }
     return err;
 }
@@ -105,7 +110,7 @@ int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn)
     int err;
     rt_bool_t existed;
 
-    existed = _ftrace_symtbl_entry_exist(fn);
+    existed = ftrace_entry_exist(fn);
 
     if (existed == RT_TRUE)
     {
@@ -113,6 +118,7 @@ int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn)
     }
     else
     {
+        LOG_W("%s: symbol (%p) unlikely to be existed", __func__, fn);
         err = -RT_ENOENT;
     }
     return err;
@@ -123,10 +129,10 @@ int ftrace_tracer_remove_trace(ftrace_tracer_t tracer, void *fn)
 {
     int err;
 
-    err = _ftrace_patch_code(fn, RT_FALSE);
+    err = ftrace_arch_patch_code(fn, RT_FALSE);
     if (!err)
     {
-        err = _ftrace_hook_tracer(fn, tracer, RT_FALSE);
+        err = ftrace_arch_hook_tracer(fn, tracer, RT_FALSE);
         if (!err)
         {
             tracer->trace_point_cnt -= 1;
@@ -230,7 +236,13 @@ rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t 
             else
             {
                 /* we don't care if the disabled fails */
-                ftrace_tracer_remove_trace(tracer, FTRACE_PC_TO_SYM(pc));
+                size_t off2entry;
+                void *symbol;
+                if (!ksymtbl_find_by_address((void *)pc, &off2entry, NULL, 0, NULL, NULL))
+                {
+                    symbol = (void *)(pc - off2entry);
+                    ftrace_tracer_remove_trace(tracer, symbol);
+                }
             }
         }
     }

@@ -7,9 +7,8 @@
  * Date           Author       Notes
  * 2023-03-30     WangXiaoyao  ftrace support
  */
-#include "aarch64.h"
 #include "../../ftrace.h"
-#include "rtdef.h"
+#include <rtdef.h>
 
 #include <stdatomic.h>
 #include <stddef.h>
@@ -23,8 +22,8 @@ extern void mcount(void);
 #define NOP             (2)
 #define INSN(idx)       (((uint32_t *)&_ftrace_entry_insn)[idx])
 
-rt_notrace
-static uint32_t insn_gen_branch_link(void *oldpc, void *newpc)
+rt_inline rt_notrace
+uint32_t _insn_gen_bl(void *oldpc, void *newpc)
 {
     /**
      * Calculate the offset between oldpc and newpc,
@@ -35,6 +34,11 @@ static uint32_t insn_gen_branch_link(void *oldpc, void *newpc)
     return instruction;
 }
 
+/**
+ * we don't want to mess up with endian, hence,
+ * the code is patched one by one and synchronized in defined way.
+ * Besides, the routine is suitable for dprobe also.
+ */
 rt_notrace
 static int _patch_code(void *entry, uint32_t new, uint32_t old)
 {
@@ -42,7 +46,7 @@ static int _patch_code(void *entry, uint32_t new, uint32_t old)
     _Atomic(uint32_t) *pc = entry;
 
     atomic_compare_exchange_strong_explicit(pc, &expected, new,
-        memory_order_relaxed, memory_order_relaxed);
+        memory_order_acq_rel, memory_order_acquire);
 
     if (expected == old)
         return 0;
@@ -51,13 +55,12 @@ static int _patch_code(void *entry, uint32_t new, uint32_t old)
 }
 
 rt_notrace
-int _ftrace_patch_code(void *entry, rt_bool_t enabled)
+int ftrace_arch_patch_code(void *entry, rt_bool_t enabled)
 {
     int err;
     uint32_t *insn = entry;
     if (enabled)
     {
-        // patch code to enable
         uint32_t new = INSN(MOV_TEMPX_LR);
         uint32_t old = INSN(NOP);
         err = _patch_code(insn, new, old);
@@ -65,15 +68,15 @@ int _ftrace_patch_code(void *entry, rt_bool_t enabled)
         if (!err)
         {
             insn++;
-            new = insn_gen_branch_link(insn, &mcount);
+            new = _insn_gen_bl(insn, &mcount);
             err = _patch_code(insn, new, old);
         }
     }
     else
     {
-        // patch code to disable, noted the ordered here is different
+        /* noted the ordered here is different */
         uint32_t new = INSN(NOP);
-        uint32_t old = insn_gen_branch_link(insn, &mcount);;
+        uint32_t old = _insn_gen_bl(insn, &mcount);
         err = _patch_code(insn + 1, new, old);
 
         if (!err)
@@ -97,7 +100,7 @@ static int _hook_tracer(void *entry, uint64_t new, uint64_t old)
     _Atomic(uint64_t) *loc = entry;
 
     atomic_compare_exchange_strong_explicit(loc, &expected, new,
-        memory_order_relaxed, memory_order_relaxed);
+        memory_order_acq_rel, memory_order_acquire);
 
     if (expected == old)
         return 0;
@@ -106,7 +109,7 @@ static int _hook_tracer(void *entry, uint64_t new, uint64_t old)
 }
 
 rt_notrace
-int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
+int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
 {
     int err;
     uint64_t nopnop = ((uint64_t *)&_ftrace_entry_insn)[1];
@@ -123,7 +126,7 @@ int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
 }
 
 rt_notrace
-ftrace_tracer_t _ftrace_get_tracer(void *entry)
+ftrace_tracer_t ftrace_arch_get_tracer(void *entry)
 {
     entry -= 8;
     return *(ftrace_tracer_t *)((uint64_t)entry & ~0x7);

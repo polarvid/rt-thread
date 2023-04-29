@@ -186,6 +186,10 @@
 /* Kernel Tracing Support */
 
 #define TRACING_KSYMTBL
+#define RT_USING_TRACING
+#define TRACING_FTRACE
+#define TRACING_SYSCALL
+#define TRACING_SYSCALL_EXT
 
 /* Network */
 

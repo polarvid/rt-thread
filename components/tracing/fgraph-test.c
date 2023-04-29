@@ -8,7 +8,6 @@
  * 2023-04-15     WangXiaoyao  fgraph support
  */
 
-#include "arch/aarch64.h"
 #include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"

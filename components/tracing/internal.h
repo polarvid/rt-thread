@@ -16,9 +16,9 @@
 rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 
 /* architecture specific */
-int _ftrace_patch_code(void *entry, rt_bool_t enabled);
-int _ftrace_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled);
-ftrace_tracer_t _ftrace_get_tracer(void *entry);
+int ftrace_arch_patch_code(void *entry, rt_bool_t enabled);
+int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled);
+ftrace_tracer_t ftrace_arch_get_tracer(void *entry);
 void _ftrace_enable_global(void);
 void _ftrace_disable_global(void);
 
@@ -29,7 +29,7 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
                            int (*cmp)(const void *, const void *));
 
 /* entries look up */
-rt_bool_t _ftrace_symtbl_entry_exist(void *entry);
+rt_bool_t ftrace_entry_exist(void *entry);
 void _ftrace_symtbl_for_each(void (*fn)(void *symbol, void *data), void *data);
 
 #endif /* __TRACE_FTRACE_INTERNAL_H__ */

@@ -40,18 +40,18 @@ static int _compare_addroff(const void *a, const void *b)
     return aa == bb ? 0 : (aa > bb ? 1 : -1);
 }
 
-rt_inline int _is_kernel_text(void *address)
+rt_inline int _is_kernel_symbol(void *address)
 {
     extern void *__text_end;
     extern void *__text_start;
-    return address >= (void *)&__text_start && address < (void *)&__text_end;
+    return address >= (void *)&__text_start && address < (void *)&ksymtbl;
 }
 
 int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, size_t bufsz, rt_ubase_t *size, char *class_char)
 {
     int oft_idx;
     int syt_idx;
-    if (!_is_kernel_text(address))
+    if (!_is_kernel_symbol(address))
         return -1;
 
     rt_ubase_t base = (ksymtbl->base_low |
@@ -62,14 +62,21 @@ int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, 
     rt_uint32_t *symbol_table = GET_SECTION(off_syt);
     char *str_sec = GET_SECTION(off_str);
     rt_uint32_t offset = (rt_ubase_t)address & 0xffffffff;
-    
+    rt_size_t entry_offset;
+
     /* find oft_idx */
     oft_idx =
         tracing_binary_search(oft, ksymtbl->symbol_counts, OFT_ORDER, &offset, _compare_addroff);
 
     if (oft_idx < 0)
     {
-        return -1;
+        /* it's unlikely that the address is out of range */
+        oft_idx = -(1 + oft_idx);
+        entry_offset = oft[oft_idx];
+    }
+    else
+    {
+        entry_offset = offset;
     }
 
     RT_ASSERT((void *)base + oft[oft_idx] <= address);
@@ -82,7 +89,7 @@ int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, 
     char *symbol = &str_sec[str_off + 1];
 
     if (off2entry)
-        *off2entry = 0;
+        *off2entry = offset - entry_offset;
     if (symbol_buf)
         rt_strncpy(symbol_buf, symbol, bufsz);
     if (size)
@@ -140,7 +147,7 @@ static void _dump_all_symbols_offasc(void)
         size_t str_off = symbol_table[sym_idx];
         char *pclass = &iter[str_off];
         char *symbol = &iter[str_off + 1];
-        snprintf(buf, sizeof(buf), "%lx %c %s\n", addr, *pclass, symbol);
+        snprintf(buf, sizeof(buf), "%016lx %c %s\n", addr, *pclass, symbol);
         write(fd, buf, strlen(buf));
     }
     close(fd);

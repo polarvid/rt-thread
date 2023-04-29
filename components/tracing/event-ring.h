@@ -10,6 +10,7 @@
 #ifndef __TRACE_EVENT_RING_H__
 #define __TRACE_EVENT_RING_H__
 
+#include "rtdef.h"
 #include <rtthread.h>
 #include <rthw.h>
 #include <cpuport.h>

@@ -15,6 +15,7 @@
 #include "event-ring.h"
 #include "ftrace.h"
 #include "internal.h"
+#include "ksymtbl.h"
 
 #include <dfs_file.h>
 #include <lwp.h>
@@ -48,14 +49,29 @@ typedef struct fgraph_session {
 
 static pid_t pid;
 
+static void *pc2symbol(rt_ubase_t pc)
+{
+    size_t off2entry;
+    void *symbol;
+    if (!ksymtbl_find_by_address((void *)pc, &off2entry, NULL, 0, NULL, NULL))
+    {
+        symbol = (void *)(pc - off2entry);
+    }
+    else
+    {
+        symbol = RT_NULL;
+    }
+    return symbol;
+}
+
 static rt_notrace
 rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
     rt_ubase_t retval;
 
     /* maybe disable tracer on lwp_free & compare pid */
-    if ((char *)&sys_exit == (char *)FTRACE_PC_TO_SYM(pc) ||
-        (char *)&lwp_free == (char *)FTRACE_PC_TO_SYM(pc))
+    if ((char *)&sys_exit == pc2symbol(pc) ||
+        (char *)&lwp_free == pc2symbol(pc))
     {
         ftrace_tracer_set_status(tracer, RT_FALSE);
         /* not to trace exit */
@@ -73,7 +89,7 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
         retval = time;
 
         rt_thread_t tid = rt_thread_self();
-        char expected = 0;
+        int expected = 0;
         if (atomic_compare_exchange_strong(&tid->trace_recorded, &expected, 1))
         {
             thread_event_t thread;
@@ -101,7 +117,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
     trace_evt_ring_t func_ring = ((fgraph_session_t)tracer->data)->function;
 
     fgraph_event_t event = {
-        .entry_address = (void *)FTRACE_PC_TO_SYM(entry_pc),
+        .entry_address = (void *)entry_pc,
         .entry_time = entry_time,
         .exit_time = exit_time,
         /* use ftrace id instead */
@@ -195,9 +211,11 @@ static void _debug_fgraph(int argc, char **argv)
     ftrace_tracer_set_on_exit(&app_tracer, _test_graph_on_exit);
 
     /* set trace point */
-    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, &rt_hw_spin_lock, &rt_hw_spin_unlock,
-                       &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, &rt_cpu_index,
-                       &rt_cpus_lock, &rt_cpus_unlock};
+    void *notrace[] = {&rt_kmem_pvoff, &rt_page_addr2page, &rt_page_ref_inc, &rt_kmem_v2p, &rt_page_ref_get, 
+                       #ifdef RT_USING_SMP
+                       &rt_cpus_lock, &rt_cpus_unlock, &rt_cpu_index, &rt_hw_spin_lock, &rt_hw_spin_unlock,
+                       #endif
+                       };
     ftrace_tracer_set_except(&app_tracer, notrace, sizeof(notrace)/sizeof(notrace[0]));
 
     /* ftrace enabled */

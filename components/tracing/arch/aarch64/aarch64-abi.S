@@ -36,8 +36,9 @@ dummy_ftrace:
     br      TEMPX
 
 .global mcount
-/* name convention follow gprof */
+/* name convention following gprof */
 mcount:
+    b       1f
     /* reduce conditional branching */
     adrp    TEMPX, do_ftrace
     add     TEMPX, TEMPX, :lo12:do_ftrace
@@ -45,6 +46,7 @@ mcount:
     br      TEMPX
     /* normally, we will never reach here */
     ret
+1:
 
 /**
  * the real ftrace implementation
@@ -56,7 +58,7 @@ mcount:
 .local _do_ftrace
 _do_ftrace:
     /**
-     * Faked a call frame for trace point.
+     * Fake a call frame for trace point.
      * Because the call is made apparently so that caller cannot notice,
      * the callee have to save & restore the frame for caller instead.
      */
@@ -163,8 +165,7 @@ _exit_normal:
      * we have to recover the fp, lr from the faked frame
      * mentioned above
      */
-    ldp     fp, lr, [sp], 16
-    mov     TEMPX, lr
+    ldp     fp, TEMPX, [sp], 16
     ldp     fp, lr, [sp], 16
     br      TEMPX
 

@@ -1,35 +1,34 @@
-menu "Kernel Tracing Support"
-
-config TRACING_KSYMTBL
-bool "Enable run-time kernel symbol table"
-default n
-
-config RT_USING_TRACING
-    bool "Kernel space FTrace framework"
+menuconfig RT_USING_TRACING
+    bool "Kernel Tracing Support"
     default n
 
 if RT_USING_TRACING
+    config TRACING_KSYMTBL
+        bool "Enable run-time kernel symbol table"
+        default y
 
-    config TRACING_FTRACE
-    bool "function tracing"
-    select TRACING_KSYMTBL
-    default y
+    if TRACING_KSYMTBL
+        config TRACING_FTRACE
+            bool "function tracing"
+            default n
 
-    config TRACING_SYSCALL
-        bool "Kernel space syscall tracing"
-        default n
+        config TRACING_SYSCALL
+            bool "Kernel space syscall tracing"
+            default n
 
-    if TRACING_SYSCALL
-        config TRACING_SYSCALL_EXT
-            bool "Embedded extra meta including parameter list"
+        if TRACING_SYSCALL
+            config TRACING_SYSCALL_EXT
+                bool "Extra syscall tracer with parameter list analyzing"
+                default n
+                help
+                    This will take up more footprint in system memory, while enabling
+                    more detailed dumping for parameter list of each syscall.
+        endif
+    endif
+
+    if ARCH_ARMV8
+        config TRACING_SOFT_KASAN
+            bool "Enable software-tagged KASAN (memory usage tracer)"
             default n
     endif
 endif
-
-if ARCH_ARMV8
-    config TRACING_SOFT_KASAN
-        bool "Enable software-tagged KASAN (memory usage tracer)"
-        default n
-endif
-
-endmenu

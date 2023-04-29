@@ -43,7 +43,7 @@ rt_uint8_t rt_thread_ready_table[32];
 #endif /* RT_THREAD_PRIORITY_MAX > 32 */
 
 extern volatile rt_uint8_t rt_interrupt_nest;
-static _Atomic(rt_uint16_t) rt_scheduler_lock_nest;
+static _Atomic(rt_ubase_t) rt_scheduler_lock_nest;
 struct rt_thread *rt_current_thread = RT_NULL;
 rt_uint8_t rt_current_priority;
 

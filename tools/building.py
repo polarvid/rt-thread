@@ -382,7 +382,16 @@ def PrepareBuilding(env, root_directory, has_libcpu=False, remove_components = [
 
     # add tracing option for gcc(& clang in the future)
     if GetDepend('TRACING_FTRACE') and rtconfig.PLATFORM in ['gcc']:
-        TRACE_CONFIG = " -fpatchable-function-entry=5,3"
+        if rtconfig.ARCH == 'risc-v':
+            # entry % 8 in (0, 2, 4, 6)
+            prefix_insn = 5
+            # entry % 4 in (0, 2)
+            total_insn = 5 + prefix_insn
+        else:
+            prefix_insn = 3
+            total_insn = 2 + prefix_insn
+
+        TRACE_CONFIG = f" -fpatchable-function-entry={total_insn},{prefix_insn}"
         env.Append(CFLAGS=TRACE_CONFIG, CXXFLAGS=TRACE_CONFIG)
     if GetDepend('TRACING_SOFT_KASAN'):
         SANITIZER = ' -fsanitize=kernel-address'

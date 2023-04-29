@@ -58,7 +58,7 @@ int _compare_entry(const void *a, const void *b)
 }
 
 rt_notrace
-rt_bool_t _ftrace_symtbl_entry_exist(void *entry)
+rt_bool_t ftrace_entry_exist(void *entry)
 {
     void **entries = &__patchable_function_entries_start;
     void **end = &__patchable_function_entries_end;

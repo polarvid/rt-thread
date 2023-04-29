@@ -19,6 +19,8 @@
 
 #ifdef ARCH_ARMV8
 #include "arch/aarch64/aarch64.h"
+#elif defined(ARCH_RISCV64)
+#include "arch/riscv64/riscv64.h"
 #endif
 
 #ifndef RT_CPUS_NR
@@ -26,6 +28,13 @@
 #endif
 
 struct ftrace_tracer;
+
+/**
+ * @brief A context for arguments passing
+ */
+struct ftrace_context {
+    rt_ubase_t args[FTRACE_REG_CNT];
+};
 
 typedef rt_ubase_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context);

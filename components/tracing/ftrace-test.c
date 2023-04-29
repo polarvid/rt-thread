@@ -29,7 +29,7 @@ typedef struct sample_event {
     void *entry_address;
 } sample_event_t;
 
-static void _debug_test_fn(char *str)
+static void _debug_test_fn(char *str, ...)
 {
     rt_kputs(str);
 }
@@ -111,8 +111,8 @@ static void _free_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, vo
 static void _debug_ftrace(void)
 {
     extern void _ftrace_entry_insn(void);
-    // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 0));
-    // RT_ASSERT(!_ftrace_patch_code(_ftrace_entry_insn, 1));
+    // RT_ASSERT(!ftrace_arch_patch_code(_ftrace_entry_insn, 0));
+    // RT_ASSERT(!ftrace_arch_patch_code(_ftrace_entry_insn, 1));
 
     /* init */
     trace_evt_ring_t ring;
@@ -139,15 +139,7 @@ static void _debug_ftrace(void)
     /* ftrace enabled */
     ftrace_tracer_register(&dummy_tracer);
     rt_kprintf("ftrace enabled\n");
-    __asm__ volatile("mov x1, 1");
-    __asm__ volatile("mov x2, 2");
-    __asm__ volatile("mov x3, 3");
-    __asm__ volatile("mov x4, 4");
-    __asm__ volatile("mov x5, 5");
-    __asm__ volatile("mov x6, 6");
-    __asm__ volatile("mov x7, 7");
-    __asm__ volatile("mov x8, 8");
-    _debug_test_fn("dummy tracer enable\n");
+    _debug_test_fn("dummy tracer enable\n", 1, 2, 3, 4, 5, 6, 7);
 
     void utest_testcase_run(int argc, char** argv);
     utest_testcase_run(1, 0);

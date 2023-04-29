@@ -61,6 +61,13 @@ typedef union {
 
 #ifndef __ASSEMBLY__
 #include <rtthread.h>
+
+rt_inline int rt_hw_cpu_id(void)
+{
+    /* TODO: support for SMP */
+    return 0;
+}
+
 rt_inline void rt_hw_dsb()
 {
     asm volatile("fence":::"memory");
