@@ -58,7 +58,7 @@ int _compare_entry(const void *a, const void *b)
 }
 
 rt_notrace
-rt_bool_t ftrace_entry_exist(void *entry)
+rt_bool_t ftrace_entries_exist(void *entry)
 {
     void **entries = &__patchable_function_entries_start;
     void **end = &__patchable_function_entries_end;
@@ -71,7 +71,7 @@ rt_bool_t ftrace_entry_exist(void *entry)
     return ret < 0 ? RT_FALSE : RT_TRUE;
 }
 
-void _ftrace_symtbl_for_each(void (*fn)(void *symbol, void *data), void *data)
+void ftrace_entries_for_each(void (*fn)(void *symbol, void *data), void *data)
 {
     void **entries = &__patchable_function_entries_start;
     void **end = &__patchable_function_entries_end;

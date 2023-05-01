@@ -8,6 +8,7 @@
  * 2023-04-28     WangXiaoyao  the first version
  */
 
+#include "utest_assert.h"
 #include <ksymtbl.h>
 #include <event-ring.h>
 #include <ftrace.h>
@@ -23,19 +24,30 @@
 
 #include <stdatomic.h>
 
-static struct ftrace_tracer tracer_test;
+struct tracee_ret {
+    long data[4];
+};
 
-static void _test_tracee(char *str, ...)
+static const long magic_numbers[4] = {0xabadcafe, 0x20232320, 0xbaabfeef, 0x04303004};
+
+static struct tracee_ret _test_tracee(char *str, ...)
 {
-    rt_kputs(str);
+    LOG_I(str);
+
+    struct tracee_ret ret;
+    /* set test data */
+    for (size_t i = 0; i < sizeof(magic_numbers)/sizeof(magic_numbers[0]); i++)
+        ret.data[i] = magic_numbers[i];
+
+    return ret;
 }
 
 static rt_notrace
-rt_ubase_t _test_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_base_t _test_handler(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
     const struct ftrace_context *ctx = context;
 
-    rt_kprintf("message[0x%lx]\n", ftrace_timestamp());
+    rt_kprintf("timestamp [0x%lx]\n", ftrace_timestamp());
     rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
     for (int i = 0; i < FTRACE_REG_CNT; i += 2)
         rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
@@ -44,19 +56,34 @@ rt_ubase_t _test_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_a
 static void test_set_trace_api(void)
 {
     /* init */
-    ftrace_tracer_init(&tracer_test, _test_handler, NULL);
-    ftrace_tracer_set_trace(&tracer_test, &_test_tracee);
+    rt_err_t retval;
+    ftrace_tracer_t tracer;
+    ftrace_session_t session;
+    ftrace_trace_fn_t handler = &_test_handler;
+
+    tracer = ftrace_tracer_create(TRACER_ENTRY, handler, NULL);
+    uassert_true(!!tracer);
+    session = ftrace_session_create();
+    uassert_true(!!session);
+
+    retval = ftrace_session_bind(session, tracer);
+    RT_ASSERT(retval == RT_EOK);
+
+    _test_tracee("no tracer");
+
+    ftrace_session_set_trace(session, &_test_tracee);
 
     /* a dummy instrumentation */
-    _test_tracee("no tracer\n");
 
     /* ftrace enabled */
-    ftrace_tracer_register(&tracer_test);
-    rt_kprintf("ftrace enabled\n");
-    _test_tracee("dummy tracer enable\n", 1, 2, 3, 4, 5, 6, 7);
+    ftrace_session_register(session);
+    struct tracee_ret ret = _test_tracee("dummy tracer enable\n", 1, 2, 3, 4, 5, 6, 7);
+    /* test test-data */
+    for (size_t i = 0; i < sizeof(magic_numbers)/sizeof(magic_numbers[0]); i++)
+        uassert_true(ret.data[i] == magic_numbers[i]);
 
     /* ftrace disabled */
-    ftrace_tracer_unregister(&tracer_test);
+    ftrace_session_unregister(session);
     _test_tracee("dummy tracer unregistered\n");
 
     return ;

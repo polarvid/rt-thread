@@ -13,14 +13,12 @@
 #include "ftrace.h"
 
 /* ftrace entry */
-rt_ubase_t ftrace_trace_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
+rt_ubase_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 
 /* architecture specific */
 int ftrace_arch_patch_code(void *entry, rt_bool_t enabled);
-int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled);
-ftrace_tracer_t ftrace_arch_get_tracer(void *entry);
-void _ftrace_enable_global(void);
-void _ftrace_disable_global(void);
+int ftrace_arch_hook_session(void *entry, ftrace_session_t session, rt_bool_t enabled);
+ftrace_session_t ftrace_arch_get_session(void *entry);
 
 /* binary search utils */
 #define GET_SECTION(sec)        ((void *)ksymtbl + ksymtbl->sec)
@@ -29,7 +27,7 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
                            int (*cmp)(const void *, const void *));
 
 /* entries look up */
-rt_bool_t ftrace_entry_exist(void *entry);
-void _ftrace_symtbl_for_each(void (*fn)(void *symbol, void *data), void *data);
+rt_bool_t ftrace_entries_exist(void *entry);
+void ftrace_entries_for_each(void (*fn)(void *symbol, void *data), void *data);
 
 #endif /* __TRACE_FTRACE_INTERNAL_H__ */

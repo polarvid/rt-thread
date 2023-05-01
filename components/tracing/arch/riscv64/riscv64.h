@@ -42,7 +42,6 @@
 #define REG_TRACE_SP    28
 #define REG_TRACE_IP    29
 #define REG_TRACE_FP    30
-#define REG_TRACE_RA    31
 #define __REG(num)      x##num
 #define _REG(num)       __REG(num)
 
@@ -50,7 +49,6 @@
 #define TRACE_SP        _REG(REG_TRACE_SP)
 #define TRACE_IP        _REG(REG_TRACE_IP)
 #define TRACE_FP        _REG(REG_TRACE_FP)
-#define TRACE_RA        _REG(REG_TRACE_RA)
 
 #ifndef __ASSEMBLY__
 #include <rtthread.h>

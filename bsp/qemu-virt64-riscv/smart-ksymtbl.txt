@@ -1564,7 +1564,7 @@
 0000000080244458 T fgraph_create
 0000000080244488 t _compare_entry
 00000000802444aa t _debug_dump
-0000000080244572 T ftrace_entry_exist
+0000000080244572 T _ftrace_symtbl_entry_exist
 00000000802445be T _ftrace_symtbl_for_each
 0000000080244616 t _test_handler
 0000000080244768 t _debug_ftrace

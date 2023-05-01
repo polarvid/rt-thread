@@ -20,23 +20,27 @@ mcount:
      * Fake a call frame for trace point.
      * Because the call is made apparently so that caller cannot notice,
      * the callee have to save & restore the frame for caller instead.
+     * the previous 2 instruction:
+     *
+     * auipc TEMPX, off[31:12]
+     * jalr TRACE_RA, TEMPX, off[11:0]
      */
     mv      TRACE_SP, sp
-    addi    TRACE_IP, TRACE_RA, -4
-    mv      TRACE_RA, ra
     mv      TRACE_FP, s0
 
     /* simulate the frame of trace point */
     addi    sp, sp, -16
-    STORE   TRACE_RA, 8(sp)
-    STORE   s0, 0(sp)
-    addi    s0, sp, 16
-
-    /* the frame of `mcount` */
-    addi    sp, sp, -16
     STORE   ra, 8(sp)
     STORE   s0, 0(sp)
     addi    s0, sp, 16
+
+    /* build the frame for mcount */
+    addi    sp, sp, -16
+    STORE   TRACE_IP, 8(sp)
+    STORE   s0, 0(sp)
+    addi    s0, sp, 16
+
+    addi    TRACE_IP, TRACE_IP, -4
 
     /* allocate and setup the context */
     addi    sp, sp, -FTRACE_REG_CNT * REGSZ
@@ -55,11 +59,10 @@ mcount:
     addi    a0, TRACE_IP, -(6 + 8)
     call    ftrace_arch_fetch_tracer
     mv      a1, TRACE_IP
-    mv      a2, TRACE_RA
+    mv      a2, ra
     mv      a3, sp
     call    ftrace_trace_entry
 
-_exit_normal:
     /* restore arguments */
     LOAD    a0, OFFTO(FTRACE_REG_A0)(sp)
     LOAD    a1, OFFTO(FTRACE_REG_A1)(sp)
@@ -78,15 +81,19 @@ _exit_normal:
      * we have to recover the fp, lr from the faked frame
      * mentioned above
      */
-    LOAD    TRACE_RA, 8(sp)
+    LOAD    TEMPX, 8(sp)
     addi    sp, sp, 16
+
     LOAD    s0, 0(sp)
     LOAD    ra, 8(sp)
     addi    sp, sp, 16
-    jr      TRACE_RA
+    jr      TEMPX
 
 /**
- * a0 is the address of hook point */
+ * @brief load tracer from the trace point in a little endian order
+ *
+ * @param a0 is the address of hook point
+ */
 .global ftrace_arch_fetch_tracer
 ftrace_arch_fetch_tracer:
     lhu     a3,6(a0)

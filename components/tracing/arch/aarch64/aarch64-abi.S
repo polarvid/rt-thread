@@ -28,25 +28,9 @@
 /* offset to the register reference by index */
 #define OFFTO(index)    ((index) * 8)
 
-do_ftrace:
-    .xword  dummy_ftrace
-dummy_ftrace:
-    mov     TEMPX, lr
-    mov     lr, TRACE_LR
-    br      TEMPX
-
 .global mcount
 /* name convention following gprof */
 mcount:
-    b       1f
-    /* reduce conditional branching */
-    adrp    TEMPX, do_ftrace
-    add     TEMPX, TEMPX, :lo12:do_ftrace
-    ldr     TEMPX, [TEMPX]
-    br      TEMPX
-    /* normally, we will never reach here */
-    ret
-1:
 
 /**
  * the real ftrace implementation
@@ -168,26 +152,6 @@ _exit_normal:
     ldp     fp, TEMPX, [sp], 16
     ldp     fp, lr, [sp], 16
     br      TEMPX
-
-.global _ftrace_enable_global
-_ftrace_enable_global:
-    /* *do_ftrace = &_do_ftrace */
-    adrp    x0, do_ftrace
-    add     x0, x0, :lo12:do_ftrace
-    adrp    x1, _do_ftrace
-    add     x1, x1, :lo12:_do_ftrace
-    str     x1, [x0]
-    ret
-
-.global _ftrace_disable_global
-_ftrace_disable_global:
-    /* *do_ftrace = &dummy_ftrace */
-    adrp    x0, do_ftrace
-    add     x0, x0, :lo12:do_ftrace
-    adrp    x1, dummy_ftrace
-    add     x1, x1, :lo12:dummy_ftrace
-    str     x1, [x0]
-    ret
 
 .global _tracer_dummy
 _tracer_dummy:

@@ -27,17 +27,38 @@
 #define RT_CPUS_NR 1
 #endif
 
-struct ftrace_tracer;
-
 /**
  * @brief A context for arguments passing
  */
-struct ftrace_context {
+typedef struct ftrace_context {
     rt_ubase_t args[FTRACE_REG_CNT];
+} *ftrace_context_t;
+
+struct ftrace_tracer;
+
+typedef rt_base_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
+typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, rt_ubase_t stat, ftrace_context_t context);
+
+enum ftrace_tracer_type {
+    TRACER_ENTRY,
+    TRACER_EXIT,
+    TRACER_AROUND,
 };
 
-typedef rt_ubase_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
-typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context);
+typedef struct ftrace_session {
+    /* number of trace points this tracer handle */
+    size_t trace_point_cnt;
+
+    /* list of tracers, serving in the order one by one */
+    rt_list_t entry_tracers;
+    struct ftrace_tracer *around;
+    rt_list_t exit_tracers;
+
+    /* control bits, default as zero */
+    unsigned int enabled:1;
+    unsigned int unregistered:1;
+
+} *ftrace_session_t;
 
 /* user should not access this structure directly */
 typedef struct ftrace_tracer {
@@ -46,32 +67,22 @@ typedef struct ftrace_tracer {
 
     /* handler of tracer */
     union {
-        struct {
-            ftrace_trace_fn_t on_entry;
-            ftrace_exit_fn_t on_exit;
-        };
+        ftrace_trace_fn_t on_entry;
+        ftrace_exit_fn_t on_exit;
         ftrace_trace_fn_t around;
     };
 
-    /* custom private data */
+    /* type of the tracer for identification on runtime */
+    enum ftrace_tracer_type type;
+
+    /* the session it belongs to */
+    ftrace_session_t session;
+
+    /* private custom data */
     void *data;
-
-    /* number of trace points this tracer handle */
-    size_t trace_point_cnt;
-
-    /* control bits, default as 0 */
-    unsigned int skip_recursion:1;
-    unsigned int enabled:1;
-    unsigned int unregistered:1;
 } *ftrace_tracer_t;
 
-void ftrace_tracer_init(ftrace_tracer_t tracer, ftrace_trace_fn_t handler, void *data);
-
-rt_notrace rt_inline
-void ftrace_tracer_ctrl_skip_recursion(ftrace_tracer_t tracer, rt_bool_t enabled)
-{
-    tracer->skip_recursion = enabled;
-}
+ftrace_tracer_t ftrace_tracer_create(enum ftrace_tracer_type type, void *handler, void *data);
 
 rt_notrace rt_inline
 void *ftrace_tracer_get_data(ftrace_tracer_t tracer)
@@ -85,33 +96,25 @@ void ftrace_tracer_set_data(ftrace_tracer_t tracer, void *data)
     tracer->data = data;
 }
 
+ftrace_session_t ftrace_session_create(void);
+
+int ftrace_session_bind(ftrace_session_t session, ftrace_tracer_t tracer);
+
+int ftrace_session_set_trace(ftrace_session_t session, void *fn);
+
+int ftrace_session_set_except(ftrace_session_t session, void *notrace[], size_t notrace_cnt);
+
+int ftrace_session_remove_trace(ftrace_session_t session, void *fn);
+
+int ftrace_session_register(ftrace_session_t session);
+
+int ftrace_session_unregister(ftrace_session_t session);
+
 rt_notrace rt_inline
-void ftrace_tracer_set_status(ftrace_tracer_t tracer, rt_bool_t enable)
+void ftrace_session_set_status(ftrace_session_t session, rt_bool_t enable)
 {
-    tracer->enabled = enable;
+    session->enabled = enable;
 }
-
-/* optional */
-rt_notrace rt_inline
-void ftrace_tracer_set_on_exit(ftrace_tracer_t tracer, ftrace_exit_fn_t on_exit)
-{
-    /* relaxed ordering */
-    tracer->on_exit = on_exit;
-}
-
-rt_notrace rt_inline
-ftrace_exit_fn_t ftrace_tracer_get_on_exit(ftrace_tracer_t tracer)
-{
-    return tracer->on_exit;
-}
-
-int ftrace_tracer_register(ftrace_tracer_t tracer);
-
-int ftrace_tracer_unregister(ftrace_tracer_t tracer);
-
-int ftrace_tracer_set_trace(ftrace_tracer_t tracer, void *fn);
-
-int ftrace_tracer_set_except(ftrace_tracer_t tracer, void *notrace[], size_t notrace_cnt);
 
 #endif /* __ASSEMBLY__ */
 

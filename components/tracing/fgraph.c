@@ -32,7 +32,7 @@ int fgraph_create()
     if (!tracer)
         return -RT_ENOMEM;
 
-    ftrace_tracer_init(tracer, handler, RT_NULL);
+    // ftrace_tracer_init(tracer, handler, RT_NULL);
 
     return 0;
 }

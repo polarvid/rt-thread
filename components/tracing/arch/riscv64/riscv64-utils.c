@@ -37,7 +37,7 @@ uint32_t _insn_gen_jalr(void *oldpc, void *newpc)
      * Its offset from the address of this instruction, in the range +/-2KB
      */
     int32_t offset = ((size_t)newpc - (size_t)oldpc) & 0x0fff;
-    uint32_t jalr = INSN_JALR(REG_TRACE_RA, REG_TEMPX, offset);
+    uint32_t jalr = INSN_JALR(REG_TRACE_IP, REG_TEMPX, offset);
     return jalr;
 }
 /* pc + off32 = pc + off[31:12] + off[11:0] */
@@ -140,13 +140,13 @@ int ftrace_arch_patch_code(void *entry, rt_bool_t enabled)
     return 0;
 }
 
-#define TRACER_PATCH_STEP   (sizeof(void *)/sizeof(uint16_t))
+#define SESSION_PATCH_STEP   (sizeof(void *)/sizeof(uint16_t))
 rt_inline rt_notrace
-int _hook_tracer(void *hook_point, uint64_t new, uint64_t old)
+int _hook_session(void *hook_point, uint64_t new, uint64_t old)
 {
     int retval;
     uint16_t *loc = hook_point;
-    uint16_t *loc_end = loc + TRACER_PATCH_STEP;
+    uint16_t *loc_end = loc + SESSION_PATCH_STEP;
     uint16_t old_value;
 
     for ( ; loc < loc_end; loc++)
@@ -167,7 +167,7 @@ int _hook_tracer(void *hook_point, uint64_t new, uint64_t old)
 }
 
 rt_notrace
-int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
+int ftrace_arch_hook_session(void *entry, ftrace_session_t session, rt_bool_t enabled)
 {
     int err;
     uint64_t nopnop = INSN_NOP4_C;
@@ -175,24 +175,23 @@ int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabl
     void *hook_point = (char *)ENTRY_FLOOR(entry) - 2 - sizeof(hook_point);
 
     if (enabled)
-        err = _hook_tracer(hook_point, (uint64_t)tracer, nopnop);
+        err = _hook_session(hook_point, (uint64_t)session, nopnop);
     else
-        err = _hook_tracer(hook_point, nopnop, (uint64_t)tracer);
+        err = _hook_session(hook_point, nopnop, (uint64_t)session);
     return err;
 }
 
 rt_notrace
-ftrace_tracer_t ftrace_arch_get_tracer(void *entry)
+ftrace_session_t ftrace_arch_get_session(void *entry)
 {
-    uint16_t *loc = (uint16_t *)(ENTRY_FLOOR(entry) - 2 - sizeof(ftrace_tracer_t));
-    uint16_t *loc_end = loc + TRACER_PATCH_STEP;
-    rt_ubase_t tracer = 0;
+    uint16_t *loc = (uint16_t *)(ENTRY_FLOOR(entry) - 2 - sizeof(ftrace_session_t));
+    rt_ubase_t session = 0;
 
-    for ( ; loc < loc_end; loc++)
+    for (size_t i = 0; i < SESSION_PATCH_STEP; i++)
     {
-        tracer |= *loc;
+        session <<= sizeof(*loc) * 8;
+        session |= loc[SESSION_PATCH_STEP - 1 - i];
 
-        tracer <<= sizeof(*loc) * 8;
     }
-    return (void *)tracer;
+    return (void *)session;
 }

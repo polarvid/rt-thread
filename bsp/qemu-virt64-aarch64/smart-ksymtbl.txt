@@ -2339,8 +2339,8 @@ ffff00000010c1cc t handler
 ffff00000010c1f8 T fgraph_create
 ffff00000010c254 t _debug_dump
 ffff00000010c370 t _compare_entry
-ffff00000010c3d0 T ftrace_entry_exist
-ffff00000010c45c T _ftrace_symtbl_for_each
+ffff00000010c3d0 T ftrace_entries_exist
+ffff00000010c45c T ftrace_entries_for_each
 ffff00000010c4f8 t event_ring_event_loc
 ffff00000010c5d8 t event_ring_buffer_loc
 ffff00000010c660 t event_ring_drop
