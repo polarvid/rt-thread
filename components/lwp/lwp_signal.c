@@ -272,7 +272,6 @@ rt_inline int _lwp_check_ignore(int sig)
     return 0;
 }
 
-void sys_exit(int value);
 lwp_sighandler_t lwp_sighandler_get(int sig)
 {
     lwp_sighandler_t func = RT_NULL;

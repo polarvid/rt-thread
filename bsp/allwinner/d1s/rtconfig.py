@@ -21,7 +21,7 @@ else:
 if os.getenv('RTT_EXEC_PATH'):
     EXEC_PATH = os.getenv('RTT_EXEC_PATH')
 
-BUILD = 'debug'
+BUILD = 'release'
 
 if PLATFORM == 'gcc':
     # toolchains
@@ -37,7 +37,7 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY  = PREFIX + 'objcopy'
 
-    DEVICE  = ' -mcmodel=medany -march=rv64imafdc -mabi=lp64'
+    DEVICE  = ' -mcmodel=medany -mcpu=thead-c906 -march=rv64imafdc -mabi=lp64d'
     CFLAGS  = DEVICE + ' -Wno-cpp -fvar-tracking -ffreestanding -fno-common -ffunction-sections -fdata-sections -fstrict-volatile-bitfields -D_POSIX_SOURCE '
     AFLAGS  = ' -c' + DEVICE + ' -x assembler-with-cpp -D__ASSEMBLY__'
     LFLAGS  = DEVICE + ' -nostartfiles -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,_start -T link.lds' + ' -lsupc++ -lgcc -static'
@@ -48,7 +48,7 @@ if PLATFORM == 'gcc':
         CFLAGS += ' -O0 -ggdb'
         AFLAGS += ' -ggdb'
     else:
-        CFLAGS += ' -O2 -Os'
+        CFLAGS += ' -O2 -ggdb'
 
     CXXFLAGS = CFLAGS
 

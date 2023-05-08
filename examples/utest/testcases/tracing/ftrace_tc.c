@@ -28,17 +28,24 @@ struct tracee_ret {
     long data[4];
 };
 
-static const long magic_numbers[4] = {0xabadcafe, 0x20232320, 0xbaabfeef, 0x04303004};
-
-static struct tracee_ret _test_tracee(char *str, ...)
+static const long magic_numbers[] = {12826212334541059438ul, 15087704365839300601ul, 14339533210297058355ul, 4206045298161606937ul, 7956564612695610633ul, 15047219555744982329ul, 15230866504987122018ul, 14535292288262951240ul};
+static const long pad[1024 * 1024];
+static struct tracee_ret _test_tracee(size_t start, ...)
 {
-    LOG_I(str);
-
     struct tracee_ret ret;
+    va_list args;
+    va_start(args, start);
     /* set test data */
-    for (size_t i = 0; i < sizeof(magic_numbers)/sizeof(magic_numbers[0]); i++)
-        ret.data[i] = magic_numbers[i];
-
+    if (start)
+    {
+        for (size_t i = 0; i < sizeof(magic_numbers)/sizeof(magic_numbers[0]); i++)
+        {
+            uassert_true(va_arg(args, long) == magic_numbers[sizeof(magic_numbers)/sizeof(magic_numbers[0]) - i - 1]);
+        }
+        for (size_t i = 0; i < sizeof(ret.data)/sizeof(ret.data[0]); i++)
+            ret.data[i] = magic_numbers[i];
+    }
+    va_end(args);
     return ret;
 }
 
@@ -46,45 +53,70 @@ static rt_notrace
 rt_base_t _test_handler(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
     const struct ftrace_context *ctx = context;
-
     rt_kprintf("timestamp [0x%lx]\n", ftrace_timestamp());
-    rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p)\n", __func__, tracer, pc, ret_addr, context);
-    for (int i = 0; i < FTRACE_REG_CNT; i += 2)
-        rt_kprintf("%d %p, %p\n", i, ctx->args[i], ctx->args[i + 1]);
+    rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p, %p)\n", __func__, tracer, pc, ret_addr, context, context->args[0]);
+    /* API to extract arguments */
+}
+
+static rt_notrace
+void _exit_handler(struct ftrace_tracer *tracer, rt_ubase_t entry_pc, ftrace_context_t context)
+{
+    struct tracee_ret *ret = (void *)context->args[2];
+    for (size_t i = 0; i < sizeof(ret->data)/sizeof(ret->data[0]); i++)
+        uassert_true(ret->data[i] == magic_numbers[i]);
+    return ;
 }
 
 static void test_set_trace_api(void)
 {
-    /* init */
+    /* Initialization */
     rt_err_t retval;
-    ftrace_tracer_t tracer;
     ftrace_session_t session;
-    ftrace_trace_fn_t handler = &_test_handler;
+    /* entry tracer */
+    ftrace_tracer_t entry_tracer;
+    ftrace_trace_fn_t entry_handler = &_test_handler;
+    /* exit tracer */
+    ftrace_tracer_t exit_tracer;
+    ftrace_exit_fn_t exit_handler = &_exit_handler;
 
-    tracer = ftrace_tracer_create(TRACER_ENTRY, handler, NULL);
-    uassert_true(!!tracer);
+    entry_tracer = ftrace_tracer_create(TRACER_ENTRY, entry_handler, NULL);
+    uassert_true(!!entry_tracer);
+    exit_tracer = ftrace_tracer_create(TRACER_EXIT, exit_handler, NULL);
+    uassert_true(!!exit_handler);
+
     session = ftrace_session_create();
     uassert_true(!!session);
 
-    retval = ftrace_session_bind(session, tracer);
-    RT_ASSERT(retval == RT_EOK);
+    /* Binding */
+    retval = ftrace_session_bind(session, entry_tracer);
+    uassert_true(retval == RT_EOK);
+    retval = ftrace_session_bind(session, exit_tracer);
+    uassert_true(retval == RT_EOK);
 
-    _test_tracee("no tracer");
+    _test_tracee(0);
 
     ftrace_session_set_trace(session, &_test_tracee);
 
-    /* a dummy instrumentation */
-
     /* ftrace enabled */
     ftrace_session_register(session);
-    struct tracee_ret ret = _test_tracee("dummy tracer enable\n", 1, 2, 3, 4, 5, 6, 7);
+
+    struct tracee_ret ret = _test_tracee(1,
+        magic_numbers[7], magic_numbers[6], magic_numbers[5], magic_numbers[4],
+        magic_numbers[3], magic_numbers[2], magic_numbers[1], magic_numbers[0]);
+
     /* test test-data */
-    for (size_t i = 0; i < sizeof(magic_numbers)/sizeof(magic_numbers[0]); i++)
+    LOG_I("Return value verification");
+    for (size_t i = 0; i < sizeof(ret.data)/sizeof(ret.data[0]); i++)
         uassert_true(ret.data[i] == magic_numbers[i]);
 
     /* ftrace disabled */
     ftrace_session_unregister(session);
-    _test_tracee("dummy tracer unregistered\n");
+    _test_tracee(0);
+
+    /* Delete */
+    ftrace_tracer_delete(entry_tracer);
+    ftrace_tracer_delete(exit_tracer);
+    ftrace_session_delete(session);
 
     return ;
 }

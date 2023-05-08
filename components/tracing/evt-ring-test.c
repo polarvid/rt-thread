@@ -14,7 +14,7 @@
 #include "event-ring.h"
 #include "rtdef.h"
 
-static void alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+static void alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     if (cpuid != 0)
         return ;
@@ -60,7 +60,7 @@ static void _test_ringbuf(void)
     rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
     const size_t cpuid = rt_hw_cpu_id();
 
-    trace_evt_ring_t ring = event_ring_create(XCPU(0x8000), sizeof(rt_ubase_t), 4096);
+    ftrace_evt_ring_t ring = event_ring_create(XCPU(0x8000), sizeof(rt_ubase_t), 4096);
     RT_ASSERT(!!ring);
     _Atomic(void *) *preloc = 0;
 

@@ -8,24 +8,34 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
-#include "ksymtbl.h"
-#include "rtdef.h"
-#include "rtservice.h"
-#include <stdatomic.h>
 #define DBG_TAG "tracing.ftrace"
-#define DBG_LVL DBG_INFO
+#define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
 
-#include <rtthread.h>
-#include <rthw.h>
-
 #include "event-ring.h"
+#include "ksymtbl.h"
 #include "ftrace.h"
 #include "internal.h"
 #include <cpuport.h>
 
+#include <rtthread.h>
+#include <rthw.h>
+#include <mm_page.h>
+
 /* for qsort utility */
+#include <stdatomic.h>
 #include <stdlib.h>
+
+void ftrace_tracer_init(ftrace_tracer_t tracer, enum ftrace_tracer_type type, void *handler, void *data)
+{
+    tracer->type = type;
+    tracer->on_entry = handler;
+    tracer->data = data;
+    tracer->session = RT_NULL;
+    rt_list_init(&tracer->node);
+
+    return ;
+}
 
 ftrace_tracer_t ftrace_tracer_create(enum ftrace_tracer_type type, void *handler, void *data)
 {
@@ -43,6 +53,22 @@ ftrace_tracer_t ftrace_tracer_create(enum ftrace_tracer_type type, void *handler
     return tracer;
 }
 
+void ftrace_tracer_delete(ftrace_tracer_t tracer)
+{
+    rt_free(tracer);
+}
+
+void ftrace_session_init(ftrace_session_t session)
+{
+    session->enabled = 0;
+    session->unregistered = 0;
+    session->trace_point_cnt = 0;
+    session->around = RT_NULL;
+    rt_list_init(&session->entry_tracers);
+    rt_list_init(&session->exit_tracers);
+    return ;
+}
+
 ftrace_session_t ftrace_session_create(void)
 {
     ftrace_session_t session;
@@ -50,14 +76,13 @@ ftrace_session_t ftrace_session_create(void)
     if (!session)
         return RT_NULL;
 
-    session->enabled = 0;
-    session->unregistered = 0;
-    session->trace_point_cnt = 0;
-    session->around = RT_NULL;
-    rt_list_init(&session->entry_tracers);
-    rt_list_init(&session->exit_tracers);
-
+    ftrace_session_init(session);
     return session;
+}
+
+void ftrace_session_delete(ftrace_session_t session)
+{
+    rt_free(session);
 }
 
 int ftrace_session_bind(ftrace_session_t session, ftrace_tracer_t tracer)
@@ -187,7 +212,7 @@ static void _set_session_in_entires(void *symbol, void *data)
     err = _set_trace(param->session, symbol);
     if (err)
     {
-        LOG_W("set trace failed %d", err);
+        LOG_I("set trace failed %d", err);
     }
 }
 
@@ -238,10 +263,9 @@ int ftrace_session_unregister(ftrace_session_t session)
 
 /* generic entry to test if session is ready to handle trace event */
 rt_notrace
-rt_ubase_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    rt_ubase_t stat = TRACER_STAT_NONE;
-
+    rt_err_t stat = 0;
     if (session)
     {
         if (session->enabled)
@@ -258,6 +282,11 @@ rt_ubase_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_
 
             /* handling around */
             /* handling exit */
+            if (rt_list_len(&session->exit_tracers) > 0)
+            {
+                ftrace_arch_push_context(session, pc, ret_addr, context);
+                stat = FTE_OVERRIDE_EXIT;
+            }
         }
         else if (session->unregistered)
         {
@@ -276,14 +305,38 @@ rt_ubase_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_
 }
 
 rt_notrace
-void ftrace_trace_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t stat, void *context)
+rt_ubase_t ftrace_trace_exit(void *context)
 {
-    /* tracer always exist & enabled */
-    if (tracer->on_exit)
-    {
-        /* no need for recursion test */
+    ftrace_session_t session;
+    rt_ubase_t pc;
+    rt_ubase_t ret_addr;
+    ftrace_arch_pop_context(&session, &pc, &ret_addr, context);
 
-        tracer->on_exit(tracer, entry_pc, stat, context);
+    ftrace_tracer_t tracer;
+    rt_list_for_each_entry(tracer, &session->exit_tracers, node)
+    {
+        tracer->on_exit(tracer, pc, context);
     }
-    return ;
+
+    return ret_addr;
+}
+
+int ftrace_trace_host_setup(rt_thread_t host)
+{
+    ftrace_host_data_t data = rt_calloc(1, sizeof(struct ftrace_host_data));
+    if (data)
+    {
+        const size_t alloc_size = 0x1000;
+        data->stack = rt_pages_alloc_ext(rt_page_bits(alloc_size), PAGE_ANY_AVAILABLE);
+        if (data->stack)
+        {
+            data->stack_pointer = (rt_ubase_t *)(data->stack + alloc_size);
+            host->ftrace_host_session = data;
+        }
+
+        data->stacked_trace = 0;
+    }
+    // atomic_store_explicit(&host->stacked_trace, 0, memory_order_relaxed);
+    // atomic_store_explicit(&host->stacked_exit, 0, memory_order_relaxed);
+    // atomic_store_explicit(&host->trace_recorded, 0, memory_order_relaxed);
 }

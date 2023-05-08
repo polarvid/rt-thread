@@ -51,7 +51,7 @@ const int lwp_get_syscall_param_list(rt_uint32_t number, const char ***ptypes, c
 
 const void *lwp_get_sys_api(rt_uint32_t number);
 
-void sys_exit(int value);
+sysret_t sys_exit(int value);
 sysret_t sys_read(int fd, void *buf, size_t nbyte);
 sysret_t sys_write(int fd, const void *buf, size_t nbyte);
 sysret_t sys_lseek(int fd, off_t offset, int whence);

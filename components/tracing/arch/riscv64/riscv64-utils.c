@@ -7,7 +7,12 @@
  * Date           Author       Notes
  * 2023-03-30     WangXiaoyao  ftrace support
  */
-#include "../../ftrace.h"
+
+#define DBG_TAG "tracing.ftrace"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
+
+#include "../../internal.h"
 #include <opcode.h>
 #include <rtdef.h>
 
@@ -34,7 +39,7 @@ uint32_t _insn_gen_jalr(void *oldpc, void *newpc)
 {
     /**
      * Calculate the offset between oldpc and newpc,
-     * Its offset from the address of this instruction, in the range +/-2KB
+     * Its offset from the address of this instruction, in the range +2KB
      */
     int32_t offset = ((size_t)newpc - (size_t)oldpc) & 0x0fff;
     uint32_t jalr = INSN_JALR(REG_TRACE_IP, REG_TEMPX, offset);
@@ -48,7 +53,11 @@ uint32_t _insn_gen_auipc(void *oldpc, void *newpc)
      * Calculate the offset between oldpc and newpc,
      * Its offset from the address of this instruction, in the range +/-2GB
      */
-    int32_t offset = ((size_t)newpc >> 12) - ((size_t)oldpc >> 12);
+    int32_t diff = (size_t)newpc - (size_t)oldpc;
+    int32_t offset = diff >> 12;
+    if (diff & 0x0800) {
+        offset += 1;
+    }
     uint32_t auipc = INSN_AUIPC(REG_TEMPX, offset);
     return auipc;
 }
@@ -195,3 +204,49 @@ ftrace_session_t ftrace_arch_get_session(void *entry)
     }
     return (void *)session;
 }
+
+rt_notrace
+void ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+{
+    // TODO pc to symbol
+    rt_thread_t thread;
+    thread = rt_thread_self();
+    if (thread)
+    {
+        ftrace_host_data_t data = thread->ftrace_host_session;
+        if (data)
+        {
+            rt_ubase_t *frame = atomic_fetch_add(&data->stack_pointer, -32);
+            *--frame = pc;
+            *--frame = ret_addr;
+            *--frame = context->args[0];
+            *--frame = (rt_ubase_t)session;
+        }
+        else
+        {
+            LOG_W("Not data found");
+        }
+    }
+}
+
+rt_notrace
+void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context)
+{
+    // TODO pc to symbol
+    rt_thread_t thread;
+    thread = rt_thread_self();
+    if (thread)
+    {
+        ftrace_host_data_t data = thread->ftrace_host_session;
+        if (data)
+        {
+            rt_ubase_t *frame = atomic_fetch_add(&data->stack_pointer, 32);
+
+            *session = (void *)frame[0];
+            context->args[2] = frame[1];
+            *ret_addr = frame[2];
+            *pc = frame[3];
+        }
+    }
+}
+

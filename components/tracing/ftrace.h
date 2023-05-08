@@ -10,9 +10,6 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
-#define TRACER_STAT_NONE        0
-#define TRACER_STAT_WATCH_EXIT  1
-
 #ifndef __ASSEMBLY__
 
 #include <rtthread.h>
@@ -30,14 +27,11 @@
 /**
  * @brief A context for arguments passing
  */
-typedef struct ftrace_context {
-    rt_ubase_t args[FTRACE_REG_CNT];
-} *ftrace_context_t;
 
 struct ftrace_tracer;
 
 typedef rt_base_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
-typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, rt_ubase_t stat, ftrace_context_t context);
+typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, ftrace_context_t context);
 
 enum ftrace_tracer_type {
     TRACER_ENTRY,
@@ -83,20 +77,18 @@ typedef struct ftrace_tracer {
 } *ftrace_tracer_t;
 
 ftrace_tracer_t ftrace_tracer_create(enum ftrace_tracer_type type, void *handler, void *data);
+void ftrace_tracer_init(ftrace_tracer_t tracer, enum ftrace_tracer_type type, void *handler, void *data);
 
-rt_notrace rt_inline
-void *ftrace_tracer_get_data(ftrace_tracer_t tracer)
-{
-    return tracer->data;
-}
+void ftrace_tracer_delete(ftrace_tracer_t tracer);
+rt_inline void ftrace_tracer_detach(ftrace_tracer_t tracer) {}
 
-rt_notrace rt_inline
-void ftrace_tracer_set_data(ftrace_tracer_t tracer, void *data)
-{
-    tracer->data = data;
-}
+void ftrace_session_init(ftrace_session_t session);
 
 ftrace_session_t ftrace_session_create(void);
+
+void ftrace_session_delete(ftrace_session_t session);
+
+rt_inline void ftrace_session_detach(ftrace_session_t session) {}
 
 int ftrace_session_bind(ftrace_session_t session, ftrace_tracer_t tracer);
 

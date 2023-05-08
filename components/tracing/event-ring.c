@@ -21,9 +21,9 @@
 
 #define POWER_OF_2(n)   ((n) != 0 && ((n) & ((n) - 1)) == 0)
 
-trace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz)
+ftrace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz)
 {
-    trace_evt_ring_t ring;
+    ftrace_evt_ring_t ring;
 
     /* size of each ring */
     const size_t ringsz = totalsz / RT_CPUS_NR;
@@ -70,7 +70,7 @@ trace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz)
     return ring;
 }
 
-void event_ring_delete(trace_evt_ring_t ring)
+void event_ring_delete(ftrace_evt_ring_t ring)
 {
     rt_free(ring);
 }

@@ -33,7 +33,7 @@
  * manner that makes the ring buffer looks like a differential gear.
  */
 
-typedef struct trace_evt_ring
+typedef struct ftrace_evt_ring
 {
     struct {
         /** aligned for each ring */
@@ -66,7 +66,7 @@ typedef struct trace_evt_ring
     int bufs_per_ring;
     int objsz;
     _Atomic(void *) buftbl[0];
-} *trace_evt_ring_t;
+} *ftrace_evt_ring_t;
 
 #define _R(ring)                                (&(ring)->rings[cpuid])
 
@@ -90,29 +90,29 @@ typedef struct trace_evt_ring
 #endif
 
 rt_inline rt_notrace
-void *event_ring_event_loc(trace_evt_ring_t ring, const int index, const int cpuid)
+void *event_ring_event_loc(ftrace_evt_ring_t ring, const int index, const int cpuid)
 {
     const size_t objshift = __builtin_ffsl(ring->objsz) - 1;
     return OFF_TO_OBJ(ring, index, objshift, cpuid);
 }
 
 rt_inline rt_notrace
-_Atomic(void *) *event_ring_buffer_loc(trace_evt_ring_t ring, const int index, const int cpuid)
+_Atomic(void *) *event_ring_buffer_loc(ftrace_evt_ring_t ring, const int index, const int cpuid)
 {
     const size_t bufoff = IDX_TO_BUF_OFF(ring, index);
     return &(_BUFTBL(ring, cpuid)[bufoff]);
 }
 
-trace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz);
+ftrace_evt_ring_t event_ring_create(size_t totalsz, size_t objsz, size_t bufsz);
 
-void event_ring_delete(trace_evt_ring_t ring);
+void event_ring_delete(ftrace_evt_ring_t ring);
 
 /**
  * @brief drop a buf from ring buffer if there is no other racer
  * assuming that the local scheduler is disable
  */
 rt_inline rt_notrace
-int event_ring_drop(trace_evt_ring_t ring, const size_t cpuid)
+int event_ring_drop(ftrace_evt_ring_t ring, const size_t cpuid)
 {
     int drops;
     rt_uint32_t cons_head, cons_next, objs_per_buf;
@@ -121,10 +121,10 @@ int event_ring_drop(trace_evt_ring_t ring, const size_t cpuid)
     /* optimized consumer index to reduce calculations */
     cons_next = (cons_head + objs_per_buf) & _R(ring)->cons_mask;
 
-    if (_R(ring)->prod_tail - cons_head >= objs_per_buf)
-    {
-        return 0;
-    }
+    // if (_R(ring)->prod_tail - cons_head >= objs_per_buf)
+    // {
+    //     return 0;
+    // }
 
     if (atomic_compare_exchange_strong(&_R(ring)->cons_head, &cons_head, cons_next))
     {
@@ -143,7 +143,7 @@ int event_ring_drop(trace_evt_ring_t ring, const size_t cpuid)
  *
  */
 rt_inline rt_notrace
-int event_ring_enqueue(trace_evt_ring_t ring, void *buf, const rt_bool_t override)
+int event_ring_enqueue(ftrace_evt_ring_t ring, void *buf, const rt_bool_t override)
 {
     const size_t cpuid = rt_hw_cpu_id();
 
@@ -227,7 +227,7 @@ int event_ring_enqueue(trace_evt_ring_t ring, void *buf, const rt_bool_t overrid
  * @note Not in interrupt context, reason same as a normal spin-lock
  */
 rt_inline rt_notrace
-void *event_ring_dequeue_mc(trace_evt_ring_t ring, void *newbuf)
+void *event_ring_dequeue_mc(ftrace_evt_ring_t ring, void *newbuf)
 {
     const size_t cpuid = rt_hw_cpu_id();
     rt_uint32_t cons_head, cons_next, objs_per_buf;
@@ -264,25 +264,25 @@ void *event_ring_dequeue_mc(trace_evt_ring_t ring, void *newbuf)
     return buf;
 }
 
-rt_inline int event_ring_is_full(trace_evt_ring_t ring, const size_t cpuid)
+rt_inline int event_ring_is_full(ftrace_evt_ring_t ring, const size_t cpuid)
 {
     atomic_thread_fence(memory_order_acquire);
     return ((_R(ring)->prod_head + 1) & _R(ring)->prod_mask) == _R(ring)->cons_tail;
 }
 
-rt_inline int event_ring_is_empty(trace_evt_ring_t ring, const size_t cpuid)
+rt_inline int event_ring_is_empty(ftrace_evt_ring_t ring, const size_t cpuid)
 {
     atomic_thread_fence(memory_order_acquire);
     return _R(ring)->cons_head == _R(ring)->prod_tail;
 }
 
-rt_inline int event_ring_count(trace_evt_ring_t ring, const size_t cpuid)
+rt_inline int event_ring_count(ftrace_evt_ring_t ring, const size_t cpuid)
 {
     atomic_thread_fence(memory_order_acquire);
     return (_R(ring)->prod_size + _R(ring)->prod_tail - _R(ring)->cons_tail) & _R(ring)->prod_mask;
 }
 
-rt_inline int event_ring_capability_percpu(trace_evt_ring_t ring)
+rt_inline int event_ring_capability_percpu(ftrace_evt_ring_t ring)
 {
     const size_t cpuid = 0;
     return _R(ring)->prod_size;
@@ -292,8 +292,8 @@ rt_inline int event_ring_capability_percpu(trace_evt_ring_t ring)
  * @brief Caller must ensure no other writers/readers working on the meanwhile
  */
 rt_inline void event_ring_for_each_buffer_lock(
-    trace_evt_ring_t ring,
-    void (*handler)(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data),
+    ftrace_evt_ring_t ring,
+    void (*handler)(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data),
     void *data)
 {
     /* for each ring */
@@ -312,8 +312,8 @@ rt_inline void event_ring_for_each_buffer_lock(
  * @brief Caller must ensure no other writers/readers working on the meanwhile
  */
 rt_inline void event_ring_for_each_event_lock(
-    trace_evt_ring_t ring,
-    void (*handler)(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *data),
+    ftrace_evt_ring_t ring,
+    void (*handler)(ftrace_evt_ring_t ring, size_t cpuid, void *pevent, void *data),
     void *data)
 {
     for (size_t cpuid = 0; cpuid < RT_CPUS_NR; cpuid++)

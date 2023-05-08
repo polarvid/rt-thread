@@ -31,6 +31,13 @@ extern struct property_t g_disp_config[];
 extern u32 g_disp_config_len;
 extern u32 g_lcd0_config_len;
 extern u32 g_lcd1_config_len;
+
+struct property_t *g_lcd0_config;
+struct property_t g_lcd1_config[1];
+struct property_t g_disp_config[1];
+u32 g_disp_config_len;
+u32 g_lcd0_config_len;
+u32 g_lcd1_config_len;
 #define MAX_PIN_NUM 32
 
 static struct property_t *disp_get_board_config(const char *main_name, u32 *len)

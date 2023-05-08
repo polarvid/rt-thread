@@ -266,9 +266,8 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
 
 #ifdef RT_USING_TRACING
-    atomic_store_explicit(&thread->stacked_trace, 0, memory_order_relaxed);
-    atomic_store_explicit(&thread->stacked_exit, 0, memory_order_relaxed);
-    atomic_store_explicit(&thread->trace_recorded, 0, memory_order_relaxed);
+    extern int ftrace_trace_host_setup(rt_thread_t t);
+    ftrace_trace_host_setup(thread);
 #endif
 #endif
 

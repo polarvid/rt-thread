@@ -13,6 +13,30 @@
 #define REGSZ           (8)
 #define OFFTO(idx)      ((idx) * REGSZ)
 
+.local _trace_exit
+_trace_exit:
+    mv      TRACE_SP, sp
+
+    addi    sp, sp, -FTRACE_REG_CNT * REGSZ
+    STORE   a0, OFFTO(FTRACE_REG_A0)(sp)
+    STORE   a1, OFFTO(FTRACE_REG_A1)(sp)
+    STORE   TRACE_SP, OFFTO(FTRACE_REG_SP)(sp)
+    STORE   s0, OFFTO(FTRACE_REG_FP)(sp)
+
+    mv      a0, sp
+    call    ftrace_trace_exit
+    mv      ra, a0
+
+    LOAD    a0, OFFTO(FTRACE_REG_A0)(sp)
+    LOAD    a1, OFFTO(FTRACE_REG_A1)(sp)
+    addi    sp, sp, FTRACE_REG_CNT * REGSZ
+
+    ret
+
+.local _dummy_mcount
+_dummy_mcount:
+    jr      TRACE_IP
+
 .global mcount
 /* name convention following gprof */
 mcount:
@@ -23,14 +47,15 @@ mcount:
      * the previous 2 instruction:
      *
      * auipc TEMPX, off[31:12]
-     * jalr TRACE_RA, TEMPX, off[11:0]
+     * jalr TRACE_IP, TEMPX, off[11:0]
      */
     mv      TRACE_SP, sp
     mv      TRACE_FP, s0
+    mv      TRACE_RA, ra
 
     /* simulate the frame of trace point */
     addi    sp, sp, -16
-    STORE   ra, 8(sp)
+    STORE   TRACE_RA, 8(sp)
     STORE   s0, 0(sp)
     addi    s0, sp, 16
 
@@ -59,9 +84,12 @@ mcount:
     addi    a0, TRACE_IP, -(6 + 8)
     call    ftrace_arch_fetch_tracer
     mv      a1, TRACE_IP
-    mv      a2, ra
+    mv      a2, TRACE_RA
     mv      a3, sp
     call    ftrace_trace_entry
+
+    /* reserve the return value */
+    mv      TEMPX, a0
 
     /* restore arguments */
     LOAD    a0, OFFTO(FTRACE_REG_A0)(sp)
@@ -81,13 +109,20 @@ mcount:
      * we have to recover the fp, lr from the faked frame
      * mentioned above
      */
-    LOAD    TEMPX, 8(sp)
+    LOAD    TRACE_IP, 8(sp)
     addi    sp, sp, 16
 
     LOAD    s0, 0(sp)
+    /* should trace exit ? */
+    beqz    TEMPX, 1f
+    la      ra, _trace_exit
+    j       2f
+
+1:
     LOAD    ra, 8(sp)
+2:
     addi    sp, sp, 16
-    jr      TEMPX
+    jr      TRACE_IP
 
 /**
  * @brief load tracer from the trace point in a little endian order

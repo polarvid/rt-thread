@@ -43,8 +43,8 @@ typedef struct thread_event {
 } thread_event_t;
 
 typedef struct fgraph_session {
-    trace_evt_ring_t function;
-    trace_evt_ring_t thread;
+    ftrace_evt_ring_t function;
+    ftrace_evt_ring_t thread;
 } *fgraph_session_t;
 
 static pid_t pid;
@@ -101,7 +101,7 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
             for (size_t i = 0; i < (sizeof(thread.name) / sizeof(rt_ubase_t)); i++)
                 *dst++ = *src++;
 
-            trace_evt_ring_t thread_ring = ((fgraph_session_t)tracer->data)->thread;
+            ftrace_evt_ring_t thread_ring = ((fgraph_session_t)tracer->data)->thread;
             event_ring_enqueue(thread_ring, &thread, 0);
         }
     }
@@ -114,7 +114,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
 {
     rt_ubase_t entry_time = stat;
     rt_ubase_t exit_time = ftrace_timestamp();
-    trace_evt_ring_t func_ring = ((fgraph_session_t)tracer->data)->function;
+    ftrace_evt_ring_t func_ring = ((fgraph_session_t)tracer->data)->function;
 
     fgraph_event_t event = {
         .entry_address = (void *)entry_pc,
@@ -127,19 +127,19 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
     return ;
 }
 
-static void _alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+static void _alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     RT_ASSERT(!!*pbuffer);
 }
 
-static void _free_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+static void _free_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     rt_pages_free(*pbuffer, 0);
     return;
 }
 
-static void _report_functions(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
+static void _report_functions(ftrace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
 {
     int *fds = data;
     int fd = fds[cpuid];
@@ -170,7 +170,7 @@ static void _report_functions(trace_evt_ring_t ring, size_t cpuid, void *pevent,
     }
 }
 
-static void _report_threads(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
+static void _report_threads(ftrace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
 {
     thread_event_t *event = pevent;
     char *name = event->name;

@@ -42,16 +42,23 @@
 #define REG_TRACE_SP    28
 #define REG_TRACE_IP    29
 #define REG_TRACE_FP    30
+#define REG_TRACE_RA    31
 #define __REG(num)      x##num
 #define _REG(num)       __REG(num)
 
 #define TEMPX           _REG(REG_TEMPX)
 #define TRACE_SP        _REG(REG_TRACE_SP)
+#define TRACE_RA        _REG(REG_TRACE_RA)
 #define TRACE_IP        _REG(REG_TRACE_IP)
 #define TRACE_FP        _REG(REG_TRACE_FP)
 
 #ifndef __ASSEMBLY__
 #include <rtthread.h>
+#include <sys/time.h>
+
+typedef struct ftrace_context {
+    rt_ubase_t args[FTRACE_REG_CNT];
+} *ftrace_context_t;
 
 rt_inline rt_notrace
 void _ftrace_enable_global(void)
@@ -59,19 +66,23 @@ void _ftrace_enable_global(void)
     return ;
 }
 
+#ifndef CPUTIME_TIMER_FREQ
+#error "Must have CPUTIME_TIMER_FREQ for timestamp"
+#endif
+
 rt_inline rt_notrace
 rt_ubase_t ftrace_timestamp(void)
 {
-#if 0
-    rt_ubase_t freq;
-    rt_ubase_t clock;
-
-    clock = (clock * NANOSECOND_PER_SECOND) / freq;
-    return clock;
-#endif
     uint64_t cycles;
-    __asm__ volatile("rdcycle %0":"=r"(cycles));
+    __asm__ volatile("rdtime %0":"=r"(cycles));
+    cycles = (cycles * NANOSECOND_PER_SECOND) / CPUTIME_TIMER_FREQ;
     return cycles;
+}
+
+rt_inline rt_notrace
+rt_ubase_t ftrace_arch_get_sp(ftrace_context_t context)
+{
+    return context->args[FTRACE_REG_SP];
 }
 
 #endif /* __ASSEMBLY__ */

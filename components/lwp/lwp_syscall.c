@@ -313,15 +313,28 @@ static void _crt_thread_entry(void *parameter)
     arch_start_umode(parameter, tid->user_entry, ((struct rt_lwp *)tid->lwp)->data_entry, (void*)user_stack);
 #endif /* ARCH_MM_MMU */
 }
+#include <sys/time.h>
+rt_ubase_t sys_exit_timestamp;
+
+rt_inline rt_notrace
+rt_ubase_t ftrace_timestamp(void)
+{
+    uint64_t cycles;
+    __asm__ volatile("rdtime %0":"=r"(cycles));
+    cycles = (cycles * NANOSECOND_PER_SECOND) / CPUTIME_TIMER_FREQ;
+    return cycles;
+}
 
 /* thread/process */
-void sys_exit(int value)
+SYSCALL_DEFINE(exit, int, value)
 {
+    sys_exit_timestamp = ftrace_timestamp();
+
     rt_base_t level;
     rt_thread_t tid, main_thread;
     struct rt_lwp *lwp;
 
-    LOG_D("thread/process exit.");
+    rt_kputs("thread/process exit.\n");
 
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
@@ -368,13 +381,13 @@ void sys_exit(int value)
     rt_schedule();
     rt_hw_interrupt_enable(level);
 
-    return;
+    return 0;
 }
 
 /* exit group */
-void sys_exit_group(int status)
+SYSCALL_DEFINE(exit_group, int, status)
 {
-    return;
+    return 0;
 }
 
 /* syscall: "read" ret: "ssize_t" args: "int" "void *" "size_t" */
@@ -403,10 +416,6 @@ SYSCALL_DEFINE(read, int, fd, void *, buf, size_t, nbyte)
     ret = read(fd, kmem, nbyte);
     if (ret > 0)
     {
-        for (size_t i = ret; i < ret; i++)
-            rt_kprintf("%c", ((char *)kmem)[i]);
-        rt_kputs("\n");
-
         lwp_put_to_user(buf, kmem, ret);
     }
 
@@ -1048,7 +1057,7 @@ rt_err_t sys_mutex_release(rt_mutex_t mutex)
 
 #ifdef ARCH_MM_MMU
 /* memory allocation */
-rt_base_t sys_brk(void *addr)
+SYSCALL_DEFINE(brk, void *, addr)
 {
     return lwp_brk(addr);
 }
@@ -4760,7 +4769,7 @@ sysret_t sys_fstatfs64(int fd, size_t sz, struct statfs *buf)
 
 const static struct rt_syscall_def func_table[] =
 {
-    SYSCALL_SIGN(sys_exit),            /* 01 */
+    SYSCALL_SIGN_EXT(sys_exit),            /* 01 */
     SYSCALL_SIGN_EXT(sys_read),
     SYSCALL_SIGN_EXT(sys_write),
     SYSCALL_SIGN_EXT(sys_lseek),
@@ -4812,7 +4821,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_enter_critical),  /* 50 */
     SYSCALL_SIGN(sys_exit_critical),
 
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_brk)),
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_brk)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_mmap2)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_munmap)),
 #ifdef ARCH_MM_MMU
@@ -4883,7 +4892,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_notimpl),    //SYSCALL_SIGN(sys_hw_interrupt_enable),
 
     SYSCALL_SIGN(sys_tick_get),
-    SYSCALL_SIGN(sys_exit_group),
+    SYSCALL_SIGN_EXT(sys_exit_group),
 
     SYSCALL_SIGN(sys_notimpl),    //rt_delayed_work_init,
     SYSCALL_SIGN(sys_notimpl),    //rt_work_submit,           /* 100 */

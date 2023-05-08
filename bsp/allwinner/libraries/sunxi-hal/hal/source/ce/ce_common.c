@@ -170,6 +170,8 @@ int sunxi_ce_init(void)
     return 0;
 }
 
+#define hal_free_irq(x)
+
 int sunxi_ce_uninit(void)
 {
 #ifndef CE_NO_IRQ

@@ -44,7 +44,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
 {
     rt_ubase_t entry_time = stat;
     rt_ubase_t exit_time = ftrace_timestamp();
-    trace_evt_ring_t ring = tracer->data;
+    ftrace_evt_ring_t ring = tracer->data;
 
     fgraph_event_t event = {
         .entry_address = (void *)FTRACE_PC_TO_SYM(entry_pc),
@@ -57,19 +57,19 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
     return ;
 }
 
-static void _alloc_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+static void _alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     RT_ASSERT(!!*pbuffer);
 }
 
-static void _free_buffer(trace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+static void _free_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     rt_pages_free(*pbuffer, 0);
     return;
 }
 
-static void _report_buf(trace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
+static void _report_buf(ftrace_evt_ring_t ring, size_t cpuid, void *pevent, void *data)
 {
     int *fds = data;
     int fd = fds[cpuid];
@@ -129,7 +129,7 @@ static void _debug_fgraph(void)
 {
     /* init */
     rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
-    trace_evt_ring_t ring;
+    ftrace_evt_ring_t ring;
     ring = event_ring_create(RT_CPUS_NR * (4ul << 20), sizeof(fgraph_event_t), ARCH_PAGE_SIZE);
     event_ring_for_each_buffer_lock(ring, _alloc_buffer, NULL);
 

@@ -33,6 +33,7 @@ extern struct ksymtbl __ksymtbl_blob;
 static struct ksymtbl *ksymtbl = &__ksymtbl_blob;
 #define OFT_ORDER (2)
 
+rt_notrace
 static int _compare_addroff(const void *a, const void *b)
 {
     rt_uint32_t aa = *(rt_uint32_t *)a;
@@ -40,6 +41,7 @@ static int _compare_addroff(const void *a, const void *b)
     return aa == bb ? 0 : (aa > bb ? 1 : -1);
 }
 
+rt_notrace
 rt_inline int _is_kernel_symbol(void *address)
 {
     extern void *__text_end;
@@ -47,6 +49,7 @@ rt_inline int _is_kernel_symbol(void *address)
     return address >= (void *)&__text_start && address < (void *)&ksymtbl;
 }
 
+rt_notrace
 int ksymtbl_find_by_address(void *address, size_t *off2entry, char *symbol_buf, size_t bufsz, rt_ubase_t *size, char *class_char)
 {
     int oft_idx;

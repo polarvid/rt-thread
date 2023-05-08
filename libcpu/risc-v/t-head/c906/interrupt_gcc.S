@@ -108,12 +108,20 @@ spurious_interrupt:
     RESTORE_ALL
     sret
 
+.global rt_hw_local_irq_enable
+rt_hw_local_irq_enable:
+#ifndef RT_USING_SMP
 .global rt_hw_interrupt_enable
 rt_hw_interrupt_enable:
+#endif
     csrs sstatus, a0    /* restore to old csr */
     jr ra
 
+.global rt_hw_local_irq_disable
+rt_hw_local_irq_disable:
+#ifndef RT_USING_SMP
 .global rt_hw_interrupt_disable
 rt_hw_interrupt_disable:
+#endif
     csrrci a0, sstatus, 2   /* clear SIE */
     jr ra

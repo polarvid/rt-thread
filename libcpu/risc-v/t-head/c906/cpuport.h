@@ -54,7 +54,11 @@ rt_inline void rt_hw_isb()
     __asm__ volatile(OPC_FENCE_I:::"memory");
 }
 
-int rt_hw_cpu_id(void);
+rt_inline rt_notrace
+int rt_hw_cpu_id(void)
+{
+    return 0;   /* d1 has one core */
+}
 
 #endif
 
