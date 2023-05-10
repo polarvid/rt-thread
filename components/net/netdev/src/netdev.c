@@ -31,6 +31,9 @@
 struct netdev *netdev_list = RT_NULL;
 /* The default network interface device */
 struct netdev *netdev_default = RT_NULL;
+/* The global network register callback */
+static netdev_callback_fn g_netdev_register_callback = RT_NULL;
+static netdev_callback_fn g_netdev_default_change_callback = RT_NULL;
 
 /**
  * This function will register network interface device and
@@ -98,7 +101,6 @@ int netdev_register(struct netdev *netdev, const char *name, void *user_data)
     if (netdev_list == RT_NULL)
     {
         netdev_list = netdev;
-        netdev_default = netdev;
     }
     else
     {
@@ -107,6 +109,17 @@ int netdev_register(struct netdev *netdev, const char *name, void *user_data)
     }
 
     rt_hw_interrupt_enable(level);
+
+    if (netdev_default == RT_NULL)
+    {
+        netdev_set_default(netdev_list);
+    }
+
+    /* execute netdev register callback */
+    if (g_netdev_register_callback)
+    {
+        g_netdev_register_callback(netdev, NETDEV_CB_REGISTER);
+    }
 
     return RT_EOK;
 }
@@ -151,12 +164,17 @@ int netdev_unregister(struct netdev *netdev)
             }
             if (netdev_default == netdev)
             {
-                netdev_default = netdev_list;
+                netdev_default = RT_NULL;
             }
             break;
         }
     }
     rt_hw_interrupt_enable(level);
+
+    if (netdev_default == RT_NULL)
+    {
+        netdev_set_default(netdev_list);
+    }
 
     if (cur_netdev == netdev)
     {
@@ -168,6 +186,17 @@ int netdev_unregister(struct netdev *netdev)
     }
 
     return -RT_ERROR;
+}
+
+/**
+ * This function will set register callback
+ *
+ * @param register_callback the network register callback
+ *
+ */
+void netdev_set_register_callback(netdev_callback_fn register_callback)
+{
+    g_netdev_register_callback = register_callback;
 }
 
 /**
@@ -355,17 +384,34 @@ int netdev_family_get(struct netdev *netdev)
  */
 void netdev_set_default(struct netdev *netdev)
 {
-    if (netdev)
+    if (netdev && (netdev != netdev_default))
     {
         netdev_default = netdev;
 
-        if (netdev->ops->set_default)
+        /* execture the default network interface device in the current network stack */
+        if (netdev->ops && netdev->ops->set_default)
         {
-            /* set default network interface device in the current network stack */
             netdev->ops->set_default(netdev);
+        }
+
+        /* execture application netdev default change callback */
+        if (g_netdev_default_change_callback)
+        {
+            g_netdev_default_change_callback(netdev, NETDEV_CB_DEFAULT_CHANGE);
         }
         LOG_D("Setting default network interface device name(%s) successfully.", netdev->name);
     }
+}
+
+/**
+ * This function will set defalut netdev change callback
+ *
+ * @param register_callback the network default change callback
+ *
+ */
+void netdev_set_default_change_callback(netdev_callback_fn register_callback)
+{
+    g_netdev_default_change_callback = register_callback;
 }
 
 /**

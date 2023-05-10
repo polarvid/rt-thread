@@ -664,6 +664,15 @@ after_enable_mmu_n:
 #define RT_CPUS_NR 1
 #endif
 
+#include "asm-generic.h"
+
+START_POINT(_thread_start)
+    mov     r10, lr
+    blx     r1
+    blx     r10
+    b       .   /* never here */
+START_POINT_END(_thread_start)
+
 .bss
 .align 3     /* align to  2~3=8 */
 svc_stack_n:

@@ -9,6 +9,7 @@
  */
 #include <board.h>
 #include <rtthread.h>
+#include <cpuport.h>
 
 #include <armv8.h>
 
