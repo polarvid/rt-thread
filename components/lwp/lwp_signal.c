@@ -168,6 +168,7 @@ int lwp_signal_check(void)
 
     if (thread->signal_in_process)
     {
+        have_signal = 1;
         goto out;
     }
 
@@ -175,6 +176,7 @@ int lwp_signal_check(void)
 
     if (lwp->signal_in_process)
     {
+        have_signal = 1;
         goto out;
     }
 
