@@ -313,28 +313,13 @@ static void _crt_thread_entry(void *parameter)
     arch_start_umode(parameter, tid->user_entry, ((struct rt_lwp *)tid->lwp)->data_entry, (void*)user_stack);
 #endif /* ARCH_MM_MMU */
 }
-#include <sys/time.h>
-rt_ubase_t sys_exit_timestamp;
-
-rt_inline rt_notrace
-rt_ubase_t ftrace_timestamp(void)
-{
-    uint64_t cycles;
-    __asm__ volatile("rdtime %0":"=r"(cycles));
-    cycles = (cycles * NANOSECOND_PER_SECOND) / CPUTIME_TIMER_FREQ;
-    return cycles;
-}
 
 /* thread/process */
 SYSCALL_DEFINE(exit, int, value)
 {
-    sys_exit_timestamp = ftrace_timestamp();
-
     rt_base_t level;
     rt_thread_t tid, main_thread;
     struct rt_lwp *lwp;
-
-    rt_kputs("thread/process exit.\n");
 
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;

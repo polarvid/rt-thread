@@ -36,6 +36,7 @@
 /* entries table conversion */
 #define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 5 * 2))
 #define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 5 * 2))
+#define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_uint16_t *)(pc) - (*((rt_uint16_t *)(pc) - 3) ? 3 : 2)))
 
 /* FTrace convention */
 #define REG_TEMPX       5

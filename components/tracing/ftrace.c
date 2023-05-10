@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
+#include "arch/riscv64/riscv64.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
@@ -129,10 +130,7 @@ static int _set_trace(ftrace_session_t session, void *fn)
     {
         err = RT_EOK;
     }
-    else
-    {
-        LOG_I("%s: Tracer already existed at (%p)", __func__, fn);
-    }
+
     return err;
 }
 
@@ -291,13 +289,9 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
         else if (session->unregistered)
         {
             /* we don't care if the disabled fails */
-            size_t off2entry;
             void *symbol;
-            if (!ksymtbl_find_by_address((void *)pc, &off2entry, NULL, 0, NULL, NULL))
-            {
-                symbol = (void *)(pc - off2entry);
-                ftrace_session_remove_trace(session, symbol);
-            }
+            symbol = FTRACE_PC_TO_SYM(pc);
+            ftrace_session_remove_trace(session, symbol);
         }
     }
 

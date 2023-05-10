@@ -87,10 +87,10 @@ int _patch_code16(void *entry, uint16_t new, uint16_t *old)
     _Atomic(uint32_t) *word_ptr = (void *)((rt_ubase_t)entry & ~0x3);
     uint32_t old32;
     uint32_t new32;
-    int16_t old16;
+    uint32_t old16;
 
     old32 = atomic_load(word_ptr);
-    old16 = (uint16_t)((old32 >> ((rt_ubase_t)entry & 2) * 8) & 0xffff);
+    old16 = ((old32 >> ((rt_ubase_t)entry & 2) * 8) & 0x0000ffff);
     if (old16 != *old)
     {
         *old = old16;
@@ -132,7 +132,7 @@ int ftrace_arch_patch_code(void *entry, rt_bool_t enabled)
     {
         /* noted the ordered here is different */
         uint32_t new = INSN_NOP;
-        uint32_t old = _insn_gen_jalr(insn + 1, &mcount);
+        uint32_t old = _insn_gen_jalr(insn, &mcount);
         err = _patch_code32(insn + 1, new, &old);
 
         if (!err)
@@ -145,6 +145,10 @@ int ftrace_arch_patch_code(void *entry, rt_bool_t enabled)
     if (!err)
     {
         rt_hw_cpu_icache_ops(RT_HW_CACHE_INVALIDATE, entry, 8);
+    }
+    else
+    {
+        RT_ASSERT(0 && "Should NEVER fail");
     }
     return 0;
 }
@@ -181,12 +185,23 @@ int ftrace_arch_hook_session(void *entry, ftrace_session_t session, rt_bool_t en
     int err;
     uint64_t nopnop = INSN_NOP4_C;
     /* relocate to 2-byte backward fn entry */
-    void *hook_point = (char *)ENTRY_FLOOR(entry) - 2 - sizeof(hook_point);
+    uint16_t *hook_point = (uint16_t *)ENTRY_FLOOR(entry) - 1 - (sizeof(void *)/sizeof(uint16_t));
+
 
     if (enabled)
+    {
+        uint16_t old16 = (uint16_t)INSN_NOP2_C;
+        if ((rt_ubase_t)entry & 0x0002)
+            _patch_code16(hook_point - 1, 0, &old16);
+        else
+            _patch_code16(hook_point + 4, 0, &old16);
+        RT_ASSERT(old16 == (uint16_t)INSN_NOP2_C || old16 == 0);
         err = _hook_session(hook_point, (uint64_t)session, nopnop);
+    }
     else
+    {
         err = _hook_session(hook_point, nopnop, (uint64_t)session);
+    }
     return err;
 }
 

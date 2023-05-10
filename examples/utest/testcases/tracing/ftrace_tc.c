@@ -52,10 +52,12 @@ static struct tracee_ret _test_tracee(size_t start, ...)
 static rt_notrace
 rt_base_t _test_handler(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    const struct ftrace_context *ctx = context;
     rt_kprintf("timestamp [0x%lx]\n", ftrace_timestamp());
     rt_kprintf("%s(%p, 0x%lx, 0x%lx, %p, %p)\n", __func__, tracer, pc, ret_addr, context, context->args[0]);
     /* API to extract arguments */
+    rt_kprintf("%p - %p/%p\n", FTRACE_PC_TO_SYM(pc), _test_tracee, sys_exit);
+    uassert_true(FTRACE_PC_TO_SYM(pc) == &_test_tracee || FTRACE_PC_TO_SYM(pc) == &sys_exit);
+    return 0;
 }
 
 static rt_notrace
@@ -96,6 +98,7 @@ static void test_set_trace_api(void)
     _test_tracee(0);
 
     ftrace_session_set_trace(session, &_test_tracee);
+    ftrace_session_set_trace(session, &sys_exit);
 
     /* ftrace enabled */
     ftrace_session_register(session);
@@ -108,6 +111,9 @@ static void test_set_trace_api(void)
     LOG_I("Return value verification");
     for (size_t i = 0; i < sizeof(ret.data)/sizeof(ret.data[0]); i++)
         uassert_true(ret.data[i] == magic_numbers[i]);
+
+    /* sys exit */
+    // sys_exit(0);
 
     /* ftrace disabled */
     ftrace_session_unregister(session);
