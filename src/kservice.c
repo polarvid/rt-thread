@@ -1713,8 +1713,8 @@ rt_weak void *rt_realloc(void *ptr, rt_size_t newsize)
 {
     rt_base_t level;
     void *nptr;
-    kasan_poisoned(rmem);
-    MASK_PTR(rmem);
+    kasan_poisoned(ptr);
+    MASK_PTR(ptr);
     /* Enter critical zone */
     level = _heap_lock();
     /* Change the size of previously allocated memory block */
@@ -1766,11 +1766,11 @@ rt_weak void rt_free(void *ptr)
     /* call 'rt_free' hook */
     RT_OBJECT_HOOK_CALL(rt_free_hook, (ptr));
     /* NULL check */
-    if (rmem == RT_NULL) return;
+    if (ptr == RT_NULL) return;
     // ? the order here, shoule we trust dynamic memory algorithm itself?
     // we gave him super tag to access anywhere
-    kasan_poisoned(rmem);
-    MASK_PTR(rmem);
+    kasan_poisoned(ptr);
+    MASK_PTR(ptr);
     /* Enter critical zone */
     level = _heap_lock();
     _MEM_FREE(ptr);

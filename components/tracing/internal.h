@@ -39,4 +39,9 @@ long tracing_binary_search(void *arr, long objcnt, long objsz_order, void *targe
 rt_bool_t ftrace_entries_exist(void *entry);
 void ftrace_entries_for_each(void (*fn)(void *symbol, void *data), void *data);
 
+/* syscall tracer */
+int ftrace_arch_trace_syscall(ftrace_session_t session);
+rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
+void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context);
+
 #endif /* __TRACE_FTRACE_INTERNAL_H__ */

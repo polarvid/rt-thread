@@ -10,16 +10,30 @@
 #ifndef __ASM_GENERIC_H__
 #define __ASM_GENERIC_H__
 
-/* use to mark a start point where every task start from */
+#include <rtconfig.h>
+
+#ifdef TRACING_FTRACE
+#include <ftrace.h>
+#else
+#define TRACE_SYMBOL(funcname)  \
+    funcname:
+#endif /* TRACING_FTRACE */
+
+/**
+ * Mark a start point where a task can start from
+ *
+ * @note be aware that start point will never return
+ */
 #define START_POINT(funcname)               \
     .global funcname;                       \
-    .type funcname, %function;	            \
+    .type funcname, %function;              \
     funcname:                               \
     .cfi_sections .debug_frame, .eh_frame;  \
     .cfi_startproc;                         \
     .cfi_undefined ra
 
 #define START_POINT_END(name)   \
+    j .;                        \
     .cfi_endproc;               \
     .size name, .-name;
 

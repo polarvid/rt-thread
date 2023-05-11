@@ -34,9 +34,26 @@
 #define TRACING_INSN_BYTES 4
 
 /* entries table conversion */
-#define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 5 * 2))
-#define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 5 * 2))
-#define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_uint16_t *)(pc) - (*((rt_uint16_t *)(pc) - 3) ? 3 : 2)))
+#define SYM2ENT(symbol)         symbol - 5 * 2
+
+#define TRACE_PAD   \
+    nop;    \
+    nop;    \
+    nop;    \
+    nop;    \
+    nop;
+
+#define __TRACE_SYMBOL(symbol_name, entry_addr)                             \
+    .section "__patchable_function_entries","awo",@progbits,symbol_name;    \
+    .long entry_addr;                                                       \
+    .previous;                                                              \
+    TRACE_PAD               \
+    .balign 4;              \
+    .type name, %function;  \
+symbol_name:                \
+    TRACE_PAD
+#define _TRACE_SYMBOL(symbol_name, entry_addr) __TRACE_SYMBOL(symbol_name, entry_addr)
+#define TRACE_SYMBOL(symbol_name) _TRACE_SYMBOL(symbol_name, SYM2ENT(symbol_name))
 
 /* FTrace convention */
 #define REG_TEMPX       5
@@ -56,6 +73,12 @@
 #ifndef __ASSEMBLY__
 #include <rtthread.h>
 #include <sys/time.h>
+
+/* entries table conversion */
+
+#define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 5 * 2))
+#define SYM_TO_ENTRIES(symbol)  ((void *)((rt_ubase_t)SYM2ENT(symbol)))
+#define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_uint16_t *)(pc) - (*((rt_uint16_t *)(pc) - 3) ? 3 : 2)))
 
 typedef struct ftrace_context {
     rt_ubase_t args[FTRACE_REG_CNT];

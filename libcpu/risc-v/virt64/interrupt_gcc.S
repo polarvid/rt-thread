@@ -17,9 +17,9 @@
 #include "encoding.h"
 #include "stackframe.h"
 
-    .align 2
     .global trap_entry
     .global debug_check_sp
+    .align 2
 trap_entry:
     // distingush exception from kernel or user
     csrrw   sp, sscratch, sp

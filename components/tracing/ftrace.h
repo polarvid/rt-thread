@@ -10,15 +10,17 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
-#ifndef __ASSEMBLY__
-
-#include <rtthread.h>
+#include <rtconfig.h>
 
 #ifdef ARCH_ARMV8
 #include "arch/aarch64/aarch64.h"
 #elif defined(ARCH_RISCV64)
 #include "arch/riscv64/riscv64.h"
 #endif
+
+#ifndef __ASSEMBLY__
+
+#include <rtthread.h>
 
 #ifndef RT_CPUS_NR
 #define RT_CPUS_NR 1

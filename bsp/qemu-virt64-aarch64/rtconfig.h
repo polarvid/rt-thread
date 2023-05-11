@@ -183,10 +183,7 @@
 /* Socket is in the 'Network' category */
 
 #define RT_USING_TRACING
-#define TRACING_KSYMTBL
-#define TRACING_FTRACE
-#define TRACING_SYSCALL
-#define TRACING_SYSCALL_EXT
+#define TRACING_SOFT_KASAN
 
 /* Network */
 

@@ -7,8 +7,8 @@ CPPPATH = [cwd]
 
 # for arch specified routines
 arch_file = {
-    "aarch64": ["aarch64-abi.S", "aarch64-utils.c"],
-    "riscv64": ["riscv64-abi.S", "riscv64-utils.c"],
+    "aarch64": ["aarch64-abi.S", "aarch64-utils.c", "aarch64-syscall.c"],
+    "riscv64": ["riscv64-abi.S", "riscv64-utils.c", "riscv64-syscall.c"],
 }
 arch    = rtconfig.ARCH
 cpu     = rtconfig.CPU
