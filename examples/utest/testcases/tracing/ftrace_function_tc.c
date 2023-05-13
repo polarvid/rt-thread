@@ -109,10 +109,14 @@ static void _delete_custom_session(ftrace_session_t session)
 static void _summary_test(ftrace_session_t session)
 {
     test_session_t custom = rt_container_of(session, struct test_session, session);
+    ftrace_consumer_session_t cons_session;
+    cons_session = ftrace_function_create_cons_session(custom->function_tracer);
 
-    size_t drops = ftrace_function_drops(custom->function_tracer);
-    size_t inbuffer = ftrace_function_evt_count(custom->function_tracer);
+    size_t drops = ftrace_consumer_session_count_drops(cons_session);
+    size_t inbuffer = ftrace_consumer_session_count_event(cons_session);
     LOG_I("Event Summary: drops 0x%lx in-buffer 0x%lx total 0x%lx\n", drops, inbuffer, drops + inbuffer);
+
+    ftrace_function_delete_cons_session(custom->function_tracer, cons_session);
 }
 
 static void _debug_ftrace(int argc, char *argv[])

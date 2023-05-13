@@ -47,7 +47,7 @@ rt_base_t _ftrace_function_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_uba
     return 0;
 }
 
-static void _alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+void ftrace_function_alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
 {
     *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
     RT_ASSERT(!!*pbuffer);  /* TODO handling */
@@ -56,7 +56,6 @@ static void _alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, 
 /* factory */
 ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t override)
 {
-    rt_err_t error;
     ftrace_tracer_t tracer;
     ftrace_trace_fn_t handler = &_ftrace_function_handler;
     ftrace_evt_ring_t ring;
@@ -64,19 +63,19 @@ ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t over
     ring = event_ring_create(buffer_size, sizeof(struct ftrace_function_evt), ARCH_PAGE_SIZE);
     tracer = rt_malloc(sizeof(*tracer));
 
-    if (!ring || !tracer || error)
+    if (!ring || !tracer)
     {
         if (ring)
             event_ring_delete(ring);
         if (tracer)
-            ftrace_tracer_delete(tracer);
+            rt_free(tracer);
 
         tracer = RT_NULL;
     }
     else
     {
         ftrace_tracer_init(tracer, TRACER_ENTRY, handler, TRACER_SET_OVERRIDE(ring));
-        event_ring_for_each_buffer_lock(ring, _alloc_buffer, NULL);
+        event_ring_for_each_buffer_lock(ring, ftrace_function_alloc_buffer, NULL);
     }
 
     return tracer;
@@ -86,31 +85,40 @@ void ftrace_function_tracer_delete(ftrace_tracer_t tracer)
 {
     RT_ASSERT(tracer);
     event_ring_delete(TRACER_GET_RING(tracer));
-
     ftrace_tracer_detach(tracer);
     rt_free(tracer);
 }
 
-size_t ftrace_function_evt_count(ftrace_tracer_t tracer)
+ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tracer)
 {
-    RT_ASSERT(tracer);
+    ftrace_consumer_session_t session;
     ftrace_evt_ring_t ring;
-    size_t count;
+    void *buffer;
     ring = TRACER_GET_RING(tracer);
-    for (size_t i = 0; i < RT_CPUS_NR; i++)
-        count += event_ring_count(ring, i);
 
-    return count;
+    session = rt_malloc(sizeof(*session));
+    if (session)
+    {
+        buffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+        if (!buffer)
+        {
+            rt_free((void *)session);
+            session = RT_NULL;
+        }
+        else
+        {
+            ftrace_consumer_session_init(session, tracer, ring, buffer);
+        }
+    }
+    return session;
 }
 
-size_t ftrace_function_drops(ftrace_tracer_t tracer)
+void ftrace_function_delete_cons_session(ftrace_tracer_t tracer, ftrace_consumer_session_t session)
 {
-    RT_ASSERT(tracer);
-    ftrace_evt_ring_t ring;
-    size_t count;
-    ring = TRACER_GET_RING(tracer);
-    for (size_t i = 0; i < RT_CPUS_NR; i++)
-        count += ring->rings[i].drop_events;
+    RT_ASSERT(session);
+    RT_ASSERT(session->buffer);
 
-    return count;
+    ftrace_consumer_session_detach(session);
+    rt_pages_free(session->buffer, 0);
+    rt_free((void *)session);
 }

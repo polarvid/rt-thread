@@ -8,7 +8,6 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
-#include "arch/riscv64/riscv64.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
@@ -317,18 +316,15 @@ rt_ubase_t ftrace_trace_exit(void *context)
 
 int ftrace_trace_host_setup(rt_thread_t host)
 {
+    int err;
     ftrace_host_data_t data = rt_calloc(1, sizeof(struct ftrace_host_data));
     if (data)
     {
-        const size_t alloc_size = 0x1000;
-        data->stack = rt_pages_alloc_ext(rt_page_bits(alloc_size), PAGE_ANY_AVAILABLE);
-        if (data->stack)
-        {
-            data->stack_pointer = (rt_ubase_t *)(data->stack + alloc_size);
-            host->ftrace_host_session = data;
-        }
+        err = ftrace_vice_stack_init(data);
+        RT_ASSERT(err == 0);
 
         data->stacked_trace = 0;
+        host->ftrace_host_session = data;
     }
     // atomic_store_explicit(&host->stacked_trace, 0, memory_order_relaxed);
     // atomic_store_explicit(&host->stacked_exit, 0, memory_order_relaxed);

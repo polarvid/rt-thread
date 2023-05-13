@@ -24,6 +24,8 @@
 
 #include <stdatomic.h>
 
+#include "internal.h"
+
 struct tracee_ret {
     long data[4];
 };
@@ -98,7 +100,6 @@ static void test_set_trace_api(void)
     _test_tracee(0);
 
     ftrace_session_set_trace(session, &_test_tracee);
-    ftrace_session_set_trace(session, &sys_exit);
 
     /* ftrace enabled */
     ftrace_session_register(session);
@@ -127,9 +128,33 @@ static void test_set_trace_api(void)
     return ;
 }
 
+void test_vice_stack(void)
+{
+    const size_t test_times = ARCH_PAGE_SIZE / sizeof(size_t);
+
+    /**
+     * @brief Functionality Test
+     * stack should return proper value on pop
+     */
+    for (size_t i = 0; i < test_times; i++)
+    {
+        ftrace_vice_stack_push_word(0, i);
+    }
+    for (long i = test_times - 1; i >= 0; i--)
+    {
+        if (ftrace_vice_stack_pop_word(0) != i)
+        {
+            uassert_true(0);
+            break;
+        }
+    }
+    uassert_true(1);
+}
+
 static void test_api(void)
 {
     test_set_trace_api();
+    test_vice_stack();
 }
 
 static rt_err_t utest_tc_init(void)

@@ -10,11 +10,11 @@
 #ifndef __TRACE_EVENT_RING_H__
 #define __TRACE_EVENT_RING_H__
 
-#include "rtdef.h"
+#include "ftrace.h"
+
 #include <rtthread.h>
 #include <rthw.h>
 #include <cpuport.h>
-#include <ftrace.h>
 
 #include <stdint.h>
 #include <stdatomic.h>
@@ -227,9 +227,8 @@ int event_ring_enqueue(ftrace_evt_ring_t ring, void *buf, const rt_bool_t overri
  * @note Not in interrupt context, reason same as a normal spin-lock
  */
 rt_inline rt_notrace
-void *event_ring_dequeue_mc(ftrace_evt_ring_t ring, void *newbuf)
+void *event_ring_dequeue_mc(ftrace_evt_ring_t ring, void *newbuf, size_t cpuid)
 {
-    const size_t cpuid = rt_hw_cpu_id();
     rt_uint32_t cons_head, cons_next, objs_per_buf;
     void *buf;
 
@@ -247,9 +246,8 @@ void *event_ring_dequeue_mc(ftrace_evt_ring_t ring, void *newbuf)
     } while (!atomic_compare_exchange_weak(&_R(ring)->cons_head, &cons_head, cons_next));
 
     _Atomic(void *) *pbuf = event_ring_buffer_loc(ring, cons_head, cpuid);
-    buf = atomic_load_explicit(pbuf, memory_order_relaxed);
-    /* synchronize writer that reading this */
-    atomic_store_explicit(pbuf, newbuf, memory_order_release);
+    buf = *pbuf;
+    *pbuf = newbuf;
 
     /**
      * If there are other dequeues in progress
@@ -329,6 +327,20 @@ rt_inline void event_ring_for_each_event_lock(
             handler(ring, cpuid, event_ring_event_loc(ring, index, cpuid), data);
         }
     }
+}
+
+rt_inline void *event_ring_switch_buffer_lock(ftrace_evt_ring_t ring, void *newbuf, size_t cpuid)
+{
+    void *buffer;
+    rt_uint32_t cons_head;
+    _Atomic(void *) *pbuf;
+
+    cons_head = _R(ring)->cons_head;
+    pbuf = event_ring_buffer_loc(ring, cons_head, cpuid);
+    buffer = *pbuf;
+    *pbuf = newbuf;
+
+    return buffer;
 }
 
 #undef _R

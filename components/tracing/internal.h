@@ -11,11 +11,13 @@
 #define __TRACE_FTRACE_INTERNAL_H__
 
 #include "ftrace.h"
+#include <stdatomic.h>
 
 typedef struct ftrace_host_data {
-    char *stack;
-    _Atomic(rt_ubase_t *) stack_pointer;
-    unsigned int stacked_trace;
+    rt_ubase_t *vice_stack;
+    size_t vice_stack_size;
+    _Atomic(size_t) vice_sp;
+    atomic_uint_fast32_t stacked_trace;
 } *ftrace_host_data_t;
 
 /* ftrace entry and its return status */
@@ -43,5 +45,8 @@ void ftrace_entries_for_each(void (*fn)(void *symbol, void *data), void *data);
 int ftrace_arch_trace_syscall(ftrace_session_t session);
 rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
 void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context);
+
+/* vice stack */
+int ftrace_vice_stack_init(ftrace_host_data_t data);
 
 #endif /* __TRACE_FTRACE_INTERNAL_H__ */

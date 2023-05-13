@@ -35,7 +35,7 @@ if PLATFORM == 'gcc':
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY  = PREFIX + 'objcopy'
 
-    DEVICE  = ' -mcmodel=medany -mcpu=thead-c906 -march=rv64imafdcv -mabi=lp64d '
+    DEVICE  = ' -mcmodel=medany -march=rv64imafdcv -mabi=lp64d '
     CFLAGS  = DEVICE + ' -Wno-cpp -fstrict-volatile-bitfields -fdiagnostics-color=always'
     AFLAGS  = ' -c' + DEVICE + ' -x assembler-with-cpp -D__ASSEMBLY__ '
     LFLAGS  = DEVICE + ' -nostartfiles -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,_start -T link.lds' + ' -lsupc++ -lgcc -static'

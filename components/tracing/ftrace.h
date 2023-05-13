@@ -10,6 +10,7 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
+#include "rtdef.h"
 #include <rtconfig.h>
 
 #ifdef ARCH_ARMV8
@@ -20,17 +21,18 @@
 
 #ifndef __ASSEMBLY__
 
-#include <rtthread.h>
-
 #ifndef RT_CPUS_NR
 #define RT_CPUS_NR 1
 #endif
+
+#include <rtthread.h>
 
 /**
  * @brief A context for arguments passing
  */
 
 struct ftrace_tracer;
+struct ftrace_evt_ring;
 
 typedef rt_base_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
 typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, ftrace_context_t context);
@@ -39,6 +41,12 @@ enum ftrace_tracer_type {
     TRACER_ENTRY,
     TRACER_EXIT,
     TRACER_AROUND,
+};
+
+enum ftrace_event_type {
+    FTRACE_EVENT_THREAD,
+    FTRACE_EVENT_FUNCTION,
+    FTRACE_EVENT_FUNCTION_GRAPH,
 };
 
 typedef struct ftrace_session {
@@ -78,11 +86,24 @@ typedef struct ftrace_tracer {
     void *data;
 } *ftrace_tracer_t;
 
+/** should not access directly or modify any fields */
+typedef const struct ftrace_consumer_session {
+    void *buffer;
+    struct ftrace_evt_ring *ring;
+    ftrace_tracer_t tracer;
+    rt_uint32_t latency;
+    rt_uint32_t cpuid;
+} *ftrace_consumer_session_t;
+
+/* Tracer */
+
 ftrace_tracer_t ftrace_tracer_create(enum ftrace_tracer_type type, void *handler, void *data);
 void ftrace_tracer_init(ftrace_tracer_t tracer, enum ftrace_tracer_type type, void *handler, void *data);
 
 void ftrace_tracer_delete(ftrace_tracer_t tracer);
 rt_inline void ftrace_tracer_detach(ftrace_tracer_t tracer) {}
+
+/** Session */
 
 void ftrace_session_init(ftrace_session_t session);
 
@@ -109,6 +130,43 @@ void ftrace_session_set_status(ftrace_session_t session, rt_bool_t enable)
 {
     session->enabled = enable;
 }
+
+/** VICE stack */
+
+void ftrace_vice_stack_push_word(ftrace_context_t context, rt_base_t word);
+
+rt_base_t ftrace_vice_stack_pop_word(ftrace_context_t context);
+
+/** Consumer Session - the event buffer */
+
+rt_inline void ftrace_consumer_session_init(ftrace_consumer_session_t session,
+                                            ftrace_tracer_t tracer,
+                                            struct ftrace_evt_ring *ring,
+                                            void *buffer,
+                                            size_t cpuid)
+{
+    struct ftrace_consumer_session *internal = (struct ftrace_consumer_session *)session;
+    internal->ring = ring;
+    internal->buffer = buffer;
+    internal->latency = 1;
+    internal->tracer = tracer;
+    internal->cpuid = cpuid;
+    return ;
+}
+
+rt_inline void ftrace_consumer_session_detach(ftrace_consumer_session_t session) {}
+
+/**
+ * @brief Refreshing buffer of the consumer session
+ *
+ * @param session
+ * @param timeout
+ * @return long number of events in new buffer OR rt error code on failure
+ */
+long ftrace_consumer_session_refresh(ftrace_consumer_session_t session, time_t timeout);
+
+size_t ftrace_consumer_session_count_event(ftrace_consumer_session_t session);
+size_t ftrace_consumer_session_count_drops(ftrace_consumer_session_t session);
 
 #endif /* __ASSEMBLY__ */
 

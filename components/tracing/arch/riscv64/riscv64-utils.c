@@ -8,6 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
+#include "ftrace.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
@@ -15,10 +16,10 @@
 #include "../../internal.h"
 #include <opcode.h>
 #include <rtdef.h>
+#include <rthw.h>
 
 #include <stdatomic.h>
 #include <stddef.h>
-#include <rthw.h>
 #include <stdint.h>
 
 extern const void *_ftrace_entry_insn;
@@ -223,45 +224,17 @@ ftrace_session_t ftrace_arch_get_session(void *entry)
 rt_notrace
 void ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    // TODO pc to symbol
-    rt_thread_t thread;
-    thread = rt_thread_self();
-    if (thread)
-    {
-        ftrace_host_data_t data = thread->ftrace_host_session;
-        if (data)
-        {
-            rt_ubase_t *frame = atomic_fetch_add(&data->stack_pointer, -32);
-            *--frame = pc;
-            *--frame = ret_addr;
-            *--frame = context->args[0];
-            *--frame = (rt_ubase_t)session;
-        }
-        else
-        {
-            LOG_W("Not data found");
-        }
-    }
+    ftrace_vice_stack_push_word(context, pc);
+    ftrace_vice_stack_push_word(context, ret_addr);
+    ftrace_vice_stack_push_word(context, context->args[0]);
+    ftrace_vice_stack_push_word(context, (rt_ubase_t)session);
 }
 
 rt_notrace
 void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context)
 {
-    // TODO pc to symbol
-    rt_thread_t thread;
-    thread = rt_thread_self();
-    if (thread)
-    {
-        ftrace_host_data_t data = thread->ftrace_host_session;
-        if (data)
-        {
-            rt_ubase_t *frame = atomic_fetch_add(&data->stack_pointer, 32);
-
-            *session = (void *)frame[0];
-            context->args[2] = frame[1];
-            *ret_addr = frame[2];
-            *pc = frame[3];
-        }
-    }
+    *session = (ftrace_session_t)ftrace_vice_stack_pop_word(context);
+    context->args[2] = ftrace_vice_stack_pop_word(context);
+    *ret_addr = ftrace_vice_stack_pop_word(context);
+    *pc = ftrace_vice_stack_pop_word(context);
 }
-
