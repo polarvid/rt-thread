@@ -7,6 +7,10 @@
  * Date           Author       Notes
  * 2023-04-30     WangXiaoyao  ftrace function tracer
  */
+#include <stdatomic.h>
+#define DBG_TAG "tracing.fgraph"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
 
 #include "event-ring.h"
 #include "ftrace.h"
@@ -47,12 +51,6 @@ rt_base_t _ftrace_function_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_uba
     return 0;
 }
 
-void ftrace_function_alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
-{
-    *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
-    RT_ASSERT(!!*pbuffer);  /* TODO handling */
-}
-
 /* factory */
 ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t override)
 {
@@ -75,7 +73,7 @@ ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t over
     else
     {
         ftrace_tracer_init(tracer, TRACER_ENTRY, handler, TRACER_SET_OVERRIDE(ring));
-        event_ring_for_each_buffer_lock(ring, ftrace_function_alloc_buffer, NULL);
+        event_ring_for_each_buffer_lock(ring, ftrace_tracer_alloc_buffer, NULL);
     }
 
     return tracer;
@@ -84,12 +82,16 @@ ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t over
 void ftrace_function_tracer_delete(ftrace_tracer_t tracer)
 {
     RT_ASSERT(tracer);
+
+    RT_ASSERT(atomic_load_explicit(&tracer->session->reference, memory_order_acquire) == 0);
+    event_ring_for_each_buffer_lock(TRACER_GET_RING(tracer), ftrace_tracer_free_buffer, NULL);
+
     event_ring_delete(TRACER_GET_RING(tracer));
     ftrace_tracer_detach(tracer);
     rt_free(tracer);
 }
 
-ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tracer)
+ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tracer, size_t cpuid)
 {
     ftrace_consumer_session_t session;
     ftrace_evt_ring_t ring;
@@ -107,7 +109,7 @@ ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tr
         }
         else
         {
-            ftrace_consumer_session_init(session, tracer, ring, buffer);
+            ftrace_consumer_session_init(session, tracer, ring, buffer, cpuid);
         }
     }
     return session;

@@ -38,11 +38,11 @@ long ftrace_consumer_session_refresh(ftrace_consumer_session_t session_const, ti
     ring = session->ring;
 
     void *consumed;
-    long evt_count = 0;
+    long evt_count;
     time_t waiting_time = 0;
     const long cpuid = session_const->cpuid;
 
-    while (!evt_count)
+    while (1)
     {
         consumed = event_ring_dequeue_mc(ring, session->buffer, cpuid);
         if (consumed)
@@ -50,12 +50,14 @@ long ftrace_consumer_session_refresh(ftrace_consumer_session_t session_const, ti
             /* successfully consumed */
             session->buffer = consumed;
             evt_count = session->ring->objs_per_buf;
+            break;
         }
         else if (session->tracer->session->unregistered)
         {
             /* it's certainly that no more event will enqueue */
             evt_count = ftrace_consumer_session_count_event(session);
             session->buffer = event_ring_switch_buffer_lock(ring, session->buffer, cpuid);
+            break;
         }
         else
         {
@@ -69,6 +71,7 @@ long ftrace_consumer_session_refresh(ftrace_consumer_session_t session_const, ti
             {
                 /* return as failure */
                 evt_count = -RT_EBUSY;
+                break;
             }
         }
     }

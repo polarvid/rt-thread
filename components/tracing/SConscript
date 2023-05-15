@@ -24,7 +24,7 @@ if GetDepend(['TRACING_FTRACE']):
     for file in arch_file[arch]:
         src.add(f'arch/{arch}/{file}')
     src = src.union({'ftrace.c', 'ftrace-symtbl.c', 'tracer-stack.c', 'ftrace-function.c', 'ftrace-graph.c',
-                     'ftrace-consumer.c'})
+                     'ftrace-consumer.c', 'ftrace-device.c'})
     if GetDepend(['TRACING_SYSCALL']):
         src = src.union({'ftrace-syscall.c'})
 if GetDepend(['TRACING_KSYMTBL']):

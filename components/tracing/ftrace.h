@@ -10,7 +10,6 @@
 #ifndef __TRACE_FTRACE_H__
 #define __TRACE_FTRACE_H__
 
-#include "rtdef.h"
 #include <rtconfig.h>
 
 #ifdef ARCH_ARMV8
@@ -46,12 +45,15 @@ enum ftrace_tracer_type {
 enum ftrace_event_type {
     FTRACE_EVENT_THREAD,
     FTRACE_EVENT_FUNCTION,
-    FTRACE_EVENT_FUNCTION_GRAPH,
+    FTRACE_EVENT_FGRAPH,
 };
 
 typedef struct ftrace_session {
     /* number of trace points this tracer handle */
-    size_t trace_point_cnt;
+    uint32_t trace_point_cnt;
+
+    /* number of consumer session waiting for this */
+    atomic_uint_fast32_t reference;
 
     /* list of tracers, serving in the order one by one */
     rt_list_t entry_tracers;
@@ -151,10 +153,15 @@ rt_inline void ftrace_consumer_session_init(ftrace_consumer_session_t session,
     internal->latency = 1;
     internal->tracer = tracer;
     internal->cpuid = cpuid;
+
+    atomic_fetch_add(&tracer->session->reference, 1);
     return ;
 }
 
-rt_inline void ftrace_consumer_session_detach(ftrace_consumer_session_t session) {}
+rt_inline void ftrace_consumer_session_detach(ftrace_consumer_session_t session)
+{
+    atomic_fetch_add(&session->tracer->session->reference, -1);
+}
 
 /**
  * @brief Refreshing buffer of the consumer session

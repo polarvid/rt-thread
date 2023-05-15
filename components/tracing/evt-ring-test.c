@@ -25,7 +25,6 @@ static void alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, v
     RT_ASSERT(!*pbuffer);
     preloc = pbuffer;
     *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
-    // rt_kprintf("buf %p\n", *pbuffer);
     RT_ASSERT(!!*pbuffer);
 
     /* test on event_ring_event_loc */
@@ -70,7 +69,7 @@ static void _test_ringbuf(void)
     RT_ASSERT(0 == event_ring_count(ring, cpuid));
 
     rt_ubase_t data = 0x0;
-    void *buf = event_ring_dequeue_mc(ring, NULL);
+    void *buf = event_ring_dequeue_mc(ring, NULL, 0);
     RT_ASSERT(!buf);
 
     for (size_t i = 0; i < 0x8000; i++)
@@ -83,7 +82,7 @@ static void _test_ringbuf(void)
     for (size_t i = 0; i < ring->bufs_per_ring; i++)
     {
         void *buf;
-        buf = event_ring_dequeue_mc(ring, NULL);
+        buf = event_ring_dequeue_mc(ring, NULL, cpuid);
         if (buf)
         {
             _test_buffer(buf);

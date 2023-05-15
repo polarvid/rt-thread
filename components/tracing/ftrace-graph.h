@@ -37,7 +37,8 @@ ftrace_tracer_t ftrace_graph_tracer_create(size_t buffer_size, rt_bool_t overrid
 void ftrace_graph_tracer_delete(ftrace_tracer_t tracer);
 
 ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t tracer,
-                                                           enum ftrace_event_type type);
+                                                           enum ftrace_event_type type,
+                                                           size_t cpuid);
 
 void ftrace_graph_delete_cons_session(ftrace_tracer_t tracer, ftrace_consumer_session_t session);
 

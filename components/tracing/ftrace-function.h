@@ -27,9 +27,10 @@ ftrace_tracer_t ftrace_function_tracer_create(size_t buffer_size, rt_bool_t over
 
 void ftrace_function_tracer_delete(ftrace_tracer_t tracer);
 
-void ftrace_function_alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data);
+void ftrace_tracer_alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data);
+void ftrace_tracer_free_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data);
 
-ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tracer);
+ftrace_consumer_session_t ftrace_function_create_cons_session(ftrace_tracer_t tracer, size_t cpuid);
 
 void ftrace_function_delete_cons_session(ftrace_tracer_t tracer, ftrace_consumer_session_t session);
 

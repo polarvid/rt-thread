@@ -64,6 +64,7 @@ void ftrace_session_init(ftrace_session_t session)
     session->unregistered = 0;
     session->trace_point_cnt = 0;
     session->around = RT_NULL;
+    atomic_store_explicit(&session->reference, 0, memory_order_release);
     rt_list_init(&session->entry_tracers);
     rt_list_init(&session->exit_tracers);
     return ;
@@ -329,4 +330,17 @@ int ftrace_trace_host_setup(rt_thread_t host)
     // atomic_store_explicit(&host->stacked_trace, 0, memory_order_relaxed);
     // atomic_store_explicit(&host->stacked_exit, 0, memory_order_relaxed);
     // atomic_store_explicit(&host->trace_recorded, 0, memory_order_relaxed);
+    return err;
+}
+
+void ftrace_tracer_alloc_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+{
+    *pbuffer = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+    RT_ASSERT(!!*pbuffer);  /* TODO handling */
+}
+
+void ftrace_tracer_free_buffer(ftrace_evt_ring_t ring, size_t cpuid, void **pbuffer, void *data)
+{
+    RT_ASSERT(!!*pbuffer);  /* TODO handling */
+    rt_pages_free(*pbuffer, 0);
 }

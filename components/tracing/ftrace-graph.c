@@ -7,9 +7,6 @@
  * Date           Author       Notes
  * 2023-04-15     WangXiaoyao  fgraph support
  */
-#include "arch/riscv64/riscv64.h"
-#include "mm_page.h"
-#include "rtdef.h"
 #define DBG_TAG "tracing.fgraph"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
@@ -127,8 +124,8 @@ ftrace_tracer_t ftrace_graph_tracer_create(size_t buffer_size, rt_bool_t overrid
         private_data->thread_ring = thread_ring;
         ftrace_tracer_init(entry_tracer, TRACER_ENTRY, entry_handler, private_data);
         ftrace_tracer_init(exit_tracer, TRACER_EXIT, exit_handler, private_data);
-        event_ring_for_each_buffer_lock(func_ring, ftrace_function_alloc_buffer, NULL);
-        event_ring_for_each_buffer_lock(thread_ring, ftrace_function_alloc_buffer, NULL);
+        event_ring_for_each_buffer_lock(func_ring, ftrace_tracer_alloc_buffer, NULL);
+        event_ring_for_each_buffer_lock(thread_ring, ftrace_tracer_alloc_buffer, NULL);
     }
 
     return entry_tracer;
@@ -140,12 +137,18 @@ void ftrace_graph_tracer_delete(ftrace_tracer_t tracer)
     event_ring_delete(TRACER_GET_THREAD_RING(tracer));
     event_ring_delete(TRACER_GET_FUNC_RING(tracer));
 
+    RT_ASSERT(atomic_load_explicit(&tracer->session->reference, memory_order_acquire) == 0);
+    event_ring_for_each_buffer_lock(TRACER_GET_FUNC_RING(tracer), ftrace_tracer_free_buffer, NULL);
+    event_ring_for_each_buffer_lock(TRACER_GET_THREAD_RING(tracer), ftrace_tracer_free_buffer, NULL);
+
     ftrace_tracer_detach(&tracer[0]);
     ftrace_tracer_detach(&tracer[1]);
     rt_free(tracer);
 }
 
-ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t tracer, enum ftrace_event_type type)
+ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t tracer,
+                                                           enum ftrace_event_type type,
+                                                           size_t cpuid)
 {
     ftrace_consumer_session_t session;
     ftrace_evt_ring_t ring;
@@ -156,7 +159,7 @@ ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t trace
         case FTRACE_EVENT_THREAD:
             ring = TRACER_GET_THREAD_RING(tracer);
             break;
-        case FTRACE_EVENT_FUNCTION_GRAPH:
+        case FTRACE_EVENT_FGRAPH:
             ring = TRACER_GET_FUNC_RING(tracer);
             break;
         default:
@@ -177,7 +180,7 @@ ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t trace
         }
         else
         {
-            ftrace_consumer_session_init(session, tracer, ring, buffer);
+            ftrace_consumer_session_init(session, tracer, ring, buffer, cpuid);
         }
     }
     return session;
