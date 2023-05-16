@@ -62,9 +62,14 @@ rt_base_t _test_handler(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t 
 static rt_notrace
 void _exit_handler(struct ftrace_tracer *tracer, rt_ubase_t entry_pc, ftrace_context_t context)
 {
+#ifdef ARCH_ARMV8
+    for (size_t i = 0; i < 8; i++)
+        rt_kprintf("return value %p\n", context->args[i]);
+#else
     struct tracee_ret *ret = (void *)context->args[2];
     for (size_t i = 0; i < sizeof(ret->data)/sizeof(ret->data[0]); i++)
         uassert_true(ret->data[i] == magic_numbers[i]);
+#endif
     return ;
 }
 

@@ -11,8 +11,8 @@
 #define __TRACE_RISCV64_H__
 
 /**
- * we are following the `RISC-V ABIs Specification, Document Version 1.0',
- * Editors Kito Cheng and Jessica Clarke, RISC-V International, November 2022
+ * we are following the *`RISC-V ABIs Specification, Document Version 1.0',
+ * Editors Kito Cheng and Jessica Clarke, RISC-V International, November 2022*
  */
 
 /* index to ftrace context registers */
@@ -33,8 +33,8 @@
 
 #define TRACING_INSN_BYTES 4
 
-/* entries table conversion */
-#define SYM2ENT(symbol)         symbol - 5 * 2
+/* entries table conversion, offset in bytes */
+#define SYM2ENT(symbol) symbol - 5 * 2
 
 #define TRACE_PAD   \
     nop;    \

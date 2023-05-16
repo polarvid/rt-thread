@@ -7,7 +7,7 @@
  * Date           Author       Notes
  * 2023-03-20     WangXiaoyao  the first version
  */
-
+#if 0
 #include "mm_aspace.h"
 #include "mmu.h"
 #include <rtthread.h>
@@ -148,3 +148,4 @@ int ftrace_device_init(void)
     return 0;
 }
 INIT_DEVICE_EXPORT(ftrace_device_init);
+#endif

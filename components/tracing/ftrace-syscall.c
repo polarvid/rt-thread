@@ -58,19 +58,15 @@ static ftrace_session_t _get_custom_session(void)
     return session;
 }
 
-static void _delete_custom_session(ftrace_session_t session)
-{
-}
-
 static void syscall_trace_start(int argc, char **argv)
 {
     /* init */
-    rt_spin_lock_init(&print_lock);
     ftrace_session_t session = _get_custom_session();
     RT_ASSERT(!!session);
 
     /* set trace point */
-    RT_ASSERT(ftrace_arch_trace_syscall(session) == 0);
+    if (ftrace_arch_trace_syscall(session) != RT_EOK)
+        RT_ASSERT(0);
 
     /* ftrace enabled */
     ftrace_session_register(session);

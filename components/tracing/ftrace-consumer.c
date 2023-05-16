@@ -13,19 +13,6 @@
 
 /** Consumer Core API */
 
-static size_t _wait_for_event(struct ftrace_consumer_session *session, time_t timeout)
-{
-    rt_err_t retval;
-    
-    while (1)
-    {
-        /* Before we reach the threshold, keep trying to fetch */
-
-
-
-    }
-}
-
 long ftrace_consumer_session_refresh(ftrace_consumer_session_t session_const, time_t timeout)
 {
     ftrace_evt_ring_t ring;

@@ -28,6 +28,26 @@
 /* offset to the register reference by index */
 #define OFFTO(index)    ((index) * 8)
 
+.local _trace_exit
+_trace_exit:
+    sub     sp, sp, FTRACE_REG_CNT * REGSZ
+    stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
+    stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
+    stp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
+    stp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+
+    /* restore session of caller */
+    mov     x0, sp
+    bl      ftrace_trace_exit
+    mov     lr, x0
+
+    ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
+    ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
+    ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
+    ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+    add     sp, sp, FTRACE_REG_CNT * REGSZ
+    ret
+
 .global mcount
 /* name convention following gprof */
 mcount:
@@ -86,54 +106,8 @@ _do_ftrace:
     mov     x3, sp
 
     bl      ftrace_trace_entry
-    cbz     x0, _exit_normal
+    cmp     x0, xzr
 
-_watch_exit:
-    /* reserve the return value as part of the session */
-    mov     RETVALX, x0
-
-    /* restore the context of trace point */
-    ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
-    ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
-    ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
-    ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
-    ldp     x8, TRACERX, [sp, #OFFTO(FTRACE_REG_X8)]
-    add     sp, sp, FTRACE_REG_CNT * REGSZ
-
-    /* get return-to-ip (where we suspend the trace point) */
-    ldp     fp, lr, [sp]
-    /* reserve the session of current tracer */
-    stp     TRACERX, RETVALX, [sp, -16]!
-
-    /* return to trace point */
-    blr     lr
-
-    /* on exit of the trace point, reserve the return value */
-    ldp     TRACERX, RETVALX, [sp], 16
-    ldp     fp, lr, [sp], 16
-
-    sub     sp, sp, FTRACE_REG_CNT * REGSZ
-    stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
-    stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
-    stp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
-    stp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
-
-    /* restore session of caller */
-    mov     x0, TRACERX
-    sub     x1, lr, 4
-    mov     x2, RETVALX
-    mov     x3, sp
-    bl      ftrace_trace_exit
-
-    ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
-    ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
-    ldp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
-    ldp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
-    add     sp, sp, FTRACE_REG_CNT * REGSZ
-    ldp     fp, lr, [sp], 16
-    ret
-
-_exit_normal:
     /* restore the context and return */
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     ldp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
@@ -150,7 +124,15 @@ _exit_normal:
      * mentioned above
      */
     ldp     fp, TEMPX, [sp], 16
+    beq     1f
+
+    ldr     lr, =_trace_exit
+    ldp     fp, xzr, [sp], 16
+    b       2f
+
+1:
     ldp     fp, lr, [sp], 16
+2:
     br      TEMPX
 
 .global _tracer_dummy

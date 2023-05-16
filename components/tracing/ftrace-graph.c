@@ -82,7 +82,7 @@ void _graph_on_exit(
 /* factory */
 ftrace_tracer_t ftrace_graph_tracer_create(size_t buffer_size, rt_bool_t override)
 {
-    rt_err_t error;
+
     ftrace_tracer_t entry_tracer, exit_tracer;
     ftrace_trace_fn_t entry_handler = &_graph_on_entry;
     ftrace_exit_fn_t exit_handler = &_graph_on_exit;

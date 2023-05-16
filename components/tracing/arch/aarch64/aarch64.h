@@ -27,9 +27,32 @@
 #define FTRACE_REG_RA   13
 #define FTRACE_REG_CNT  14
 
+/* order of the length of the entry in ftrace entry table */
 #define FTRACE_ENTRY_ORDER 3
 
 #define TRACING_INSN_BYTES 4
+
+#define SYM2ENT(symbol) symbol - 3 * 4
+
+#define TRACE_PAD   \
+    nop;    \
+    nop;    \
+    nop;
+
+#define __TRACE_SYMBOL(symbol_name, entry_addr)                             \
+    .section "__patchable_function_entries","awo",@progbits,symbol_name;    \
+    .xword entry_addr;                                                      \
+    .previous;                                                              \
+    .balign 4;              \
+    .type name, %function;  \
+    .global symbol_name;    \
+_prefix_##symbol_name:      \
+    TRACE_PAD               \
+symbol_name:                \
+    nop;                    \
+    nop
+#define _TRACE_SYMBOL(symbol_name, entry_addr) __TRACE_SYMBOL(symbol_name, entry_addr)
+#define TRACE_SYMBOL(symbol_name) _TRACE_SYMBOL(symbol_name, SYM2ENT(symbol_name))
 
 #ifndef __ASSEMBLY__
 
@@ -39,6 +62,10 @@
 #define ENTRIES_TO_SYM(entry)   ((void *)((rt_ubase_t)(entry) + 3 * 4))
 #define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 3 * 4))
 #define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_ubase_t)(pc) - 4))
+
+typedef struct ftrace_context {
+    rt_ubase_t args[FTRACE_REG_CNT];
+} *ftrace_context_t;
 
 rt_notrace rt_inline
 rt_ubase_t ftrace_timestamp(void)
@@ -54,12 +81,6 @@ rt_ubase_t ftrace_timestamp(void)
     clock = (clock * NANOSECOND_PER_SECOND) / freq;
     return clock;
 }
-
-#else
-// #define ARCH_FTRACE_INSTRUMENT __asm__ volatile("ldr lr, [fp, 8]\nnop\nnop\nnop\nmov x10, lr\nbl mcount")
-.macro ARCH_FTRACE_INSTRUMENT
-
-.endm
 
 #endif
 

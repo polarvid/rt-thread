@@ -194,12 +194,24 @@ START_POINT(SVC_Handler)
     /* x0 is initial sp */
     mov sp, x0
 
+    bl _SVC_Handler
+
+    /* jump explictly, make this code position independant */
+    b arch_syscall_exit
+START_POINT_END(SVC_Handler)
+
+#define FRAME_REG x19
+TRACE_SYMBOL(_SVC_Handler)
+    stp fp, lr, [sp, -16]!
+    mov fp, sp
+
+    mov FRAME_REG, x0   /* save the value of frame address */
     msr daifclr, #3  /* enable interrupt */
 
     bl  rt_thread_self
     bl  lwp_user_setting_save
 
-    ldp x8, x9, [sp, #(CONTEXT_OFFSET_X8)]
+    ldp x8, x9, [FRAME_REG, #(CONTEXT_OFFSET_X8)]
     and x0, x8, #0xf000
     cmp x0, #0xe000
     beq arch_signal_quit
@@ -212,16 +224,15 @@ START_POINT(SVC_Handler)
     cmp x0, xzr
     mov x30, x0
     beq arch_syscall_exit
-    ldp x0, x1, [sp, #(CONTEXT_OFFSET_X0)]
-    ldp x2, x3, [sp, #(CONTEXT_OFFSET_X2)]
-    ldp x4, x5, [sp, #(CONTEXT_OFFSET_X4)]
-    ldp x6, x7, [sp, #(CONTEXT_OFFSET_X6)]
-    ldp x8, x9, [sp, #(CONTEXT_OFFSET_X8)]
-    mov x7, x8
+    ldp x0, x1, [FRAME_REG, #(CONTEXT_OFFSET_X0)]
+    ldp x2, x3, [FRAME_REG, #(CONTEXT_OFFSET_X2)]
+    ldp x4, x5, [FRAME_REG, #(CONTEXT_OFFSET_X4)]
+    ldp x6, x7, [FRAME_REG, #(CONTEXT_OFFSET_X6)]
+    ldp x8, x9, [FRAME_REG, #(CONTEXT_OFFSET_X8)]
     blr x30
-    /* jump explictly, make this code position independant */
-    b arch_syscall_exit
-START_POINT_END(SVC_Handler)
+
+    ldp fp, lr, [sp], 16
+    ret
 
 .global arch_syscall_exit
 arch_syscall_exit:

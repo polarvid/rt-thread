@@ -8,8 +8,6 @@
  * 2023-03-20     WangXiaoyao  the first version
  */
 
-#include "riscv_mmu.h"
-#include "rtdef.h"
 #define DBG_TAG "tracing.ftrace.device"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>

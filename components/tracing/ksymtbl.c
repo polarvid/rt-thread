@@ -44,7 +44,6 @@ static int _compare_addroff(const void *a, const void *b)
 rt_notrace
 rt_inline int _is_kernel_symbol(void *address)
 {
-    extern void *__text_end;
     extern void *__text_start;
     return address >= (void *)&__text_start && address < (void *)&ksymtbl;
 }

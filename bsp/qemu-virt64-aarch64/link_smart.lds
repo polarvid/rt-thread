@@ -56,14 +56,6 @@ SECTIONS
     {
         *(.rodata)
         *(.rodata.*)
-
-        . = ALIGN(8);
-        __patchable_function_entries_start = .;
-        KEEP(*(__patchable_function_entries))
-        __patchable_function_entries_end = .;
-
-        __ksymtbl_blob = .;
-        KEEP(*(.ksymtbl))
     }
     __rodata_end = .;
 
@@ -92,6 +84,21 @@ SECTIONS
         *(.data.*)
     }
     __data_end = .;
+
+    . = ALIGN(8);
+    __patchable_function_entries :
+    {
+        __patchable_function_entries_start = .;
+        KEEP(*(__patchable_function_entries))
+        __patchable_function_entries_end = .;
+    }
+
+    . = ALIGN(8);
+    .ksymtbl :
+    {
+        __ksymtbl_blob = .;
+        KEEP(*(.ksymtbl))
+    }
 
     . = ALIGN(8);
     __bss_start = .;

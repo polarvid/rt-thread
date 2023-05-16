@@ -109,7 +109,7 @@ static int _hook_tracer(void *entry, uint64_t new, uint64_t old)
 }
 
 rt_notrace
-int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
+int ftrace_arch_hook_session(void *entry, ftrace_tracer_t tracer, rt_bool_t enabled)
 {
     int err;
     uint64_t nopnop = ((uint64_t *)&_ftrace_entry_insn)[1];
@@ -126,8 +126,24 @@ int ftrace_arch_hook_tracer(void *entry, ftrace_tracer_t tracer, rt_bool_t enabl
 }
 
 rt_notrace
-ftrace_tracer_t ftrace_arch_get_tracer(void *entry)
+ftrace_tracer_t ftrace_arch_get_session(void *entry)
 {
     entry -= 8;
     return *(ftrace_tracer_t *)((uint64_t)entry & ~0x7);
+}
+
+rt_notrace
+void ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+{
+    ftrace_vice_stack_push_word(context, pc);
+    ftrace_vice_stack_push_word(context, ret_addr);
+    ftrace_vice_stack_push_word(context, (rt_ubase_t)session);
+}
+
+rt_notrace
+void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context)
+{
+    *session = (ftrace_session_t)ftrace_vice_stack_pop_word(context);
+    *ret_addr = ftrace_vice_stack_pop_word(context);
+    *pc = ftrace_vice_stack_pop_word(context);
 }

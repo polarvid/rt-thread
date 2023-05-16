@@ -64,7 +64,6 @@ rt_bool_t ftrace_entries_exist(void *entry)
     void **end = &__patchable_function_entries_end;
     const size_t objcnt = end - entries;
     void *target = SYM_TO_ENTRIES(entry);
-
     int ret =
         tracing_binary_search(entries, objcnt, FTRACE_ENTRY_ORDER, &target, _compare_entry);
 
