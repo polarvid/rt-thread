@@ -2522,7 +2522,7 @@ static int sys_log_enable(int argc, char** argv)
 }
 MSH_CMD_EXPORT_ALIAS(sys_log_enable, sys_log, sys_log 1(enable)/0(disable));
 
-sysret_t sys_log(const char* log, int size)
+SYSCALL_DEFINE(log, const char *, log, int, size)
 {
     rt_device_t console = rt_console_get_device();
 
@@ -3270,7 +3270,7 @@ SYSCALL_DEFINE(sigprocmask, int, how, const sigset_t *, sigset, sigset_t *, oset
     return (ret < 0 ? -EFAULT: ret);
 }
 
-sysret_t sys_tkill(int tid, int sig)
+SYSCALL_DEFINE(tkill, int, tid, int, sig)
 {
 #ifdef ARCH_MM_MMU
     rt_base_t level;
@@ -3654,7 +3654,7 @@ __exit:
 }
 #endif
 
-char *sys_getcwd(char *buf, size_t size)
+SYSCALL_DEFINE(getcwd, char *, buf, size_t, size)
 {
     if (!lwp_user_accessable((void *)buf, size))
     {
@@ -3662,7 +3662,7 @@ char *sys_getcwd(char *buf, size_t size)
     }
     getcwd(buf, size);
 
-    return (char *)strlen(buf);
+    return strlen(buf);
 }
 
 sysret_t sys_chdir(const char *path)
@@ -4912,7 +4912,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_thread_mdelay),
     SYSCALL_SIGN(sys_sigaction),
     SYSCALL_SIGN_EXT(sys_sigprocmask),
-    SYSCALL_SIGN(sys_tkill),             /* 105 */
+    SYSCALL_SIGN_EXT(sys_tkill),             /* 105 */
     SYSCALL_SIGN(sys_thread_sigprocmask),
 #ifdef ARCH_MM_MMU
     SYSCALL_SIGN(sys_cacheflush),
@@ -4930,7 +4930,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_rt_timer_start),
     SYSCALL_SIGN(sys_rt_timer_stop),
     SYSCALL_SIGN(sys_rt_timer_control),  /* 115 */
-    SYSCALL_SIGN(sys_getcwd),
+    SYSCALL_SIGN_EXT(sys_getcwd),
     SYSCALL_SIGN(sys_chdir),
     SYSCALL_SIGN_EXT(sys_unlink),
     SYSCALL_SIGN(sys_mkdir),
@@ -5039,13 +5039,18 @@ const char *lwp_get_syscall_name(rt_uint32_t number)
 }
 
 #ifdef TRACING_SYSCALL_EXT
+
+static struct rt_syscall_def sys_log_def = SYSCALL_SIGN_EXT(sys_log);
+
 const int lwp_get_syscall_param_list(rt_uint32_t number, const char ***ptypes, const char ***pargs)
 {
     int retval = -1;
 
     if (number == 0xff)
     {
-        // name = "sys_log";
+        *ptypes = sys_log_def.param_list_types;
+        *pargs = sys_log_def.param_list_name;
+        retval = sys_log_def.param_cnt;
     }
     else
     {
