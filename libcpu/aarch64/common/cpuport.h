@@ -48,6 +48,8 @@ rt_inline void rt_hw_dsb(void)
     __asm__ volatile ("dsb ish":::"memory");
 }
 
+void _thread_start(void);
+
 rt_inline int __rt_ffs(int value)
 {
     return __builtin_ffs(value);

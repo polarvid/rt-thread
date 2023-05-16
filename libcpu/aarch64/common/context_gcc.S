@@ -25,7 +25,7 @@ rt_hw_cpu_id_set:
 /*
 int rt_hw_cpu_id(void)
 */
-.global rt_hw_cpu_id
+.weak rt_hw_cpu_id
 .type rt_hw_cpu_id, @function
 rt_hw_cpu_id:
    mrs x0, tpidr_el1           /* MPIDR_EL1: Multi-Processor Affinity Register */
@@ -78,16 +78,12 @@ rt_hw_get_gtimer_frq:
     MRS X0,CNTFRQ_EL0
     RET
 
-.cfi_sections .debug_frame, .eh_frame
-.global _thread_start
-.cfi_startproc
-_thread_start:
-    .cfi_undefined x30
-    /* x0 - thread entry parameter */
+START_POINT(_thread_start)
     blr x19
     mov x29, #0
     blr x20
-.cfi_endproc
+    b   .   /* never here */
+START_POINT_END(_thread_start)
 
 .macro SAVE_CONTEXT
     /* Save the entire context. */
