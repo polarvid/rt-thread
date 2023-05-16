@@ -182,12 +182,14 @@ int lwp_signal_check(void)
     if (have_signal)
     {
         thread->signal_in_process = 1;
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
         goto out;
     }
     have_signal = !lwp_sigisemptyset(&lwp->signal);
     if (have_signal)
     {
         lwp->signal_in_process = 1;
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
     }
 out:
     rt_hw_interrupt_enable(level);
@@ -203,8 +205,11 @@ int lwp_signal_backup(void *user_sp, void *user_pc, void* user_flag)
 
     level = rt_hw_interrupt_disable();
     thread = rt_thread_self();
+
+    /* distinguish signal for thread or lwp */
     if (thread->signal_in_process)
     {
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
         thread->user_ctx.sp = user_sp;
         thread->user_ctx.pc = user_pc;
         thread->user_ctx.flag = user_flag;
@@ -217,6 +222,7 @@ int lwp_signal_backup(void *user_sp, void *user_pc, void* user_flag)
     }
     else
     {
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
         lwp = (struct rt_lwp*)thread->lwp;
         lwp->user_ctx.sp = user_sp;
         lwp->user_ctx.pc = user_pc;
@@ -247,6 +253,7 @@ struct rt_user_context *lwp_signal_restore(void)
         thread->signal_in_process = 0;
 
         lwp_sigdelset(&thread->signal_mask, thread->signal_mask_bak);
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
         thread->signal_mask_bak = 0;
     }
     else
@@ -257,6 +264,7 @@ struct rt_user_context *lwp_signal_restore(void)
         lwp->signal_in_process = 0;
 
         lwp_sigdelset(&lwp->signal_mask, lwp->signal_mask_bak);
+        rt_kprintf("%s:%d\n", __func__, __LINE__);
         lwp->signal_mask_bak = 0;
     }
     rt_hw_interrupt_enable(level);
