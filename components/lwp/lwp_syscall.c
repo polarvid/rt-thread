@@ -559,7 +559,7 @@ sysret_t sys_openat(int dirfd, const char *name, int flag, mode_t mode)
 }
 
 /* syscall: "close" ret: "int" args: "int" */
-sysret_t sys_close(int fd)
+SYSCALL_DEFINE(close, int, fd)
 {
     int ret = close(fd);
     return (ret < 0 ? GET_ERRNO() : ret);
@@ -699,7 +699,7 @@ static void dfs2musl_events(short *events)
     *events = result_e;
 }
 
-sysret_t sys_poll(struct pollfd *fds, nfds_t nfds, int timeout)
+SYSCALL_DEFINE(poll, struct pollfd *, fds, nfds_t, nfds, int, timeout)
 {
     int ret = -1;
     int i = 0;
@@ -3186,8 +3186,7 @@ struct k_sigaction {
     unsigned mask[2];
 };
 
-sysret_t sys_sigaction(int sig, const struct k_sigaction *act,
-                     struct k_sigaction *oact, size_t sigsetsize)
+SYSCALL_DEFINE(sigaction, int, sig, const struct k_sigaction *, act, struct k_sigaction *, oact, size_t, sigsetsize)
 {
     int ret = -RT_EINVAL;
     struct lwp_sigaction kact, *pkact = RT_NULL;
@@ -4827,10 +4826,10 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN_EXT(sys_write),
     SYSCALL_SIGN_EXT(sys_lseek),
     SYSCALL_SIGN_EXT(sys_open),            /* 05 */
-    SYSCALL_SIGN(sys_close),
+    SYSCALL_SIGN_EXT(sys_close),
     SYSCALL_SIGN_EXT(sys_ioctl),
     SYSCALL_SIGN_EXT(sys_fstat),
-    SYSCALL_SIGN(sys_poll),
+    SYSCALL_SIGN_EXT(sys_poll),
     SYSCALL_SIGN(sys_nanosleep),       /* 10 */
     SYSCALL_SIGN(sys_gettimeofday),
     SYSCALL_SIGN(sys_settimeofday),
@@ -4951,7 +4950,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_notimpl),    //rt_work_submit,           /* 100 */
     SYSCALL_SIGN(sys_notimpl),    //rt_wqueue_wakeup,
     SYSCALL_SIGN(sys_thread_mdelay),
-    SYSCALL_SIGN(sys_sigaction),
+    SYSCALL_SIGN_EXT(sys_sigaction),
     SYSCALL_SIGN_EXT(sys_sigprocmask),
     SYSCALL_SIGN_EXT(sys_tkill),             /* 105 */
     SYSCALL_SIGN(sys_thread_sigprocmask),
