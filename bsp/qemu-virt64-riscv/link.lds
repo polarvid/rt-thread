@@ -102,17 +102,17 @@ SECTIONS
         *(.sdata.*)
     } > SRAM
 
+    . = ALIGN(8);
     __patchable_function_entries :
     {
-        . = ALIGN(8);
         __patchable_function_entries_start = .;
         KEEP(*(SORT(__patchable_function_entries)))
         __patchable_function_entries_end = .;
     } > SRAM
 
+    . = ALIGN(8);
     .ksymtbl :
     {
-        . = ALIGN(8);
         __ksymtbl_blob = .;
         KEEP(*(.ksymtbl))
     } > SRAM

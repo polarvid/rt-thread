@@ -386,7 +386,8 @@ class MapInfo:
                 parent.substrings += new_subs
         percentage = 0
         progress_bar(percentage, 100)
-        sys.stderr.write(f'Compress-rate: {total_before - total_reduce}/{total_before} {100 * (total_before - total_reduce)/total_before:.2f}%\n')
+        total_after = total_before - total_reduce
+        sys.stderr.write(f'Compress-rate: after/before={total_after}/{total_before}={100 * (total_after)/total_before:.2f}%\n')
 
     def compile(self):
         # TODO: we only deal with the 4G section first text entry located currently
@@ -419,6 +420,8 @@ class MapInfo:
 
         # 2.0. the compression is apply if needed
         # self.compress_symbol_bytes(base)
+
+        # 2.1. build the byte array
         syt_str = '\n'
         str_bytes = bytearray()
         offset = 0

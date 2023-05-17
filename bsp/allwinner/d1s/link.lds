@@ -85,14 +85,6 @@ SECTIONS
     {
         *(.rodata)
         *(.rodata.*)
-
-        . = ALIGN(8);
-        __patchable_function_entries_start = .;
-        KEEP(*(__patchable_function_entries))
-        __patchable_function_entries_end = .;
-
-        __ksymtbl_blob = .;
-        KEEP(*(.ksymtbl))
     } > SRAM
     __rodata_end = .;
 
@@ -109,6 +101,21 @@ SECTIONS
 
         *(.sdata)
         *(.sdata.*)
+    } > SRAM
+
+    . = ALIGN(8);
+    __patchable_function_entries :
+    {
+        __patchable_function_entries_start = .;
+        KEEP(*(SORT(__patchable_function_entries)))
+        __patchable_function_entries_end = .;
+    } > SRAM
+
+    . = ALIGN(8);
+    .ksymtbl :
+    {
+        __ksymtbl_blob = .;
+        KEEP(*(.ksymtbl))
     } > SRAM
 
     . = ALIGN(8);
