@@ -58,6 +58,16 @@ static ftrace_session_t _get_custom_session(void)
     return session;
 }
 
+static pid_t pid;
+
+void _app_test(int argc, char **argv)
+{
+    pid = exec(argv[0], 0, argc - 1, argv + 1);
+    struct rt_lwp* lwp = lwp_from_pid(pid);
+    rt_thread_t thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
+    rt_thread_control(thread, RT_THREAD_CTRL_BIND_CPU, (void *)1);
+}
+
 static void syscall_trace_start(int argc, char **argv)
 {
     /* init */
@@ -70,6 +80,9 @@ static void syscall_trace_start(int argc, char **argv)
 
     /* ftrace enabled */
     ftrace_session_register(session);
+
+    if (argc > 1)
+        _app_test(argc - 1, &argv[1]);
 
     return ;
 }

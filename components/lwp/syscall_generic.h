@@ -14,14 +14,19 @@
 
 #include <rtthread.h>
 
-#define __NARGS(a,aa,b,bb,c,cc,d,dd,e,ee,f,ff,g,gg,n,...) n
+#define __NARGS(z,a,aa,b,bb,c,cc,d,dd,e,ee,f,ff,g,gg,n,...) n
 #define _NARGS(...) __NARGS(__VA_ARGS__,7,7,6,6,5,5,4,4,3,3,2,2,1,1,0,0)
+
+#define ZERO _NARGS()
+#if ZERO != 0
+#error non zero
+#endif
 
 #define _TYPE(type, arg)            #type
 #define _ARG(type, arg)             #arg
 #define _SIGNATURE(type, arg)       type arg
 
-#define _SEL0(func)
+#define _SEL0(func, none)
 #define _SEL1(func, type, arg)      func(type, arg)
 #define _SEL2(func, type, arg, ...) func(type, arg), _SEL1(func, __VA_ARGS__)
 #define _SEL3(func, type, arg, ...) func(type, arg), _SEL2(func, __VA_ARGS__)
@@ -37,9 +42,15 @@
 #define __PARAM_LIST(narg, ...)     _SEL##narg(_SIGNATURE, __VA_ARGS__)
 #define _PARAM_LIST(narg, ...)      __PARAM_LIST(narg, __VA_ARGS__)
 
-#define _SYSCALL_METADATA(name, ...)                                                        \
-const char *_sys_##name##_param_type[] = {_META_TYPES(_NARGS(__VA_ARGS__), __VA_ARGS__)};   \
-const char *_sys_##name##_param_name[] = {_META_ARGS(_NARGS(__VA_ARGS__), __VA_ARGS__)}
+#define _SYSCALL_METADATA(name, ...)                                                                            \
+const char *_sys_##name##_param_type[_NARGS(__VA_ARGS__)] = {_META_TYPES(_NARGS(__VA_ARGS__), __VA_ARGS__)};    \
+const char *_sys_##name##_param_name[_NARGS(__VA_ARGS__)] = {_META_ARGS(_NARGS(__VA_ARGS__), __VA_ARGS__)}
+
+#define _META(name, ...) _NARGS(__VA_ARGS__)
+
+#if _META("no") != 0
+#error error
+#endif
 
 #define SYSCALL_DEFINE_VARG(name, ...)                                  \
 _SYSCALL_METADATA(name, __VA_ARGS__);                                   \

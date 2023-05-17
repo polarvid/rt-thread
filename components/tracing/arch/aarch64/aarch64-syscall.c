@@ -88,12 +88,15 @@ rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt
         dbg_log_prologue(DBG_INFO);
         dbg_raw("[%s:%x] %s(", tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall));
 
-        for (size_t i = 0; i < param_cnt - 1; i++)
+        if (param_cnt)
         {
-            _log_param(frame, types, names, i);
-            dbg_raw(", ");
+            for (size_t i = 0; i < param_cnt - 1; i++)
+            {
+                _log_param(frame, types, names, i);
+                dbg_raw(", ");
+            }
+            _log_param(frame, types, names, param_cnt - 1);
         }
-        _log_param(frame, types, names, param_cnt - 1);
 
         dbg_raw(")\n");
         dbg_log_epilogue(DBG_INFO);

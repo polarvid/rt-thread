@@ -987,7 +987,8 @@ sysret_t sys_kill(int pid, int sig)
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-sysret_t sys_getpid(void)
+// sysret_t sys_getpid(void)
+SYSCALL_DEFINE(getpid)
 {
     return lwp_getpid();
 }
@@ -4650,7 +4651,7 @@ rt_weak sysret_t sys_cacheflush(void *addr, int size, int cache)
     return -EFAULT;
 }
 
-sysret_t sys_uname(struct utsname *uts)
+SYSCALL_DEFINE(uname, struct utsname *, uts)
 {
     struct utsname utsbuff = {0};
     int ret = 0;
@@ -4835,7 +4836,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_settimeofday),
     SYSCALL_SIGN(sys_exec),
     SYSCALL_SIGN(sys_kill),
-    SYSCALL_SIGN(sys_getpid),          /* 15 */
+    SYSCALL_SIGN_EXT(sys_getpid),          /* 15 */
     SYSCALL_SIGN(sys_getpriority),
     SYSCALL_SIGN(sys_setpriority),
     SYSCALL_SIGN(sys_sem_create),
@@ -5029,7 +5030,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_mq_getsetattr),
     SYSCALL_SIGN(sys_mq_close),
     SYSCALL_SIGN(sys_stat), //TODO should be replaced by sys_lstat if symbolic link are implemented
-    SYSCALL_SIGN(sys_uname),                            /* 170 */
+    SYSCALL_SIGN_EXT(sys_uname),                            /* 170 */
     SYSCALL_SIGN(sys_statfs),
     SYSCALL_SIGN(sys_statfs64),
     SYSCALL_SIGN(sys_fstatfs),
