@@ -115,12 +115,19 @@ rt_hw_context_switch:
     RESERVE_CONTEXT
     STORE sp, (a0)
 
-    // restore to thread SP
+    /* restore to thread SP */
     LOAD sp, (a1)
 
     // restore Address Space
     la s0, rt_current_thread
     LOAD s1, (s0)
+
+    /**
+     * switch thread. It is atomic-op since interrupt is disable;
+     * we need a percpu variable by the way
+     */
+    la      s0, rt_current_thread_sync
+    STORE   s1, (s0)
 
     #ifdef RT_USING_SMART
         mv a0, s1

@@ -266,6 +266,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
 
 #ifdef TRACING_FTRACE
+    thread->ftrace_host_session = NULL;
     extern int ftrace_trace_host_setup(rt_thread_t t);
     ftrace_trace_host_setup(thread);
 #endif

@@ -88,7 +88,7 @@ rt_ubase_t _test_graph_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_
         time = time ? time : 1;
         retval = time;
 
-        rt_thread_t tid = rt_thread_self();
+        rt_thread_t tid = rt_thread_self_sync();
         int expected = 0;
         if (atomic_compare_exchange_strong(&tid->trace_recorded, &expected, 1))
         {
@@ -121,7 +121,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
         .entry_time = entry_time,
         .exit_time = exit_time,
         /* use ftrace id instead */
-        .tid = rt_thread_self(),
+        .tid = rt_thread_self_sync(),
     };
     event_ring_enqueue(func_ring, &event, 0);
     return ;

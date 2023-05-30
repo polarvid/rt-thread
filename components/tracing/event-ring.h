@@ -277,7 +277,7 @@ rt_inline int event_ring_is_empty(ftrace_evt_ring_t ring, const size_t cpuid)
 rt_inline int event_ring_count(ftrace_evt_ring_t ring, const size_t cpuid)
 {
     atomic_thread_fence(memory_order_acquire);
-    return (_R(ring)->prod_size + _R(ring)->prod_tail - _R(ring)->cons_tail) & _R(ring)->prod_mask;
+    return ((long)_R(ring)->prod_size + _R(ring)->prod_tail - _R(ring)->cons_tail) & _R(ring)->prod_mask;
 }
 
 rt_inline int event_ring_capability_percpu(ftrace_evt_ring_t ring)

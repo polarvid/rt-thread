@@ -135,7 +135,7 @@ void ftrace_session_set_status(ftrace_session_t session, rt_bool_t enable)
 
 /** VICE stack */
 
-void ftrace_vice_stack_push_word(ftrace_context_t context, rt_base_t word);
+rt_err_t ftrace_vice_stack_push_word(ftrace_context_t context, rt_base_t word);
 
 rt_base_t ftrace_vice_stack_pop_word(ftrace_context_t context);
 

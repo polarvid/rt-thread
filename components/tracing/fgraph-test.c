@@ -51,7 +51,7 @@ void _test_graph_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, rt_ubase_t
         .entry_time = entry_time,
         .exit_time = exit_time,
         /* use ftrace id instead */
-        .tid = rt_thread_self(),
+        .tid = rt_thread_self_sync(),
     };
     event_ring_enqueue(ring, &event, 0);
     return ;
@@ -128,7 +128,7 @@ void _app_test(void)
 static void _debug_fgraph(void)
 {
     /* init */
-    rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
+    rt_thread_control(rt_thread_self_sync(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
     ftrace_evt_ring_t ring;
     ring = event_ring_create(RT_CPUS_NR * (4ul << 20), sizeof(fgraph_event_t), ARCH_PAGE_SIZE);
     event_ring_for_each_buffer_lock(ring, _alloc_buffer, NULL);
@@ -179,7 +179,7 @@ static void _debug_fgraph(void)
     /* delete */
     event_ring_for_each_buffer_lock(ring, _free_buffer, 0);
     event_ring_delete(ring);
-    rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)RT_CPUS_NR);
+    rt_thread_control(rt_thread_self_sync(), RT_THREAD_CTRL_BIND_CPU, (void *)RT_CPUS_NR);
     return ;
 }
 MSH_CMD_EXPORT_ALIAS(_debug_fgraph, fgraph_test, test ftrace feature);

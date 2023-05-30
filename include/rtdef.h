@@ -680,6 +680,7 @@ enum
 struct rt_cpu
 {
     struct rt_thread *current_thread;
+    struct rt_thread *current_thread_sync;
 
     rt_uint16_t irq_nest;
     rt_uint8_t  irq_switch_flag;

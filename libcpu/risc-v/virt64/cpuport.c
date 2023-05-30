@@ -35,6 +35,11 @@ volatile rt_ubase_t rt_interrupt_to_thread = 0;
  */
 volatile rt_ubase_t rt_thread_switch_interrupt_flag = 0;
 
+/**
+ * @brief current thread which is sync with SP strictly
+ */
+void *rt_current_thread_sync;
+
 void *_rt_hw_stack_init(rt_ubase_t *sp, rt_ubase_t ra, rt_ubase_t sstatus)
 {
     (*--sp) = 0;                                /* tp */
@@ -106,6 +111,12 @@ void rt_hw_context_switch_interrupt(rt_ubase_t from, rt_ubase_t to, rt_thread_t 
     return;
 }
 #endif /* end of RT_USING_SMP */
+
+rt_notrace
+rt_thread_t rt_hw_thread_self_sync(void)
+{
+    return rt_current_thread_sync;
+}
 
 /** shutdown CPU */
 void rt_hw_cpu_shutdown()

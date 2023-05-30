@@ -199,12 +199,18 @@ static int _is_notrace(void *entry, struct _param *param)
     }
 }
 
+#define ADDR(num) (void *)num
+
 static void _set_session_in_entires(void *symbol, void *data)
 {
     // skip notrace here
     struct _param *param = data;
     if (param->notrace_cnt && _is_notrace(symbol, param))
         return ;
+
+    /* Skip entry in set */
+    // if (symbol >= ADDR(0x000000004042d4fc)/*  && symbol < ADDR(0x000000008025a412) */)
+    //     return ;
 
     int err;
     err = _set_trace(param->session, symbol);
@@ -235,7 +241,7 @@ int ftrace_session_set_except(ftrace_session_t session, void *notrace[], size_t 
 int ftrace_session_register(ftrace_session_t session)
 {
     RT_ASSERT(session->enabled == 0);
-
+    RT_ASSERT(session->unregistered == 0);
     session->enabled = RT_TRUE;
     /* cache flush smp, mb */
     rt_hw_dmb();
@@ -245,9 +251,9 @@ int ftrace_session_register(ftrace_session_t session)
 
 int ftrace_session_unregister(ftrace_session_t session)
 {
-    session->enabled = 0;
+    session->enabled = RT_FALSE;
     /* free to remove the trace point */
-    session->unregistered = 1;
+    session->unregistered = RT_TRUE;
     /* cache flush smp, mb */
     rt_hw_dmb();
 
@@ -263,28 +269,46 @@ int ftrace_session_unregister(ftrace_session_t session)
 rt_notrace
 rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
-    rt_err_t stat = 0;
+    rt_err_t stat = FTE_NOTRACE_EXIT;
     if (session)
     {
         if (session->enabled)
         {
+            /* Recursion detector */
+            // rt_thread_t tcb = rt_thread_self_sync();
+            // uint32_t stacked_trace = 0;
+            // if (!atomic_compare_exchange_strong(&((ftrace_host_data_t)tcb->ftrace_host_session)->stacked_trace, &stacked_trace, 0))
+            //     return 0;
+            #define DEBUG
+            #ifdef DEBUG
+                if (FTRACE_PC_TO_SYM(pc) < (void *)rt_free)
+                    return 0;
+            #endif
+
             /* handling entry */
+            int retval;
             ftrace_tracer_t tracer;
             rt_list_for_each_entry(tracer, &session->entry_tracers, node)
             {
-                int retval;
                 retval = tracer->on_entry(tracer, pc, ret_addr, context);
-                if (retval)
+                if (retval != RT_EOK)
                     break;
             }
 
             /* handling around */
             /* handling exit */
-            if (rt_list_len(&session->exit_tracers) > 0)
+            if (retval == RT_EOK)
             {
-                ftrace_arch_push_context(session, pc, ret_addr, context);
-                stat = FTE_OVERRIDE_EXIT;
+                if (rt_list_len(&session->exit_tracers) > 0)
+                {
+                    stat = ftrace_arch_push_context(session, pc, ret_addr, context);
+                    if (!stat)
+                        stat = FTE_OVERRIDE_EXIT;
+                    else
+                        stat = FTE_NOTRACE_EXIT;
+                }
             }
+            // atomic_store(&((ftrace_host_data_t)tcb->ftrace_host_session)->stacked_trace, 0);
         }
         else if (session->unregistered)
         {
@@ -324,12 +348,11 @@ int ftrace_trace_host_setup(rt_thread_t host)
         err = ftrace_vice_stack_init(data);
         RT_ASSERT(err == 0);
 
-        data->stacked_trace = 0;
+        atomic_store(&data->stacked_trace, 0);
+        atomic_store(&data->trace_recorded, 0);
+        data->arch_ctx_level = 0;
         host->ftrace_host_session = data;
     }
-    // atomic_store_explicit(&host->stacked_trace, 0, memory_order_relaxed);
-    // atomic_store_explicit(&host->stacked_exit, 0, memory_order_relaxed);
-    // atomic_store_explicit(&host->trace_recorded, 0, memory_order_relaxed);
     return err;
 }
 

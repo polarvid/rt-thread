@@ -13,7 +13,7 @@
 #define REGSZ           (8)
 #define OFFTO(idx)      ((idx) * REGSZ)
 
-.local _trace_exit
+.global _trace_exit
 _trace_exit:
     mv      TRACE_SP, sp
 
@@ -40,6 +40,7 @@ _dummy_mcount:
 .global mcount
 /* name convention following gprof */
 mcount:
+    // j       _dummy_mcount
     /**
      * Fake a call frame for trace point.
      * Because the call is made apparently so that caller cannot notice,

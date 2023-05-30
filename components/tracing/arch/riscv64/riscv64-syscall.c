@@ -48,15 +48,11 @@ rt_inline void _log_param(struct rt_hw_stack_frame *frame, const char **types, c
 rt_notrace
 rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    rt_thread_t tcb = rt_thread_self();
+    rt_thread_t tcb = rt_thread_self_sync();
     struct rt_hw_stack_frame *frame = (void *)context->args[0];
     long syscall = frame->a7;
     const char **types;
     const char **names;
-
-    /* filter out massive futex ops */
-    if (syscall == 131 || syscall == 132)
-        return 0;
 
     const int param_cnt = lwp_get_syscall_param_list(syscall, &types, &names);
     rt_spin_lock(&print_lock);
@@ -96,7 +92,7 @@ rt_notrace
 void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context)
 {
     long syscall = ftrace_vice_stack_pop_word(context);
-    rt_thread_t tcb = rt_thread_self();
+    rt_thread_t tcb = rt_thread_self_sync();
     struct ftrace_context *ctx = context;
     rt_ubase_t retval = ctx->args[0];
 

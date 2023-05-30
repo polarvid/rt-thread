@@ -420,7 +420,7 @@ static int _pthread_mutex_destroy(void *umutex)
 
 #include <syscall_generic.h>
 
-sysret_t sys_pmutex(void *umutex, int op, void *arg)
+sysret_t lwp_pmutex(void *umutex, int op, void *arg)
 {
     int ret = -EINVAL;
 

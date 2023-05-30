@@ -8,11 +8,11 @@
  * 2023-03-20     WangXiaoyao  the first version
  */
 
+#include "rtdef.h"
 #define DBG_TAG "tracing.ftrace.device"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
-#include "ftrace.h"
 #include "ftrace-device.h"
 #include "ftrace-graph.h"
 
@@ -25,8 +25,7 @@
 
 struct fgraph_session {
     ftrace_tracer_t tracer;
-    ftrace_consumer_session_t func_evt[RT_CPUS_NR];
-    ftrace_consumer_session_t thread_evt[RT_CPUS_NR];
+    struct ftrace_device_fgraph_cons_session cons_session[RT_CPUS_NR];
 };
 
 typedef struct ftrace_dev_session {
@@ -44,36 +43,6 @@ typedef struct ftrace_dev_session {
 static struct ftrace_dev_session _dev_session;
 
 static struct rt_device ftrace_dev;
-
-static int ftrace_mmap(struct dfs_mmap2_args *mmap)
-{
-    rt_varea_t varea;
-    struct rt_lwp *lwp = lwp_self();
-
-    /* create a va area in user space (lwp) */
-    varea = lwp_map_user_varea(lwp, mmap->addr, mmap->length);
-    if (varea)
-    {
-        /* alloc a page frame for the area */
-        void *page = rt_pages_alloc(0);
-        strncpy(page, "ftrace sample message", 128);
-
-        /* map the page frame to user */
-        rt_varea_map_page(varea, varea->start, page);
-
-        /* let varea free the page automatically on unmap */
-        rt_varea_pgmgr_insert(varea, page);
-
-        mmap->ret = varea->start;
-    }
-    else
-    {
-        LOG_W("%s(va:%p, sz:%lx): failed to create varea in user space",
-            __func__, mmap->addr, mmap->length);
-    }
-
-    return RT_EOK;
-}
 
 rt_err_t ftrace_init(rt_device_t dev)
 {
@@ -105,8 +74,8 @@ static void _cleanup_fgraph_tracer(ftrace_dev_session_t session)
     /* delete all consumer */
     for (size_t i = 0; i < RT_CPUS_NR; i++)
     {
-        ftrace_graph_delete_cons_session(fgraph, session->fgraph.func_evt[i]);
-        ftrace_graph_delete_cons_session(fgraph, session->fgraph.thread_evt[i]);
+        ftrace_graph_delete_cons_session(fgraph, session->fgraph.cons_session[i].func_evt);
+        ftrace_graph_delete_cons_session(fgraph, session->fgraph.cons_session[i].thread_evt);
     }
 
     /* delete tracer */
@@ -149,17 +118,17 @@ static rt_ssize_t _setup_fgraph_tracer(ftrace_dev_session_t session, ftrace_devi
                     ftrace_graph_delete_cons_session(fgraph, thread_evt);
 
                 i--;
-                func_evt = session->fgraph.func_evt[i];
-                session->fgraph.func_evt[i] = 0;
-                thread_evt = session->fgraph.thread_evt[i];
-                session->fgraph.thread_evt[i] = 0;
+                func_evt = session->fgraph.cons_session[i].func_evt;
+                session->fgraph.cons_session[i].func_evt = 0;
+                thread_evt = session->fgraph.cons_session[i].thread_evt;
+                session->fgraph.cons_session[i].thread_evt = 0;
             } while (i >= 0 && (func_evt || thread_evt));
             retval = -ENOMEM;
             break;
         }
 
-        session->fgraph.thread_evt[i] = thread_evt;
-        session->fgraph.func_evt[i] = func_evt;
+        session->fgraph.cons_session[i].thread_evt = (void *)thread_evt;
+        session->fgraph.cons_session[i].func_evt = (void *)func_evt;
     }
     
     if (retval > 0)
@@ -168,6 +137,40 @@ static rt_ssize_t _setup_fgraph_tracer(ftrace_dev_session_t session, ftrace_devi
         LOG_W("FTrace session setup failed, return code %ld", retval);
 
     return retval;
+}
+
+static int _fgraph_tracer_mmap(ftrace_dev_session_t session, struct dfs_mmap2_args *mmap)
+{
+    int rc;
+    rt_varea_t varea;
+    struct rt_lwp *lwp = lwp_self();
+    /* find the corresponding consumer stream */
+
+    /* create a va area in user space (lwp) */
+    varea = lwp_map_user_varea(lwp, mmap->addr, mmap->length);
+
+    if (varea)
+    {
+        /* alloc a page frame for the area */
+        void *page = rt_pages_alloc(0);
+        strncpy(page, "ftrace sample message", 128);
+
+        /* map the page frame to user */
+        rc = rt_varea_map_page(varea, varea->start, page);
+
+        /* let varea free the page automatically on unmap */
+        rt_varea_pgmgr_insert(varea, page);
+
+        mmap->ret = varea->start;
+    }
+    else
+    {
+        rc = -RT_ENOMEM;
+        LOG_W("%s(va:%p, sz:%lx): failed to create varea in user space",
+            __func__, mmap->addr, mmap->length);
+    }
+
+    return rc;
 }
 
 #define FUNC_STR            1
@@ -196,17 +199,17 @@ static rt_ssize_t _fgraph_tracer_read(ftrace_dev_session_t session, rt_off_t pos
         pos += sizeof(rt_base_t);
     }
 
-    while (POS2IDX(pos, FUNC_STR) < RT_CPUS_NR && buffer != bufend)
-    {
-        *buffer++ = (rt_base_t)session->fgraph.func_evt[POS2IDX(pos, FUNC_STR)];
-        pos += sizeof(rt_base_t);
-    }
+    // while (POS2IDX(pos, FUNC_STR) < RT_CPUS_NR && buffer != bufend)
+    // {
+    //     *buffer++ = (rt_base_t)session->fgraph.func_evt[POS2IDX(pos, FUNC_STR)];
+    //     pos += sizeof(rt_base_t);
+    // }
 
-    while (size && POS2IDX(pos, THREAD_STR) < RT_CPUS_NR)
-    {
-        *buffer++ = (rt_base_t)session->fgraph.thread_evt[POS2IDX(pos, THREAD_STR)];
-        pos += sizeof(rt_base_t);
-    }
+    // while (size && POS2IDX(pos, THREAD_STR) < RT_CPUS_NR)
+    // {
+    //     *buffer++ = (rt_base_t)session->fgraph.thread_evt[POS2IDX(pos, THREAD_STR)];
+    //     pos += sizeof(rt_base_t);
+    // }
 
     return rc;
 }
@@ -300,17 +303,49 @@ static rt_ssize_t ftrace_write(rt_device_t dev, rt_off_t pos, const void *buffer
     return rc;
 }
 
+static int ftrace_mmap(rt_device_t dev, struct dfs_mmap2_args *mmap)
+{
+    int rc;
+    ftrace_dev_session_t session = dev->user_data;
+
+    /* filter out invalid argument */
+    if (!mmap->length || (mmap->length & ARCH_PAGE_MASK))
+        return -EINVAL;
+
+    switch (session->event_generator_class)
+    {
+        // case FTRACE_EVT_CLZ_FUNCTION:
+        //     session->event_generator_class = control->event_class;
+        //     rc = _setup_function_tracer(session, control);
+        //     break;
+        case FTRACE_EVT_CLZ_FGRAPH:
+            rc = _fgraph_tracer_mmap(session, mmap);
+            break;
+        default:
+            rc = -ENOSYS;
+    }
+
+    return rc;
+}
+
 static rt_err_t ftrace_control(rt_device_t dev, int cmd, void *args)
 {
     rt_err_t err;
+    ftrace_dev_session_t session = dev->user_data;
 
     switch (cmd)
     {
         case RT_FIOMMAP2:
-            err = ftrace_mmap((struct dfs_mmap2_args *)args);
+            err = ftrace_mmap(dev, (struct dfs_mmap2_args *)args);
+            break;
+        case FTRACE_DEV_IOCTL_REG:
+            ftrace_session_register(&session->session);
+            break;
+        case FTRACE_DEV_IOCTL_UNREG:
+            ftrace_session_unregister(&session->session);
             break;
         default:
-            err = -RT_ENOSYS;
+            err = -ENOSYS;
     }
     return err;
 }

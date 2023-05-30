@@ -25,4 +25,23 @@ typedef struct ftrace_device_control {
     unsigned int override:1;
 } *ftrace_device_control_t;
 
+struct ftrace_consumer_session;
+
+struct ftrace_device_fgraph_cons_session {
+    struct ftrace_consumer_session *func_evt;
+    struct ftrace_consumer_session *thread_evt;
+};
+
+#define EVENT_TYPE_FUNCTION 0
+#define EVENT_TYPE_THREAD   1
+
+#define FTRACE_DEV_FGRAPH_CONS_SESSION_OFF(cpuid,event_type)   \
+    (((cpuid) * sizeof(struct ftrace_device_fgraph_cons_session) / sizeof(struct ftrace_consumer_session *))   \
+        + event_type)
+
+#define _FTRACE_DEV_IOCTL_UNREG_MAGIC 0xabba0000
+#define _FTRACE_DEV(num)        (_FTRACE_DEV_IOCTL_UNREG_MAGIC | num)
+#define FTRACE_DEV_IOCTL_UNREG  _FTRACE_DEV(0)
+#define FTRACE_DEV_IOCTL_REG    _FTRACE_DEV(1)
+
 #endif /* __FTRACE_DEVICE_H__ */

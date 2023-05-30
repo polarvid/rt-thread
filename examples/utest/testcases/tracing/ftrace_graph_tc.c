@@ -116,21 +116,7 @@ static struct rt_semaphore subthread_exit_cnt;
 static struct rt_thread thread_consumer_thread;
 static struct rt_thread func_consumer_thread;
 
-static void _thread_consumer(void *param)
-{
-    ftrace_consumer_session_t events;
-    long consumed;
-    events = param;
-    consumed = ftrace_consumer_session_refresh(events, 10000);
-    uassert_true(consumed > 0);
-
-    LOG_I("consumed %ld: thread %s, tid %p", consumed,
-        ((ftrace_thread_evt_t)events->buffer)->name,
-        ((ftrace_thread_evt_t)events->buffer)->tid);
-    rt_sem_release(&subthread_exit_cnt);
-    return ;
-}
-
+/* thread event consumer thread entry */
 static void thread_consumer(void *param)
 {
     ftrace_consumer_session_t events;
@@ -139,6 +125,7 @@ static void thread_consumer(void *param)
     consumed = ftrace_consumer_session_refresh(events, 10000);
     uassert_true(consumed > 0);
 
+    ((ftrace_thread_evt_t)events->buffer)->name[7] = 0;
     LOG_I("consumed %ld: thread %s, tid %p", consumed,
         ((ftrace_thread_evt_t)events->buffer)->name,
         ((ftrace_thread_evt_t)events->buffer)->tid);
@@ -146,6 +133,7 @@ static void thread_consumer(void *param)
     return ;
 }
 
+/* function call graph event consumer thread entry */
 static void func_consumer(void *param)
 {
     ftrace_consumer_session_t events;
@@ -160,6 +148,7 @@ static void func_consumer(void *param)
         total_consumed += consumed;
     } while (consumed == events->ring->objs_per_buf);
 
+    LOG_I("%lx event consumed", total_consumed);
     uassert_true(total_consumed == testtimes);
     LOG_I("Dumping part of events: (%p, %p, 0x%lx, 0x%lx)",
         ((ftrace_graph_evt_t)events->buffer)->entry_address,
@@ -185,7 +174,7 @@ static void _tester(ftrace_session_t session)
     thread_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
     uassert_true(!!thread_stk);
     retval = rt_thread_init(&thread_consumer_thread,
-                            "fgraph_thread_consumer",
+                            "thread_consumer_thread",
                             &thread_consumer,
                             (void *)custom->thread_evt,
                             thread_stk,
@@ -193,13 +182,14 @@ static void _tester(ftrace_session_t session)
                             20,
                             100);
     uassert_true(retval == RT_EOK);
+    uassert_true(rt_object_get_type(&thread_consumer_thread.parent) == RT_Object_Class_Thread);
     retval = rt_thread_startup(&thread_consumer_thread);
     uassert_true(retval == RT_EOK);
     /* --> function-consumer thread startup */
     func_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
     uassert_true(!!func_stk);
     retval = rt_thread_init(&func_consumer_thread,
-                            "fgraph_func_consumer",
+                            "func_consumer_thread",
                             &func_consumer,
                             (void *)custom->func_evt,
                             func_stk,
@@ -207,6 +197,7 @@ static void _tester(ftrace_session_t session)
                             20,
                             100);
     uassert_true(retval == RT_EOK);
+    uassert_true(rt_object_get_type(&func_consumer_thread.parent) == RT_Object_Class_Thread);
     retval = rt_thread_startup(&func_consumer_thread);
     uassert_true(retval == RT_EOK);
 
@@ -227,10 +218,6 @@ static void _tester(ftrace_session_t session)
     retval = rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
     uassert_true(retval == RT_EOK);
 
-    retval = rt_thread_detach(&thread_consumer_thread);
-    uassert_true(retval == RT_EOK);
-    retval = rt_thread_detach(&func_consumer_thread);
-    uassert_true(retval == RT_EOK);
     retval = rt_sem_detach(&subthread_exit_cnt);
     uassert_true(retval == RT_EOK);
 }
@@ -297,6 +284,9 @@ static rt_err_t utest_tc_cleanup(void)
 
 static void testcase(void)
 {
+    /**
+     * @brief API functionality test
+     */
     UTEST_UNIT_RUN(_test_api);
 }
 UTEST_TC_EXPORT(testcase, "testcases.tracing.ftrace.graph", utest_tc_init, utest_tc_cleanup, 20);

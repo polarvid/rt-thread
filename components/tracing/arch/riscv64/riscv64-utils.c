@@ -8,12 +8,12 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 
-#include "ftrace.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 #include "../../internal.h"
+#include "ksymtbl.h"
 #include <opcode.h>
 #include <rtdef.h>
 #include <rthw.h>
@@ -221,20 +221,129 @@ ftrace_session_t ftrace_arch_get_session(void *entry)
     return (void *)session;
 }
 
+#if 0
 rt_notrace
-void ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    ftrace_vice_stack_push_word(context, pc);
-    ftrace_vice_stack_push_word(context, ret_addr);
-    ftrace_vice_stack_push_word(context, context->args[0]);
-    ftrace_vice_stack_push_word(context, (rt_ubase_t)session);
+    rt_err_t rc;
+    rc = ftrace_vice_stack_push_word(context, ret_addr);
+    return rc;
 }
 
 rt_notrace
-void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context)
+void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
 {
-    *session = (ftrace_session_t)ftrace_vice_stack_pop_word(context);
-    context->args[2] = ftrace_vice_stack_pop_word(context);
-    *ret_addr = ftrace_vice_stack_pop_word(context);
-    *pc = ftrace_vice_stack_pop_word(context);
+    *pret_addr = ftrace_vice_stack_pop_word(context);
 }
+#else
+
+#ifndef DEBUG
+// #define DEBUG
+#endif
+
+#define CHECKSUM
+
+rt_notrace
+rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+{
+    rt_ubase_t implicit_retval = context->args[0];  /* RISC-V ABI */
+#ifdef DEBUG
+    /* event format print */
+    int enable = session->enable;
+    session->enabled = 0;
+
+    int height = ((ftrace_host_data_t)rt_thread_self_sync()->ftrace_host_session)->vice_sp;
+
+    char symbol_name[32];
+    symbol_name[0] = 0;
+    // ksymtbl_find_by_address((void *)pc, 0, symbol_name, sizeof(symbol_name), 0, 0);
+    // rt_kprintf("push [height %d] [thread %s] [pc 0x%x:%s]", height, rt_thread_self_sync()->parent.name, pc, symbol_name);
+    // ksymtbl_find_by_address((void *)ret_addr, 0, symbol_name, sizeof(symbol_name), 0, 0);
+    // rt_kprintf(" [sp 0x%x] [ret_addr 0x%x:%s]\n", context->args[FTRACE_REG_SP], ret_addr, symbol_name);
+    static long count = 64 * 1024;
+    count --;
+    if (count < 0)
+        rt_kprintf("push [height %d] [thread %s] [pc 0x%x] [sp 0x%lx] [ret_addr 0x%x]\n", height, rt_thread_self_sync()->parent.name, pc, context->args[FTRACE_REG_SP], ret_addr);
+
+    session->enabled = enable;
+#endif /* DEBUG */
+
+#ifdef CHECKSUM
+    /* the push counter */
+    rt_ubase_t sp = context->args[FTRACE_REG_SP];
+    /* checksum */
+    rt_ubase_t check = pc + ret_addr + implicit_retval + (rt_ubase_t)session;
+    sp &= 0xffffffff;
+    sp |= check << 32;
+#endif /* CHECKSUM */
+
+    int push_counter = 0;
+    rt_ubase_t values_to_push[] = {pc, ret_addr, implicit_retval, (rt_ubase_t)session};
+    int num_values = sizeof(values_to_push) / sizeof(values_to_push[0]);
+
+    for (int i = 0; i < num_values; i++)
+    {
+        if (ftrace_vice_stack_push_word(context, values_to_push[i]) != 0)
+        {
+            for (int j = 0; j < push_counter; j++)
+            {
+                ftrace_vice_stack_pop_word(context);
+            }
+            return -RT_ERROR;
+        }
+        push_counter++;
+    }
+
+#ifdef CHECKSUM
+    ftrace_vice_stack_push_word(context, sp);
+#endif /* DEBUG */
+
+    return RT_EOK;
+}
+
+rt_notrace
+void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
+{
+    ftrace_session_t session;
+    rt_ubase_t ret_addr, pc;
+
+#ifdef CHECKSUM
+    rt_ubase_t sp = ftrace_vice_stack_pop_word(context);
+
+    rt_ubase_t old_check = sp >> 32;
+    sp &= 0xffffffff;
+    if (sp != context->args[FTRACE_REG_SP])
+    {
+        session->enabled = 0;
+        dbg_log(DBG_ERROR, "%s: invalid sp\n", __func__);
+        while (1) ;
+    }
+#endif
+
+    *psession = session = (ftrace_session_t)ftrace_vice_stack_pop_word(context);
+    /* 0 and 1 for explicit return value, 2 for implicit return value by reference */
+    context->args[2] = ftrace_vice_stack_pop_word(context);
+    *pret_addr = ret_addr = ftrace_vice_stack_pop_word(context);
+    *ppc = pc = ftrace_vice_stack_pop_word(context);
+
+#ifdef CHECKSUM
+    /* checksum */
+    int enable = session->enabled;
+    session->enabled = 0;
+
+    rt_ubase_t check = (rt_ubase_t)session + context->args[2] + ret_addr + pc;
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    if ((check & 0xffffffff) != old_check)
+    {
+        int height = ((ftrace_host_data_t)rt_thread_self_sync()->ftrace_host_session)->vice_sp;
+        rt_kprintf("pop [height %d] [thread %s] [pc 0x%lx] [sp 0x%lx] [ret_addr 0x%lx]\n", height, rt_thread_self_sync()->parent.name, pc, sp, ret_addr);
+        rt_kprintf("session 0x%lx, a2 0x%lx, ret_addr 0x%lx, pc 0x%lx\n", (rt_ubase_t)session, context->args[2], ret_addr, pc);
+        dbg_log(DBG_ERROR, "%s: vice-stack data corruption detected\n", __func__);
+        while (1) ;
+    }
+    rt_hw_interrupt_enable(level);
+    session->enabled = enable;
+#endif /* CHECKSUM */
+}
+
+#endif/* one by one */

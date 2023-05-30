@@ -56,7 +56,7 @@ static void _test_buffer(void *buf)
 
 static void _test_ringbuf(void)
 {
-    rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
+    rt_thread_control(rt_thread_self_sync(), RT_THREAD_CTRL_BIND_CPU, (void *)0);
     const size_t cpuid = rt_hw_cpu_id();
 
     ftrace_evt_ring_t ring = event_ring_create(XCPU(0x8000), sizeof(rt_ubase_t), 4096);
@@ -94,7 +94,7 @@ static void _test_ringbuf(void)
     rt_pages_free(*event_ring_buffer_loc(ring, ring->rings[cpuid].prod_head, cpuid), 0);
 
     event_ring_delete(ring);
-    rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)RT_CPUS_NR);
+    rt_thread_control(rt_thread_self_sync(), RT_THREAD_CTRL_BIND_CPU, (void *)RT_CPUS_NR);
     return ;
 }
 MSH_CMD_EXPORT_ALIAS(_test_ringbuf, ringbuf_test, test ftrace feature);

@@ -324,6 +324,11 @@ SYSCALL_DEFINE(exit, int, value)
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
 
+    void _fgraph_stop(void);
+    extern pid_t trace_pid;
+    if (lwp->pid == trace_pid)
+        _fgraph_stop();
+
     level = rt_hw_interrupt_disable();
 #ifdef ARCH_MM_MMU
     if (tid->clear_child_tid)
@@ -4820,6 +4825,13 @@ sysret_t sys_fstatfs64(int fd, size_t sz, struct statfs *buf)
     return ret;
 }
 
+#include "lwp_pmutex.h"
+
+SYSCALL_DEFINE(pmutex, void *, umutex, int, op, void *, arg)
+{
+    return lwp_pmutex(umutex, op, arg);
+}
+
 const static struct rt_syscall_def func_table[] =
 {
     SYSCALL_SIGN_EXT(sys_exit),            /* 01 */
@@ -4992,7 +5004,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_clock_getres),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_clone)),           /* 130 */
     SYSCALL_USPACE(SYSCALL_SIGN(sys_futex)),
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_pmutex)),
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_pmutex)),
     SYSCALL_SIGN(sys_dup),
     SYSCALL_SIGN(sys_dup2),
     SYSCALL_SIGN(sys_rename),         /* 135 */
@@ -5038,6 +5050,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_openat),                           /* 175 */
 };
 
+rt_notrace
 const void *lwp_get_sys_api(rt_uint32_t number)
 {
     const void *func = (const void *)NULL;

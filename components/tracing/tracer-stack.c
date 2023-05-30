@@ -8,9 +8,6 @@
  * 2023-05-01     WangXiaoyao  standalone vice stack for tracer
  */
 
-/** TODO make it round back by using index to reference */
-
-#include "rtdef.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
@@ -19,39 +16,73 @@
 
 #include <page.h>
 
+/* TODO: Handle the case of stack overflow by applying the technique of hight detection */
+/**
+ * This is error prone and should be taken care of.
+ * Interruptable, and only processed parallel on interrupt
+ */
+
 rt_notrace
-void ftrace_vice_stack_push_word(ftrace_context_t context, rt_base_t word)
+rt_err_t ftrace_vice_stack_push_word(ftrace_context_t context, rt_base_t word)
 {
+    size_t sp;
+    int success;
+    rt_err_t rc;
     rt_thread_t thread;
-    thread = rt_thread_self();
+
+    thread = rt_thread_self_sync();
     if (thread)
     {
         ftrace_host_data_t data = thread->ftrace_host_session;
         if (data)
         {
-            size_t sp = atomic_fetch_add(&data->vice_sp, -1) - 1;
-            sp &= data->vice_stack_size - 1;
-            data->vice_stack[sp] = word;
+            do
+            {
+                size_t old_sp = atomic_load(&data->vice_sp);
+                sp = old_sp - 1;
+                if (sp >= 0)
+                    success = atomic_compare_exchange_weak(&data->vice_sp, &old_sp, sp);
+                else
+                    break;
+            } while (!success);
+
+            if (success)
+            {
+                sp &= data->vice_stack_size - 1;
+                data->vice_stack[sp] = word;
+                rc = RT_EOK;
+            }
+            else
+                rc = -RT_ENOSPC;
         }
         else
         {
-            LOG_W("%s: Not data found", __func__);
+            rc = -RT_ENOENT;
         }
     }
+
+    return rc;
 }
 
 rt_notrace
 rt_base_t ftrace_vice_stack_pop_word(ftrace_context_t context)
 {
+    size_t sp;
     rt_thread_t thread;
-    thread = rt_thread_self();
-    rt_base_t word = -1;
+    ftrace_host_data_t data;
+    rt_base_t word;
+
+    thread = rt_thread_self_sync();
     if (thread)
     {
-        ftrace_host_data_t data = thread->ftrace_host_session;
+        data = thread->ftrace_host_session;
         if (data)
         {
-            size_t sp = atomic_fetch_add(&data->vice_sp, 1);
+            sp = atomic_fetch_add(&data->vice_sp, 1);
+
+            /* debug */
+            if (sp >= data->vice_stack_size)
+                while (1) ;
             sp &= data->vice_stack_size - 1;
             word = data->vice_stack[sp];
         }

@@ -55,7 +55,7 @@ trap_entry:
 rt_hw_context_switch_interrupt_do:
 
 #ifdef RT_USING_SMART
-//swap to thread kernel stack
+    // swap to thread kernel stack
     csrr t0, sstatus
     andi t0, t0, 0x100
     beqz t0, __restore_sp_from_tcb_interrupt

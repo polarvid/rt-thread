@@ -8,7 +8,7 @@ CPPPATH = [cwd]
 if GetDepend(['UTEST_TRACING_TC']) and GetDepend(['TRACING_KSYMTBL']):
     src += ['tracing_ksymtbl_tc.c']
 if GetDepend(['UTEST_TRACING_TC']) and GetDepend(['TRACING_FTRACE']):
-    src += ['ftrace_tc.c', 'ftrace_function_tc.c', 'ftrace_graph_tc.c']
+    src += ['ftrace_tc.c', 'ftrace_function_tc.c', 'ftrace_graph_tc.c', 'fgraph.c']
 
 group = DefineGroup('utestcases', src, depend = ['RT_USING_UTESTCASES'], CPPPATH = CPPPATH)
 

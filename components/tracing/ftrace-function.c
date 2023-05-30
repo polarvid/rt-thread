@@ -29,7 +29,7 @@
 static rt_notrace
 rt_base_t _ftrace_function_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    rt_thread_t tcb = rt_thread_self();
+    rt_thread_t tcb = rt_thread_self_sync();
 
     time_t timestamp = ftrace_timestamp();
     ftrace_evt_ring_t ring = TRACER_GET_RING(tracer);
@@ -41,13 +41,7 @@ rt_base_t _ftrace_function_handler(ftrace_tracer_t tracer, rt_ubase_t pc, rt_uba
         .timestamp = timestamp
     };
 
-    // unsigned int *stacked_trace = &((ftrace_host_data_t)tcb->ftrace_host_session)->stacked_trace;
-    // if (*stacked_trace)
-    //     return -1;
-    // else
-    //     *stacked_trace += 1;
     event_ring_enqueue(ring, &event, TRACER_GET_OVERRIDE(tracer));
-    // *stacked_trace -= 1;
     return 0;
 }
 

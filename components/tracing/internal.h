@@ -16,19 +16,22 @@
 typedef struct ftrace_host_data {
     rt_ubase_t *vice_stack;
     size_t vice_stack_size;
+    int arch_ctx_level;
     _Atomic(size_t) vice_sp;
-    atomic_uint_fast32_t stacked_trace;
+    atomic_uint stacked_trace;
+    atomic_uint trace_recorded;
 } *ftrace_host_data_t;
 
 /* ftrace entry and its return status */
-#define FTE_OVERRIDE_EXIT 1
+#define FTE_NOTRACE_EXIT    0
+#define FTE_OVERRIDE_EXIT   1
 rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context);
 
 /* architecture specific */
 int ftrace_arch_patch_code(void *entry, rt_bool_t enabled);
 int ftrace_arch_hook_session(void *entry, ftrace_session_t session, rt_bool_t enabled);
 ftrace_session_t ftrace_arch_get_session(void *entry);
-void ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
+rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
 void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context);
 
 /* binary search utils */

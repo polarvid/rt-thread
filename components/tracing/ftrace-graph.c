@@ -38,10 +38,25 @@ rt_base_t _graph_on_entry(
     rt_ubase_t ret_addr,
     ftrace_context_t context)
 {
+    rt_err_t rc;
     rt_ubase_t time = ftrace_timestamp();
-    ftrace_vice_stack_push_word(context, time);
+    rc = ftrace_vice_stack_push_word(context, time);
 
-    return 0;
+    return rc;
+}
+
+rt_inline rt_notrace
+char* _strncpy_notrace(char* dest, const char* src, size_t n) {
+    size_t i;
+    for (i = 0; i < n && src[i] != '\0'; i++)
+    {
+        dest[i] = src[i];
+    }
+    for (; i < n; i++)
+    {
+        dest[i] = '\0';
+    }
+    return dest;
 }
 
 static rt_notrace
@@ -51,15 +66,18 @@ void _graph_on_exit(
     ftrace_context_t context)
 {
     /* thread event */
-    rt_thread_t tcb = rt_thread_self();
+    rt_thread_t tcb = rt_thread_self_sync();
     ftrace_host_data_t host_data = tcb->ftrace_host_session;
-    uint32_t expected = 0;
-    if (atomic_compare_exchange_strong(&host_data->stacked_trace, &expected, 1))
+
+    /* TODO: handling the enqueue if the session is disable */
+
+    unsigned int expected = 0;
+    if (atomic_compare_exchange_strong(&host_data->trace_recorded, &expected, (rt_ubase_t)tracer))
     {
         struct ftrace_thread_evt thread;
         thread.tid = (rt_ubase_t)tcb;
 
-        rt_memcpy(thread.name, tcb->parent.name, sizeof(thread.name));
+        _strncpy_notrace(thread.name, tcb->parent.name, sizeof(thread.name));
 
         ftrace_evt_ring_t thread_ring = TRACER_GET_THREAD_RING(tracer);
         event_ring_enqueue(thread_ring, &thread, TRACER_GET_OVERRIDE(tracer));
@@ -97,7 +115,7 @@ ftrace_tracer_t ftrace_graph_tracer_create(size_t buffer_size, rt_bool_t overrid
 
     thread_ring = event_ring_create(
         RT_CPUS_NR * ARCH_PAGE_SIZE * 2,
-        sizeof(struct ftrace_graph_evt),
+        sizeof(struct ftrace_thread_evt),
         ARCH_PAGE_SIZE);
 
     entry_tracer = rt_malloc(2 * sizeof(*entry_tracer));

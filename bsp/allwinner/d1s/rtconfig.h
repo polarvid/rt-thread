@@ -40,8 +40,10 @@
 
 #define RT_PAGE_MAX_ORDER 11
 #define RT_USING_MEMPOOL
-#define RT_USING_SMALL_MEM
-#define RT_USING_SMALL_MEM_AS_HEAP
+#define RT_USING_MEMHEAP
+#define RT_MEMHEAP_FAST_MODE
+#define RT_USING_MEMHEAP_AS_HEAP
+#define RT_USING_MEMHEAP_AUTO_BINDING
 #define RT_USING_MEMTRACE
 #define RT_USING_HEAP
 
@@ -189,6 +191,7 @@
 
 /* Kernel Testcase */
 
+#define UTEST_MEMHEAP_TC
 
 /* CPP11 Testcase */
 
@@ -201,6 +204,7 @@
 
 /* Memory Management Subsytem Testcase */
 
+#define UTEST_TRACING_TC
 
 /* RT-Thread online packages */
 
