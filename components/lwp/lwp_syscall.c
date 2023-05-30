@@ -324,10 +324,12 @@ SYSCALL_DEFINE(exit, int, value)
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
 
+#ifdef RT_USING_TRACING
     void _fgraph_stop(void);
     extern pid_t trace_pid;
     if (lwp->pid == trace_pid)
         _fgraph_stop();
+#endif /* RT_USING_TRACING */
 
     level = rt_hw_interrupt_disable();
 #ifdef ARCH_MM_MMU

@@ -112,12 +112,6 @@ void rt_hw_context_switch_interrupt(rt_ubase_t from, rt_ubase_t to, rt_thread_t 
 }
 #endif /* end of RT_USING_SMP */
 
-rt_notrace
-rt_thread_t rt_hw_thread_self_sync(void)
-{
-    return rt_current_thread_sync;
-}
-
 /** shutdown CPU */
 void rt_hw_cpu_shutdown()
 {

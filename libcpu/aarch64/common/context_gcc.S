@@ -331,12 +331,19 @@ rt_hw_context_switch:
     SAVE_CONTEXT_FROM_EL1
     MOV    X3, SP
     STR    X3, [X0]            // store sp in preempted tasks TCB
-    LDR    X0, [X1]            // get new task stack pointer
+
+    /* reset the sp */
+    LDR    X0, [X1]
     MOV    SP, X0
-    MOV    X0, X2
+
+    /* set current thread sync */
+    MOV    X19, X2
+    MOV    X0, X19
+    BL     rt_thread_self_sync_set
+    MOV    X0, X19
     BL     rt_cpus_lock_status_restore
 #ifdef RT_USING_LWP
-    BL     rt_thread_self
+    MOV    X0, X19
     BL     lwp_user_setting_restore
 #endif
     B      rt_hw_context_switch_exit

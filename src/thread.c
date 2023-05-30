@@ -350,7 +350,6 @@ RTM_EXPORT(rt_thread_init);
  *
  * @return  The self thread object.
  */
-rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP
@@ -368,6 +367,44 @@ rt_thread_t rt_thread_self(void)
 #endif /* RT_USING_SMP */
 }
 RTM_EXPORT(rt_thread_self);
+
+/**
+ * @brief   This function will return self thread object sync with sp.
+ *
+ * @return  The self thread object.
+ */
+rt_notrace
+rt_thread_t rt_thread_self_sync(void)
+{
+#ifdef RT_USING_SMP
+    rt_base_t lock;
+    rt_thread_t self;
+
+    lock = rt_hw_local_irq_disable();
+    self = rt_cpu_self()->current_thread_sync;
+    rt_hw_local_irq_enable(lock);
+    return self;
+#else
+    extern rt_thread_t rt_current_thread_sync;
+
+    return rt_current_thread_sync;
+#endif /* RT_USING_SMP */
+}
+RTM_EXPORT(rt_thread_self);
+
+/**
+ * @brief Must be called in interrupt disable context
+ * 
+ * @param thread 
+ */
+void rt_thread_self_sync_set(rt_thread_t thread)
+{
+#ifdef RT_USING_SMP
+    rt_cpu_self()->current_thread_sync = thread;
+#else
+    rt_current_thread_sync = thread;
+#endif /* RT_USING_SMP */
+}
 
 /**
  * @brief   This function will start a thread and put it to system ready queue.
