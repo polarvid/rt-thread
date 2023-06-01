@@ -30,11 +30,13 @@
 
 .local _trace_exit
 _trace_exit:
+    mov     TRACE_SP, sp
     sub     sp, sp, FTRACE_REG_CNT * REGSZ
     stp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
     stp     x2, x3, [sp, #OFFTO(FTRACE_REG_X2)]
     stp     x4, x5, [sp, #OFFTO(FTRACE_REG_X4)]
     stp     x6, x7, [sp, #OFFTO(FTRACE_REG_X6)]
+    stp     TRACE_SP, xzr, [sp, #OFFTO(FTRACE_REG_SP)]
 
     /* restore session of caller */
     mov     x0, sp

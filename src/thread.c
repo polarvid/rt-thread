@@ -350,6 +350,7 @@ RTM_EXPORT(rt_thread_init);
  *
  * @return  The self thread object.
  */
+rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP
@@ -376,21 +377,25 @@ RTM_EXPORT(rt_thread_self);
 rt_notrace
 rt_thread_t rt_thread_self_sync(void)
 {
-#ifdef RT_USING_SMP
-    rt_base_t lock;
     rt_thread_t self;
-
-    lock = rt_hw_local_irq_disable();
-    self = rt_cpu_self()->current_thread_sync;
-    rt_hw_local_irq_enable(lock);
-    return self;
+#ifdef RT_USING_SMP
+    self = rt_thread_self();
 #else
     extern rt_thread_t rt_current_thread_sync;
 
-    return rt_current_thread_sync;
+    self = rt_current_thread_sync;
 #endif /* RT_USING_SMP */
+
+    /* compare sp */
+    rt_ubase_t self_sp = (rt_ubase_t)__builtin_frame_address(0);
+    if (self_sp < (rt_ubase_t)self->stack_addr || self_sp > (rt_ubase_t)self->stack_addr + self->stack_size)
+    {
+        /* If scheduler not working proper, or sp overflow */
+        while (1) ;
+    }
+    return self;
 }
-RTM_EXPORT(rt_thread_self);
+RTM_EXPORT(rt_thread_self_sync);
 
 /**
  * @brief Must be called in interrupt disable context
@@ -399,9 +404,7 @@ RTM_EXPORT(rt_thread_self);
  */
 void rt_thread_self_sync_set(rt_thread_t thread)
 {
-#ifdef RT_USING_SMP
-    rt_cpu_self()->current_thread_sync = thread;
-#else
+#ifndef RT_USING_SMP
     rt_current_thread_sync = thread;
 #endif /* RT_USING_SMP */
 }

@@ -339,8 +339,6 @@ rt_hw_context_switch:
     /* set current thread sync */
     MOV    X19, X2
     MOV    X0, X19
-    BL     rt_thread_self_sync_set
-    MOV    X0, X19
     BL     rt_cpus_lock_status_restore
 #ifdef RT_USING_LWP
     MOV    X0, X19

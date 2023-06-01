@@ -172,15 +172,14 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
 {
     test_session_t custom = rt_container_of(session, struct test_session, session);
     const size_t stack_size = 0x2000;
-    rt_err_t retval;
     void *thread_stk, *func_stk;
 
     /* environment setup */
-    retval = rt_sem_init(&subthread_exit_cnt, "subthread_exit_cnt", 0, RT_IPC_FLAG_FIFO);
+    rt_sem_init(&subthread_exit_cnt, "subthread_exit_cnt", 0, RT_IPC_FLAG_FIFO);
 
     /* --> function-consumer thread startup */
     func_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
-    retval = rt_thread_init(&func_consumer_thread,
+    rt_thread_init(&func_consumer_thread,
                             "fgc_func",
                             &func_consumer,
                             (void *)custom->func_evt,
@@ -188,11 +187,11 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
                             stack_size,
                             30,
                             100);
-    retval = rt_thread_startup(&func_consumer_thread);
+    rt_thread_startup(&func_consumer_thread);
 
     /* --> thread-consumer thread startup */
     thread_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
-    retval = rt_thread_init(&thread_consumer_thread,
+    rt_thread_init(&thread_consumer_thread,
                             "fgc_thread",
                             &thread_consumer,
                             (void *)custom->thread_evt,
@@ -200,7 +199,7 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
                             stack_size,
                             30,
                             100);
-    retval = rt_thread_startup(&thread_consumer_thread);
+    rt_thread_startup(&thread_consumer_thread);
 
     /* Testing */
     ftrace_session_register(session);
@@ -208,21 +207,20 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
         _app_test(argc - 1, &argv[1]);
 
     /* --> wait for sub-thread exit */
-    retval = rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
-    retval = rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
+    rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
+    rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
 
     ftrace_session_unregister(session);
     LOG_I("unregistered");
 
     /* environment cleanup */
-    retval = rt_sem_detach(&subthread_exit_cnt);
+    rt_sem_detach(&subthread_exit_cnt);
 }
 
 
 static void _debug_ftrace(int argc, char *argv[])
 {
-    rt_err_t error;
-    error = rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)TEST_CORE);
+    rt_thread_control(rt_thread_self(), RT_THREAD_CTRL_BIND_CPU, (void *)TEST_CORE);
 
     /**
      * @brief The following API are considered:
@@ -236,8 +234,8 @@ static void _debug_ftrace(int argc, char *argv[])
     /* Define the events set */
     // void *notrace[] = {&rt_schedule};
     // size_t notrace_cnt = sizeof(notrace)/sizeof(notrace[0]);
-    // error = ftrace_session_set_except(session, notrace, notrace_cnt);
-    error = ftrace_session_set_except(session, 0, 0);
+    // ftrace_session_set_except(session, notrace, notrace_cnt);
+    ftrace_session_set_except(session, 0, 0);
 
     _tester(session, argc, argv);
 

@@ -40,7 +40,7 @@ rt_base_t _graph_on_entry(
 {
     rt_err_t rc;
     rt_ubase_t time = ftrace_timestamp();
-    rc = ftrace_vice_stack_push_word(context, time);
+    rc = ftrace_vice_stack_push_word(ftrace_trace_host_data_get(), context, time);
 
     return rc;
 }
@@ -84,7 +84,7 @@ void _graph_on_exit(
     }
 
     /* function event */
-    rt_ubase_t entry_time = ftrace_vice_stack_pop_word(context);
+    rt_ubase_t entry_time = ftrace_vice_stack_pop_word(ftrace_trace_host_data_get(), context);
     rt_ubase_t exit_time = ftrace_timestamp();
     ftrace_evt_ring_t func_ring = TRACER_GET_FUNC_RING(tracer);
     struct ftrace_graph_evt event = {

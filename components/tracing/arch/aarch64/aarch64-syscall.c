@@ -111,14 +111,14 @@ rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt
 
     /* some syscall never return */
     if (syscall != 1)
-        ftrace_vice_stack_push_word(context, syscall);
+        ftrace_vice_stack_push_word(ftrace_trace_host_data_get(), context, syscall);
     return 0;
 }
 
 rt_notrace
 void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context)
 {
-    long syscall = ftrace_vice_stack_pop_word(context);
+    long syscall = ftrace_vice_stack_pop_word(ftrace_trace_host_data_get(), context);
     rt_thread_t tcb = rt_thread_self_sync();
     rt_ubase_t retval = context->args[FTRACE_REG_X0];
 

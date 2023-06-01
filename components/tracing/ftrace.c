@@ -238,6 +238,7 @@ int ftrace_session_set_except(ftrace_session_t session, void *notrace[], size_t 
     return 0;
 }
 
+rt_notrace
 int ftrace_session_register(ftrace_session_t session)
 {
     RT_ASSERT(session->enabled == 0);
@@ -249,6 +250,7 @@ int ftrace_session_register(ftrace_session_t session)
     return 0;
 }
 
+rt_notrace
 int ftrace_session_unregister(ftrace_session_t session)
 {
     session->enabled = RT_FALSE;
@@ -274,17 +276,6 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
     {
         if (session->enabled)
         {
-            /* Recursion detector */
-            // rt_thread_t tcb = rt_thread_self_sync();
-            // uint32_t stacked_trace = 0;
-            // if (!atomic_compare_exchange_strong(&((ftrace_host_data_t)tcb->ftrace_host_session)->stacked_trace, &stacked_trace, 0))
-            //     return 0;
-            #define DEBUG
-            #ifdef DEBUG
-                if (FTRACE_PC_TO_SYM(pc) < (void *)rt_free)
-                    return 0;
-            #endif
-
             /* handling entry */
             int retval;
             ftrace_tracer_t tracer;
@@ -308,7 +299,6 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
                         stat = FTE_NOTRACE_EXIT;
                 }
             }
-            // atomic_store(&((ftrace_host_data_t)tcb->ftrace_host_session)->stacked_trace, 0);
         }
         else if (session->unregistered)
         {
@@ -348,9 +338,7 @@ int ftrace_trace_host_setup(rt_thread_t host)
         err = ftrace_vice_stack_init(data);
         RT_ASSERT(err == 0);
 
-        atomic_store(&data->stacked_trace, 0);
         atomic_store(&data->trace_recorded, 0);
-        data->arch_ctx_level = 0;
         host->ftrace_host_session = data;
     }
     return err;

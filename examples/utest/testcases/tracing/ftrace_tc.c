@@ -31,7 +31,7 @@ struct tracee_ret {
 };
 
 static const long magic_numbers[] = {12826212334541059438ul, 15087704365839300601ul, 14339533210297058355ul, 4206045298161606937ul, 7956564612695610633ul, 15047219555744982329ul, 15230866504987122018ul, 14535292288262951240ul};
-static const long pad[1024 * 1024];
+
 static struct tracee_ret _test_tracee(size_t start, ...)
 {
     struct tracee_ret ret;

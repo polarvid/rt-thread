@@ -247,16 +247,19 @@ RTM_EXPORT(rt_cpus_unlock);
  * It will restore the lock state to whatever the thread's counter expects.
  * If target thread not locked the cpus then unlock the cpus lock.
  *
+ * @note This API will reset current thread, hence it's notrace
+ *
  * @param   thread is a pointer to the target thread.
  */
+rt_notrace
 void rt_cpus_lock_status_restore(struct rt_thread *thread)
 {
     struct rt_cpu* pcpu = rt_cpu_self();
+    pcpu->current_thread = thread;
 
 #if defined(ARCH_MM_MMU) && defined(RT_USING_SMART)
     lwp_aspace_switch(thread);
 #endif
-    pcpu->current_thread = thread;
     if (!thread->cpus_lock_nest)
     {
         rt_hw_spin_unlock(&_cpus_lock);
