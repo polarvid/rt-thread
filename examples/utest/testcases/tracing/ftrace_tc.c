@@ -135,13 +135,14 @@ void test_vice_stack(void)
      * @brief Functionality Test
      * stack should return proper value on pop
      */
+    ftrace_host_data_t data = ftrace_trace_host_data_get();
     for (size_t i = 0; i < test_times; i++)
     {
-        ftrace_vice_stack_push_word(0, i);
+        ftrace_vice_stack_push_word(data, 0, i);
     }
     for (long i = test_times - 1; i >= 0; i--)
     {
-        if (ftrace_vice_stack_pop_word(0) != i)
+        if (ftrace_vice_stack_pop_word(data, 0) != i)
         {
             uassert_true(0);
             break;

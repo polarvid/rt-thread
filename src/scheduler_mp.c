@@ -397,6 +397,7 @@ __exit:
  *        it will select one thread with the highest priority level, and then switch
  *        to it.
  */
+// rt_notrace
 void rt_scheduler_do_irq_switch(void *context)
 {
     int cpu_id;

@@ -267,38 +267,70 @@ int ftrace_session_unregister(ftrace_session_t session)
 /* current implementation of enter/exit critical is unreasonable */
 #define stack_prot_threshold    0x2000
 
+rt_notrace
+ftrace_host_data_t ftrace_trace_host_data_get(void)
+{
+    rt_thread_t thread;
+    ftrace_host_data_t data;
+
+    thread = rt_thread_self_sync();
+    if (thread)
+    {
+        data = thread->ftrace_host_session;
+    }
+    else
+    {
+        data = RT_NULL;
+    }
+    return data;
+}
+
 /* generic entry to test if session is ready to handle trace event */
 rt_notrace
 rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
 {
+    rt_err_t error;
+    int has_exit_tracer;
+    ftrace_tracer_t tracer;
+    ftrace_host_data_t data;
     rt_err_t stat = FTE_NOTRACE_EXIT;
+
     if (session)
     {
         if (session->enabled)
         {
+            rt_ubase_t level = rt_hw_local_irq_disable();
+
+            has_exit_tracer = rt_list_len(&session->exit_tracers) > 0;
+            if (has_exit_tracer)
+            {
+                /* verify and recycle the unsolved frame in vice stack if any */
+                data = ftrace_trace_host_data_get();
+                ftrace_vice_stack_verify(data, context);
+            }
+
             /* handling entry */
-            int retval;
-            ftrace_tracer_t tracer;
             rt_list_for_each_entry(tracer, &session->entry_tracers, node)
             {
-                retval = tracer->on_entry(tracer, pc, ret_addr, context);
-                if (retval != RT_EOK)
+                error = tracer->on_entry(tracer, pc, ret_addr, context);
+                if (error != RT_EOK)
                     break;
             }
 
-            /* handling around */
-            /* handling exit */
-            if (retval == RT_EOK)
+            /* prepare for handling exit */
+            if (error == RT_EOK && has_exit_tracer)
             {
-                if (rt_list_len(&session->exit_tracers) > 0)
-                {
-                    stat = ftrace_arch_push_context(session, pc, ret_addr, context);
-                    if (!stat)
-                        stat = FTE_OVERRIDE_EXIT;
-                    else
-                        stat = FTE_NOTRACE_EXIT;
-                }
+                /* record */
+                error = ftrace_arch_push_context(data, session, pc, ret_addr, context);
+                if (!error)
+                    stat = FTE_OVERRIDE_EXIT;
+                else
+                    // TODO: restore stack, clear all pushed words if any
+                    // stat = FTE_NOTRACE_EXIT;
+                    while (1) ;
             }
+
+            rt_hw_local_irq_enable(level);
         }
         else if (session->unregistered)
         {
@@ -315,10 +347,13 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
 rt_notrace
 rt_ubase_t ftrace_trace_exit(void *context)
 {
-    ftrace_session_t session;
     rt_ubase_t pc;
     rt_ubase_t ret_addr;
-    ftrace_arch_pop_context(&session, &pc, &ret_addr, context);
+    ftrace_host_data_t data;
+    ftrace_session_t session;
+
+    data = ftrace_trace_host_data_get();
+    ftrace_arch_pop_context(data, &session, &pc, &ret_addr, context);
 
     ftrace_tracer_t tracer;
     rt_list_for_each_entry(tracer, &session->exit_tracers, node)

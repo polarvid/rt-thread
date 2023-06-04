@@ -1,0 +1,9 @@
+0xffff0000003612f8 tshell
+0xffff0000001da8e0 tidle0
+0xffff00000032dea8 tcpip
+0xffff00000036ec68 getcwd.e
+0 
+0 
+0 
+0 
+0 

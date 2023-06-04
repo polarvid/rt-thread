@@ -14,11 +14,12 @@
 #include <stdatomic.h>
 
 typedef struct ftrace_host_data {
+    /* vice stack context */
     rt_ubase_t *vice_stack;
     size_t vice_stack_size;
-    int arch_ctx_level;
-    _Atomic(size_t) vice_sp;
-    atomic_uint stacked_trace;
+    atomic_uint vice_sp;
+    size_t vice_fp;
+
     atomic_uint trace_recorded;
 } *ftrace_host_data_t;
 
@@ -31,8 +32,13 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
 int ftrace_arch_patch_code(void *entry, rt_bool_t enabled);
 int ftrace_arch_hook_session(void *entry, ftrace_session_t session, rt_bool_t enabled);
 ftrace_session_t ftrace_arch_get_session(void *entry);
-rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
-void ftrace_arch_pop_context(ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context);
+
+/* vice stack */
+rt_err_t ftrace_arch_push_context(ftrace_host_data_t data, ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
+void ftrace_arch_pop_context(ftrace_host_data_t data, ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context);
+rt_err_t ftrace_vice_stack_verify(ftrace_host_data_t data, ftrace_context_t context);
+rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_sp);
+rt_base_t ftrace_vice_stack_pop_frame(ftrace_host_data_t data, rt_ubase_t trace_sp);
 
 /* binary search utils */
 #define GET_SECTION(sec)        ((void *)ksymtbl + ksymtbl->sec)

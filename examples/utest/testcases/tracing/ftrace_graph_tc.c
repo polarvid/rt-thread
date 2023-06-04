@@ -122,7 +122,7 @@ static void thread_consumer(void *param)
     ftrace_consumer_session_t events;
     long consumed;
     events = param;
-    consumed = ftrace_consumer_session_refresh(events, 10000);
+    consumed = ftrace_consumer_session_refresh(events, 20 * 1000);
     uassert_true(consumed > 0);
 
     ((ftrace_thread_evt_t)events->buffer)->name[7] = 0;

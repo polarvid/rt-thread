@@ -20,6 +20,7 @@ class RawFGraphText:
         self.depth = {}
         self.stacked = {}
         self.last_record_time = 0
+        self.current_tid = 0
         pass
 
     def get_stacked(self, tid) -> list:
@@ -28,10 +29,14 @@ class RawFGraphText:
             # If it is not, save 0 in timeline for tid and return 0
             self.stacked[tid] = []
         return self.stacked[tid]
+    
+    def func_name_dict_set(self, func_name_dict:dict):
+        self.func_name_dict = func_name_dict
+        return
 
     def append(self, cpuid, record:Event):
-        entry_record = '0x{tid:x} [{cpuid:03d}] {sec:3d}.{msec:09d}: funcgraph_entry:       func:0x{func:x} depth:{depth}\n'
-        exit_record = '0x{tid:x} [{cpuid:03d}] {sec:3d}.{msec:09d}: funcgraph_exit:        func:0x{func:x} depth:{depth} overrun:{overrun} calltime:0x{entry_time:x} rettime=0x{exit_time:x}\n'
+        entry_record = '{tname}-{tid} [{cpuid:03d}] {sec:3d}.{msec:09d}: funcgraph_entry:       func:0x{func:x} depth:{depth}\n'
+        exit_record = '{tname}-{tid} [{cpuid:03d}] {sec:3d}.{msec:09d}: funcgraph_exit:        func:0x{func:x} depth:{depth} overrun:{overrun} calltime:0x{entry_time:x} rettime=0x{exit_time:x}\n'
         # Simulate the record to stack
 
         # 1. Append the entry record
@@ -52,8 +57,10 @@ class RawFGraphText:
                     exit_sec = outer.exit_time // 1000000000
                     exit_ms = outer.exit_time % 1000000000
 
+                    tname, tid = self.func_name_dict[outer.tid]
                     exit_record_formatted = exit_record.format(
-                        tid = outer.tid,
+                        tid = tid,
+                        tname = tname,
                         cpuid = cpuid,
                         sec = exit_sec,
                         msec = exit_ms,
@@ -74,8 +81,10 @@ class RawFGraphText:
                 break
 
         # 3. Insert the entry record
+        tname, tid = self.func_name_dict[record.tid]
         entry_record_formatted = entry_record.format(
-            tid = record.tid,
+            tid = tid,
+            tname = tname,
             cpuid = cpuid,
             sec = seconds,
             msec = msec,
@@ -83,10 +92,37 @@ class RawFGraphText:
             depth = len(stack))
         fgraph_record = FGraphRecord(entry_time, entry_record_formatted)
         self.records.append(fgraph_record)
-        
+
         # 4. To stack
         stack.append(record)
+        return
 
+""" stack name parser """
+def parse_file_to_dict(file_path):
+    result_dict = {}
+    unique_id = 10
+    with open(file_path, 'r') as file:
+        for line in file:
+            # Split the line by comma to get address and func_name
+            address, func_name = line.strip().split(' ')
+            address = int(address, 16)
+            # Use address as key and store func_name and unique_id as a tuple
+            result_dict[address] = (func_name, unique_id)
+            unique_id += 1
+    return result_dict
+""" file path fetcher """
+def get_file_paths():
+    import sys
+    # Check if the correct number of arguments are provided
+    if len(sys.argv) != 3:
+        print("Usage: python fgraph-parser.py <bin_file_path> <thr_name_file_path>")
+        sys.exit(1)
+
+    # Get the file paths from the command line arguments
+    bin_file_path = sys.argv[1]
+    thr_name_file_path = sys.argv[2]
+
+    return bin_file_path, thr_name_file_path
 
 cpuid = 0
 fgraph = RawFGraphText()
@@ -94,7 +130,7 @@ events = []
 while True:
     try:
         # Open the logging.txt file and read the addresses
-        with open(f'/home/rtthread-smart/kernel/bsp/qemu-virt64-aarch64/logging-{cpuid}.bin', 'rb') as f:
+        with open(f'./logging-{cpuid}.bin', 'rb') as f:
             while True:
                 # Read 32 bytes event
                 event_bytes = f.read(32)
@@ -108,6 +144,9 @@ while True:
         break
     print(f'cpu {cpuid} is done')
     cpuid += 1
+
+func_name_dict = parse_file_to_dict("./func-name-0.txt")
+fgraph.func_name_dict_set(func_name_dict)
 
 events.sort(key=lambda x: x.entry_time)
 for event in events:

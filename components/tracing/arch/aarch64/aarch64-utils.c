@@ -155,71 +155,55 @@ static uint16_t get_checksum(rt_ubase_t *array, int array_size)
     return (uint16_t)checksum;
 }
 
-rt_notrace
-static void panic(const char *func, long line)
-{
-    int panic = 1;
-    rt_hw_interrupt_disable();
-    while (panic);
-}
-
 #define CHECKSUM
 
 rt_notrace
-rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_err_t ftrace_arch_push_context(ftrace_host_data_t data, ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
-    int push_counter = 0;
+    rt_err_t rc;
+    const rt_ubase_t trace_sp = context->args[FTRACE_REG_SP];
     rt_ubase_t values_to_push[] = {pc, ret_addr, (rt_ubase_t)session};
     int num_values = sizeof(values_to_push) / sizeof(values_to_push[0]);
 
-    for (int i = 0; i < num_values; i++)
-    {
-        if (ftrace_vice_stack_push_word(context, values_to_push[i]) != 0)
-        {
-            for (int j = 0; j < push_counter; j++)
-            {
-                ftrace_vice_stack_pop_word(context);
-            }
-            return -RT_ERROR;
-        }
-        push_counter++;
-    }
-
 #ifdef CHECKSUM
-    rt_ubase_t array[] = {pc, ret_addr, (rt_ubase_t)session};
-    rt_ubase_t checksum = get_checksum(array, sizeof(array)/sizeof(array[0]));
+    rt_ubase_t checksum = get_checksum(values_to_push, num_values);
+    rc = ftrace_vice_stack_push_word(data, context, checksum);
+    if (rc)
+        while (1) ;
 
-    rt_ubase_t sp = context->args[FTRACE_REG_SP];
-    sp &= 0x0000ffffffffffff;
-    sp |= checksum << 48;
-    ftrace_vice_stack_push_word(context, sp);
 #endif /* CHECKSUM */
 
-    return RT_EOK;
+    /* save the context that is needed by exit tracer in vice stack */
+    rc = ftrace_vice_stack_push(data, context, values_to_push, num_values);
+    if (!rc)
+        rc = ftrace_vice_stack_push_frame(data, trace_sp);
+    else
+        while (1) ;
+
+    return rc;
 }
 
 rt_notrace
-void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
+void ftrace_arch_pop_context(ftrace_host_data_t data, ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
 {
     ftrace_session_t session;
     rt_ubase_t pc, ret_addr;
-#ifdef CHECKSUM
-    rt_ubase_t sp = ftrace_vice_stack_pop_word(context);
 
-    rt_ubase_t old_check = sp >> 48;
-    sp |= 0xffff000000000000;
-    if (sp != context->args[FTRACE_REG_SP])
-        panic(__func__, __LINE__);
-#endif
+    ftrace_vice_stack_pop_frame(data, context->args[FTRACE_REG_SP]);
 
-    *psession = session = (ftrace_session_t)ftrace_vice_stack_pop_word(context);
-    *pret_addr = ret_addr = ftrace_vice_stack_pop_word(context);
-    *ppc = pc = ftrace_vice_stack_pop_word(context);
+    *psession = session = (ftrace_session_t)ftrace_vice_stack_pop_word(data, context);
+    *pret_addr = ret_addr = ftrace_vice_stack_pop_word(data, context);
+    *ppc = pc = ftrace_vice_stack_pop_word(data, context);
 
 #ifdef CHECKSUM
+    rt_ubase_t old_check = ftrace_vice_stack_pop_word(data, context);
+
     rt_ubase_t array[] = {pc, ret_addr, (rt_ubase_t)session};
     rt_ubase_t checksum = get_checksum(array, sizeof(array)/sizeof(array[0]));
     if (checksum != old_check)
-        panic(__func__, __LINE__);
+    {
+        rt_hw_local_irq_disable();
+        while (1);
+    }
 #endif
 }

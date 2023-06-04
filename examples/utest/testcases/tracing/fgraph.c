@@ -228,7 +228,7 @@ static void _debug_ftrace(int argc, char *argv[])
      * void ftrace_graph_tracer_delete(ftrace_tracer_t tracer);
      */
     ftrace_session_t session;
-    session = _get_custom_session(0);
+    session = _get_custom_session(1);
     trace_session = session;
 
     /* Define the events set */

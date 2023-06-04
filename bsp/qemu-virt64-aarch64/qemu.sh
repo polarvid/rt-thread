@@ -2,13 +2,13 @@ if [ ! -f "sd.bin" ]; then
 dd if=/dev/zero of=sd.bin bs=1024 count=65536
 fi
 
+# -drive if=none,file=fat:rw:/home/rtthread-smart/userapps/root/bin,format=raw,id=blk0 -device virtio-blk-device,drive=blk0,bus=virtio-mmio-bus.0 \
 qemu-system-aarch64 -M virt,gic-version=2 -cpu cortex-a53 -m 128M -smp 4 -kernel rtthread.bin -nographic \
--drive if=none,file=fat:rw:/home/rtthread-smart/userapps/root/bin,format=raw,id=blk0 -device virtio-blk-device,drive=blk0,bus=virtio-mmio-bus.0 \
+-drive if=none,file=sd.bin,format=raw,id=blk0 -device virtio-blk-device,drive=blk0,bus=virtio-mmio-bus.0 \
 -netdev user,id=net0 -device virtio-net-device,netdev=net0,bus=virtio-mmio-bus.1 \
 -device virtio-serial-device -chardev socket,host=127.0.0.1,port=4321,server=on,wait=off,telnet=on,id=console0 -device virtserialport,chardev=console0 \
 | tee "session/session-$(date +%Y-%m-%d_%H-%M-%S).txt"
 
 mount sd.bin /mnt/sd
-mv /mnt/sd/logging-*.bin /mnt/sd/smart-* ./
+mv /mnt/sd/logging-*.bin /mnt/sd/smart-* /mnt/sd/func-name-*.txt /mnt/sd/entries.log ./
 umount /mnt/sd
-# mv /home/rtthread-smart/userapps/root/bin/logging-*.bin /home/rtthread-smart/userapps/root/bin/smart-ksymtbl.txt ./
