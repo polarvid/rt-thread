@@ -145,7 +145,16 @@ while True:
     print(f'cpu {cpuid} is done')
     cpuid += 1
 
-func_name_dict = parse_file_to_dict("./func-name-0.txt")
+func_name_dict = {}
+cpuid = 0
+while True:
+    try:
+        file_name = f'/home/rtthread-smart/kernel/bsp/qemu-virt64-aarch64/func-name-{cpuid}.txt'
+        func_name_dict.update(parse_file_to_dict(file_name))
+        cpuid += 1
+    except:
+        break
+
 fgraph.func_name_dict_set(func_name_dict)
 
 events.sort(key=lambda x: x.entry_time)

@@ -381,8 +381,7 @@ rt_hw_context_switch_interrupt:
 vector_fiq:
     B       .
 
-.globl vector_irq
-vector_irq:
+START_POINT(vector_irq)
     CLREX
     SAVE_CONTEXT
     STP     X0, X1, [SP, #-0x10]!   /* X0 is thread sp */
@@ -394,6 +393,7 @@ vector_irq:
     LDP     X0, X1, [SP], #0x10
     BL      rt_scheduler_do_irq_switch
     B       rt_hw_context_switch_exit
+START_POINT_END(vector_irq)
 
 .global rt_hw_context_switch_exit
 rt_hw_context_switch_exit:

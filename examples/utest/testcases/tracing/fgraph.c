@@ -34,8 +34,8 @@ typedef struct test_session {
     struct ftrace_session session;
 
     ftrace_tracer_t graph_tracer;
-    ftrace_consumer_session_t thread_evt;
-    ftrace_consumer_session_t func_evt;
+    ftrace_consumer_session_t thread_evt[RT_CPUS_NR];
+    ftrace_consumer_session_t func_evt[RT_CPUS_NR];
 } *test_session_t;
 
 static ftrace_session_t _get_custom_session(rt_bool_t override)
@@ -56,8 +56,11 @@ static ftrace_session_t _get_custom_session(rt_bool_t override)
 
     session->graph_tracer = graph_tracer;
 
-    session->func_evt = ftrace_graph_create_cons_session(graph_tracer, FTRACE_EVENT_FGRAPH, TEST_CORE);
-    session->thread_evt = ftrace_graph_create_cons_session(graph_tracer, FTRACE_EVENT_THREAD, TEST_CORE);
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+    {
+        session->func_evt[i] = ftrace_graph_create_cons_session(graph_tracer, FTRACE_EVENT_FGRAPH, i);
+        session->thread_evt[i] = ftrace_graph_create_cons_session(graph_tracer, FTRACE_EVENT_THREAD, i);
+    }
     return &session->session;
 }
 
@@ -65,8 +68,11 @@ static void _delete_custom_session(ftrace_session_t session)
 {
     test_session_t custom = rt_container_of(session, struct test_session, session);
 
-    ftrace_graph_delete_cons_session(custom->graph_tracer, custom->func_evt);
-    ftrace_graph_delete_cons_session(custom->graph_tracer, custom->thread_evt);
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+    {
+        ftrace_graph_delete_cons_session(custom->graph_tracer, custom->func_evt[i]);
+        ftrace_graph_delete_cons_session(custom->graph_tracer, custom->thread_evt[i]);
+    }
 
     ftrace_graph_tracer_delete(custom->graph_tracer);
 
@@ -77,24 +83,19 @@ static void _delete_custom_session(ftrace_session_t session)
 static struct rt_semaphore subthread_exit_cnt;
 
 /* consumer thread for reading */
-static struct rt_thread thread_consumer_thread;
-static struct rt_thread func_consumer_thread;
+static struct rt_thread thread_consumer_thread[RT_CPUS_NR];
+static struct rt_thread func_consumer_thread[RT_CPUS_NR];
 
-static void _report_thread_buffer(ftrace_thread_evt_t buffer, size_t size)
+static void _report_thread_buffer(ftrace_thread_evt_t buffer, size_t size, int fd)
 {
     char name_buf[sizeof(buffer->name) + 1] = {0};
-    static char temp[128];
-
-    /* write to a file */
-    int fd;
-    snprintf(temp, sizeof(temp), "./func-name-%d.txt", rt_hw_cpu_id());
-    fd = open(temp, O_WRONLY | O_CREAT, 0);
+    char temp[128];
 
     for (size_t i = 0; i < size; i++)
     {
-        strncpy(name_buf, buffer[i].name, sizeof(buffer->name));
+        rt_sprintf(name_buf, buffer[i].name, sizeof(buffer->name));
         name_buf[sizeof(buffer->name)] = '\0';
-        sprintf(temp, "%p %s\n", (void *)buffer[i].tid, name_buf);
+        rt_sprintf(temp, "%p %s\n", (void *)buffer[i].tid, name_buf);
         write(fd, temp, strlen(temp));
     }
     close(fd);
@@ -108,9 +109,19 @@ static void thread_consumer(void *param)
     ftrace_consumer_session_t events;
     long consumed;
     events = param;
-    consumed = ftrace_consumer_session_refresh(events, 10000);
-    _report_thread_buffer(events->buffer, consumed);
-    LOG_I("Summary: session %p (cpu-%d) recorded 0x%lx activity thread", events->ring, events->cpuid, consumed);
+
+    /* open file */
+    char buf[32];
+    int fd;
+    snprintf(buf, sizeof(buf), "./func-name-%d.txt", events->cpuid);
+    fd = open(buf, O_WRONLY | O_CREAT, 0);
+
+    consumed = ftrace_consumer_session_refresh(events, 1000);
+    if (consumed < 0)
+        LOG_W("Summary: thread recording failed");
+
+    _report_thread_buffer(events->buffer, consumed, fd);
+    LOG_I("Summary: cpu %d recorded 0x%lx activity thread", events->cpuid, consumed);
 
     rt_sem_release(&subthread_exit_cnt);
     return ;
@@ -133,12 +144,12 @@ static void func_consumer(void *param)
     /* open file */
     char buf[32];
     int fd;
-    snprintf(buf, sizeof(buf), "./logging-%d.bin", rt_hw_cpu_id());
+    snprintf(buf, sizeof(buf), "./logging-%d.bin", events->cpuid);
     fd = open(buf, O_WRONLY | O_CREAT, 0);
 
     /* keep dumping data */
     do {
-        consumed = ftrace_consumer_session_refresh(events, 10000);
+        consumed = ftrace_consumer_session_refresh(events, 1000);
         if (consumed < 0)
             RT_ASSERT(0);
         _report_func_buffer(fd, events->buffer, consumed);
@@ -172,44 +183,66 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
 {
     test_session_t custom = rt_container_of(session, struct test_session, session);
     const size_t stack_size = 0x2000;
+    const size_t stk_size_bits = rt_page_bits(stack_size);
     void *thread_stk, *func_stk;
 
     /* environment setup */
     rt_sem_init(&subthread_exit_cnt, "subthread_exit_cnt", 0, RT_IPC_FLAG_FIFO);
-
-    /* --> function-consumer thread startup */
-    func_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
-    rt_thread_init(&func_consumer_thread,
-                            "fgc_func",
-                            &func_consumer,
-                            (void *)custom->func_evt,
-                            func_stk,
-                            stack_size,
-                            30,
-                            100);
-    rt_thread_startup(&func_consumer_thread);
-
-    /* --> thread-consumer thread startup */
-    thread_stk = rt_pages_alloc_ext(rt_page_bits(stack_size), PAGE_ANY_AVAILABLE);
-    rt_thread_init(&thread_consumer_thread,
-                            "fgc_thread",
-                            &thread_consumer,
-                            (void *)custom->thread_evt,
-                            thread_stk,
-                            stack_size,
-                            30,
-                            100);
-    rt_thread_startup(&thread_consumer_thread);
 
     /* Testing */
     ftrace_session_register(session);
     if (argc > 1)
         _app_test(argc - 1, &argv[1]);
 
-    /* --> wait for sub-thread exit */
-    rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
-    rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
+    /* --> function-consumer thread startup */
+    static char fgc_func_name[] = "fgc_fcx";
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+    {
+        fgc_func_name[sizeof(fgc_func_name) - 2] = '0' + i;
+        func_stk = rt_pages_alloc_ext(stk_size_bits, PAGE_ANY_AVAILABLE);
+        rt_thread_init(&func_consumer_thread[i],
+                       fgc_func_name,
+                       &func_consumer,
+                       (void *)custom->func_evt[i],
+                       func_stk,
+                       stack_size,
+                       30,
+                       100);
 
+        rt_thread_control(&func_consumer_thread[i], RT_THREAD_CTRL_BIND_CPU, (void *)i);
+        rt_thread_startup(&func_consumer_thread[i]);
+    }
+
+    /* --> thread-consumer thread startup */
+    static char fgc_thread_name[] = "fgc_thx";
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+    {
+        fgc_thread_name[sizeof(fgc_thread_name) - 2] = '0' + i;
+        thread_stk = rt_pages_alloc_ext(stk_size_bits, PAGE_ANY_AVAILABLE);
+        rt_thread_init(&thread_consumer_thread[i],
+                       fgc_thread_name,
+                       &thread_consumer,
+                       (void *)custom->thread_evt[i],
+                       thread_stk,
+                       stack_size,
+                       30,
+                       100);
+
+        rt_thread_control(&thread_consumer_thread[i], RT_THREAD_CTRL_BIND_CPU, (void *)i);
+        rt_thread_startup(&thread_consumer_thread[i]);
+    }
+
+
+
+    /* --> wait for sub-thread exit */
+    for (size_t i = 0; i < 2 * RT_CPUS_NR; i++)
+        rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
+
+    for (size_t i = 0; i < RT_CPUS_NR; i++)
+    {
+        rt_pages_free(func_consumer_thread[i].stack_addr, stk_size_bits);
+        rt_pages_free(thread_consumer_thread[i].stack_addr, stk_size_bits);
+    }
     ftrace_session_unregister(session);
     LOG_I("unregistered");
 

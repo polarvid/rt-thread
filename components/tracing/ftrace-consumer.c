@@ -42,7 +42,7 @@ long ftrace_consumer_session_refresh(ftrace_consumer_session_t session_const, ti
         else if (session->tracer->session->unregistered)
         {
             /* it's certainly that no more event will enqueue */
-            evt_count = ftrace_consumer_session_count_event(session);
+            evt_count = event_ring_count(session->ring, session->cpuid);
             session->buffer = event_ring_switch_buffer_lock(ring, session->buffer, cpuid);
             break;
         }
