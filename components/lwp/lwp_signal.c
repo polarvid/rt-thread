@@ -15,6 +15,8 @@
 #include "lwp_arch.h"
 #include "sys/signal.h"
 
+#define rt_kprintf(...)
+
 rt_inline void lwp_sigaddset(lwp_sigset_t *set, int _sig)
 {
     unsigned long sig = _sig - 1;

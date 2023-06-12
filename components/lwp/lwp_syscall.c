@@ -326,7 +326,7 @@ SYSCALL_DEFINE(exit, int, value)
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
 
-#ifdef RT_USING_TRACING
+#ifdef TRACING_FTRACE
     void _fgraph_stop(void);
     extern pid_t trace_pid;
     if (lwp->pid == trace_pid)

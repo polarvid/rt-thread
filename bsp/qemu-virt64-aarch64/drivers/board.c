@@ -87,7 +87,9 @@ void rt_hw_board_init(void)
 #ifdef RT_USING_SMART
     rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xfffffffff0000000, 0x10000000, MMUTable, PV_OFFSET);
 #else
-    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0x80000000, 0x10000000, MMUTable, 0);
+    #define USER_VADDR_TOP      0x0001000000000000UL
+    #define IOREMAP_MAX_SIZE    0x10000000
+    rt_hw_mmu_map_init(&rt_kernel_space, (void*)USER_VADDR_TOP - IOREMAP_MAX_SIZE, IOREMAP_MAX_SIZE, MMUTable, 0);
 #endif
     rt_page_init(init_page_region);
     rt_hw_mmu_setup(&rt_kernel_space, platform_mem_desc, platform_mem_desc_size);
