@@ -23,6 +23,9 @@ typedef struct ftrace_host_data {
     atomic_uint trace_recorded;
 } *ftrace_host_data_t;
 
+#define CONTROL_DISABLE _ftrace_global_disable
+extern long _ftrace_global_disable;
+
 /* ftrace entry and its return status */
 #define FTE_NOTRACE_EXIT    0
 #define FTE_OVERRIDE_EXIT   1

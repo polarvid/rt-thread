@@ -17,12 +17,27 @@
 
 #include <page.h>
 
+#define PANIC(str)                                                  \
+{                                                                   \
+    _ftrace_global_disable = 1;                                     \
+    rt_hw_local_irq_disable();                                      \
+    LOG_E("(%s:%d %s)\n\t%s", __FILE__, __LINE__, __func__, str);   \
+    while (1);                                                      \
+}
+
 /* TODO: Handle the case of stack overflow by applying the technique of hight detection */
 /**
  * This is error prone and should be taken care of.
  * Interruptable, and only processed parallel on interrupt
  */
 
+/**
+ * @brief Reset the vice stack by dropping the outer most frame
+ * and reseting the vsp/vfp
+ * 
+ * @param data 
+ * @return rt_inline 
+ */
 rt_inline rt_notrace
 void _drop_frame(ftrace_host_data_t data)
 {
@@ -45,20 +60,33 @@ rt_notrace
 rt_err_t ftrace_vice_stack_verify(ftrace_host_data_t data, ftrace_context_t context)
 {
     rt_err_t rc = -RT_ERROR;
-    rt_ubase_t prev_tsp;
+    rt_ubase_t prev_sp;
 
     while (rc != RT_EOK)
     {
         if (data->vice_fp)
         {
-            prev_tsp = data->vice_stack[data->vice_fp];
+            prev_sp = data->vice_stack[data->vice_fp];
             /**
              * sp in current context must at least equal or lower than previous one
              * Noted that it's acceptable in some ABI to avoid maintaining call frames,
              * hence the sp can be identical to previous one. 
              */
-            if (prev_tsp < context->args[FTRACE_REG_SP])
+            if (prev_sp < context->args[FTRACE_REG_SP])
             {
+                rt_ubase_t vsp;
+                vsp = atomic_load(&data->vice_sp);
+
+                /**
+                 * debug：
+                 * The corruption is generated from the what?
+                 * -> the one operating on it!
+                 */
+                if (vsp != data->vice_fp)
+                    PANIC("VSP corrupted");
+                if (vsp + 2 > data->vice_stack_size)
+                    PANIC("VSP overflow");
+
                 /* rewind */
                 _drop_frame(data);
             }
@@ -95,10 +123,32 @@ rt_err_t ftrace_vice_stack_push(ftrace_host_data_t data, ftrace_context_t contex
     return RT_EOK;
 }
 
+/**
+ * Vice stack image in the entry of exit tracer:
+ *
+ *       HIGH
+ *   +-----------+
+ *   |  VICE FP  |
+ *   +-----------+
+ *   |    SP     |
+ *   +-----------+ <------+
+ *   |           |        |
+ *   |           |        |
+ *   |  CONTEXT  |        |
+ *   |           |        |
+ *   |           |        |
+ *   +-----------+        |
+ *   |  VICE FP -+--------+
+ *   +-----------+
+ *   |    SP     |
+ *   +-----------+ <-------+ vice_sp/vice_fp
+ *       LOW
+ *
+ */
 rt_notrace
 rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_sp)
 {
-    long sp;
+    long vsp;
     int success;
     rt_err_t rc;
 
@@ -106,10 +156,10 @@ rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_
     {
         do
         {
-            unsigned int old_sp = atomic_load(&data->vice_sp);
-            sp = old_sp - 2;
-            if (sp >= 0)
-                success = atomic_compare_exchange_weak(&data->vice_sp, &old_sp, sp);
+            unsigned int old_vsp = atomic_load(&data->vice_sp);
+            vsp = old_vsp - 2;
+            if (vsp >= 0)
+                success = atomic_compare_exchange_weak(&data->vice_sp, &old_vsp, vsp);
             else
             {
                 success = 0;
@@ -119,17 +169,9 @@ rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_
 
         if (success)
         {
-            /**
-             * calculate the frame, and push it in
-             *
-             * High --> | PREV FP | SP | ... | PREV FP | SP | --> Low
-             *                         ^          |         ^
-             *                          \________/      {VICE-FP}
-             *                                          {VICE-SP}
-             */
-            data->vice_stack[sp] = trace_sp;
-            data->vice_stack[sp + 1] = data->vice_fp;
-            data->vice_fp = sp;
+            data->vice_stack[vsp] = trace_sp;
+            data->vice_stack[vsp + 1] = data->vice_fp;
+            data->vice_fp = vsp;
             rc = RT_EOK;
         }
         else
@@ -193,10 +235,14 @@ rt_base_t ftrace_vice_stack_pop_word(ftrace_host_data_t data, ftrace_context_t c
 
         /* debug */
         if (sp >= data->vice_stack_size)
-            while (1) ;
+            PANIC("stack overflow");
 
         word = data->vice_stack[sp];
         atomic_fetch_add(&data->vice_sp, 1);
+    }
+    else
+    {
+        PANIC("Invalid data");
     }
 
     return word;
@@ -213,11 +259,15 @@ rt_base_t ftrace_vice_stack_pop_frame(ftrace_host_data_t data, rt_ubase_t trace_
         do {
             vsp = atomic_load(&data->vice_sp);
 
-            /* debug */
+            /**
+             * debug：
+             * The corruption is generated from the what?
+             * -> the one operating on it!
+             */
             if (vsp != data->vice_fp)
-                while (1) ;
+                PANIC("VSP corrupted");
             if (vsp + 2 > data->vice_stack_size)
-                while (1) ;
+                PANIC("VSP overflow");
 
             word = data->vice_stack[vsp];
             if (word != trace_sp)
@@ -233,6 +283,10 @@ rt_base_t ftrace_vice_stack_pop_frame(ftrace_host_data_t data, rt_ubase_t trace_
 
         data->vice_fp = data->vice_stack[vsp + 1];
         atomic_fetch_add(&data->vice_sp, 2);
+    }
+    else
+    {
+        PANIC("Invalid input");
     }
 
     return word;

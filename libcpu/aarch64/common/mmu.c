@@ -519,7 +519,7 @@ void mmu_tcr_init(void)
 {
     unsigned long val64;
 
-    val64 = 0x00447fUL;
+    val64 = 0x0044ffUL;
     __asm__ volatile("msr MAIR_EL1, %0\n dsb sy\n" ::"r"(val64));
 
     /* TCR_EL1 */

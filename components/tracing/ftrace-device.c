@@ -340,9 +340,11 @@ static rt_err_t ftrace_control(rt_device_t dev, int cmd, void *args)
             break;
         case FTRACE_DEV_IOCTL_REG:
             ftrace_session_register(&session->session);
+            err = RT_EOK;
             break;
         case FTRACE_DEV_IOCTL_UNREG:
             ftrace_session_unregister(&session->session);
+            err = RT_EOK;
             break;
         default:
             err = -ENOSYS;

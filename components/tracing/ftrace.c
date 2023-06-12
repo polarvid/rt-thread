@@ -26,6 +26,8 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 
+long _ftrace_global_disable = 0;
+
 void ftrace_tracer_init(ftrace_tracer_t tracer, enum ftrace_tracer_type type, void *handler, void *data)
 {
     tracer->type = type;
@@ -203,16 +205,13 @@ static int _is_notrace(void *entry, struct _param *param)
 
 static void _set_session_in_entires(void *symbol, void *data)
 {
-    // skip notrace here
+    int err;
     struct _param *param = data;
+
+    /* skip entries in notrace set */
     if (param->notrace_cnt && _is_notrace(symbol, param))
         return ;
 
-    /* Skip entry in set */
-    // if (symbol >= ADDR(0x000000004042d4fc)/*  && symbol < ADDR(0x000000008025a412) */)
-    //     return ;
-
-    int err;
     err = _set_trace(param->session, symbol);
     if (err)
     {
@@ -295,7 +294,7 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
     ftrace_host_data_t data;
     rt_err_t stat = FTE_NOTRACE_EXIT;
 
-    if (session)
+    if (!CONTROL_DISABLE && session)
     {
         if (session->enabled)
         {
@@ -323,11 +322,15 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
                 /* record */
                 error = ftrace_arch_push_context(data, session, pc, ret_addr, context);
                 if (!error)
+                {
                     stat = FTE_OVERRIDE_EXIT;
+                }
                 else
+                {
                     // TODO: restore stack, clear all pushed words if any
                     // stat = FTE_NOTRACE_EXIT;
                     while (1) ;
+                }
             }
 
             rt_hw_local_irq_enable(level);
@@ -376,6 +379,11 @@ int ftrace_trace_host_setup(rt_thread_t host)
         atomic_store(&data->trace_recorded, 0);
         host->ftrace_host_session = data;
     }
+    else
+    {
+        err = -RT_ENOENT;
+    }
+
     return err;
 }
 

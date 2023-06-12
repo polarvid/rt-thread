@@ -8,6 +8,7 @@
  * 2023-05-12     WangXiaoyao  fgraph functionality test cases
  */
 
+#include "ftrace.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
@@ -116,7 +117,7 @@ static void thread_consumer(void *param)
     snprintf(buf, sizeof(buf), "./func-name-%d.txt", events->cpuid);
     fd = open(buf, O_WRONLY | O_CREAT, 0);
 
-    consumed = ftrace_consumer_session_refresh(events, 1000);
+    consumed = ftrace_consumer_session_refresh(events, 10000);
     if (consumed < 0)
         LOG_W("Summary: thread recording failed");
 
@@ -149,7 +150,7 @@ static void func_consumer(void *param)
 
     /* keep dumping data */
     do {
-        consumed = ftrace_consumer_session_refresh(events, 1000);
+        consumed = ftrace_consumer_session_refresh(events, 10000);
         if (consumed < 0)
             RT_ASSERT(0);
         _report_func_buffer(fd, events->buffer, consumed);
@@ -163,36 +164,34 @@ static void func_consumer(void *param)
     return ;
 }
 
+static const size_t stack_size = 0x2000;
+static size_t stk_size_bits;
+
 void _fgraph_stop(void)
 {
-    ftrace_session_unregister(trace_session);
+    ftrace_session_t session = trace_session;
+
+    ftrace_session_unregister(session);
 }
 
 static void _app_test(int argc, char **argv)
 {
-    LOG_I("Execution Start");
     trace_pid = exec(argv[0], 0, argc - 1, argv + 1);
     if (trace_pid <= 0)
     {
-        LOG_W("Execution Error: APP running failed");
         _fgraph_stop();
+        LOG_W("Execution Error: APP running failed");
     }
 }
 
 static void _tester(ftrace_session_t session, int argc, char **argv)
 {
     test_session_t custom = rt_container_of(session, struct test_session, session);
-    const size_t stack_size = 0x2000;
-    const size_t stk_size_bits = rt_page_bits(stack_size);
+    stk_size_bits = rt_page_bits(stack_size);
     void *thread_stk, *func_stk;
 
     /* environment setup */
     rt_sem_init(&subthread_exit_cnt, "subthread_exit_cnt", 0, RT_IPC_FLAG_FIFO);
-
-    /* Testing */
-    ftrace_session_register(session);
-    if (argc > 1)
-        _app_test(argc - 1, &argv[1]);
 
     /* --> function-consumer thread startup */
     static char fgc_func_name[] = "fgc_fcx";
@@ -210,7 +209,6 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
                        100);
 
         rt_thread_control(&func_consumer_thread[i], RT_THREAD_CTRL_BIND_CPU, (void *)i);
-        rt_thread_startup(&func_consumer_thread[i]);
     }
 
     /* --> thread-consumer thread startup */
@@ -229,13 +227,25 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
                        100);
 
         rt_thread_control(&thread_consumer_thread[i], RT_THREAD_CTRL_BIND_CPU, (void *)i);
+    }
+
+    /* Testing */
+    LOG_I("Input argument counts: %d", argc - 1);
+    ftrace_session_register(session);
+    if (argc > 1)
+        _app_test(argc - 1, argv + 1);
+
+    LOG_I("Execution Start");
+    
+    #define RUNNING_COLLECTOR RT_CPUS_NR
+    for (size_t i = 0; i < RUNNING_COLLECTOR; i++)
+    {
+        rt_thread_startup(&func_consumer_thread[i]);
         rt_thread_startup(&thread_consumer_thread[i]);
     }
 
-
-
     /* --> wait for sub-thread exit */
-    for (size_t i = 0; i < 2 * RT_CPUS_NR; i++)
+    for (size_t i = 0; i < 2 * RUNNING_COLLECTOR; i++)
         rt_sem_take(&subthread_exit_cnt, RT_WAITING_FOREVER);
 
     for (size_t i = 0; i < RT_CPUS_NR; i++)
@@ -249,7 +259,6 @@ static void _tester(ftrace_session_t session, int argc, char **argv)
     /* environment cleanup */
     rt_sem_detach(&subthread_exit_cnt);
 }
-
 
 static void _debug_ftrace(int argc, char *argv[])
 {
