@@ -139,7 +139,7 @@ typedef struct ftrace_host_data *ftrace_host_data_t;
 ftrace_host_data_t ftrace_trace_host_data_get(void);
 
 rt_err_t ftrace_vice_stack_push_word(ftrace_host_data_t data, ftrace_context_t context, rt_base_t word);
-rt_err_t ftrace_vice_stack_push(ftrace_host_data_t data, ftrace_context_t context, rt_ubase_t *words, size_t num_words);
+rt_err_t ftrace_vice_stack_push(ftrace_host_data_t data, ftrace_context_t context, rt_base_t *words, size_t num_words);
 
 rt_base_t ftrace_vice_stack_pop_word(ftrace_host_data_t data, ftrace_context_t context);
 

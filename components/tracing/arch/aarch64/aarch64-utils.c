@@ -8,7 +8,7 @@
  * 2023-03-30     WangXiaoyao  ftrace support
  */
 #include "../../internal.h"
-#include <rtdef.h>
+#include "ftrace.h"
 
 #include <stdatomic.h>
 #include <stddef.h>
@@ -133,52 +133,48 @@ ftrace_session_t ftrace_arch_get_session(void *entry)
 }
 
 rt_notrace
-static uint16_t get_checksum(rt_ubase_t *array, int array_size)
+static uint16_t get_checksum(rt_base_t *array, int array_size)
 {
-    uint32_t checksum = 0;
+    rt_base_t checksum = 0;
 
-    /* Iterate through the array and add each 64-bit value to the checksum */
     for (int i = 0; i < array_size; i++)
     {
-        checksum += (array[i] & 0xFFFF) + ((array[i] >> 16) & 0xFFFF) + ((array[i] >> 32) & 0xFFFF) + ((array[i] >> 48) & 0xFFFF);
+        checksum += array[i];
     }
 
-    /* Fold the 32-bit checksum to 16 bits */
-    checksum = (checksum & 0xFFFF) + (checksum >> 16);
-
-    /* If there is a carry, add it to the checksum */
-    if (checksum > 0xFFFF)
-    {
-        checksum = (checksum & 0xFFFF) + 1;
-    }
-
-    return (uint16_t)checksum;
+    return checksum;
 }
 
 #define CHECKSUM
 
+#define num_words 4
+typedef rt_base_t arch_ctx_t[num_words];
+
 rt_notrace
-rt_err_t ftrace_arch_push_context(ftrace_host_data_t data, ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_err_t ftrace_arch_push_context(ftrace_host_data_t data,
+                                  ftrace_session_t session,
+                                  rt_ubase_t pc,
+                                  rt_ubase_t ret_addr,
+                                  ftrace_context_t context)
 {
     rt_err_t rc;
     const rt_ubase_t trace_sp = context->args[FTRACE_REG_SP];
-    rt_ubase_t values_to_push[] = {pc, ret_addr, (rt_ubase_t)session};
-    int num_values = sizeof(values_to_push) / sizeof(values_to_push[0]);
 
 #ifdef CHECKSUM
-    rt_ubase_t checksum = get_checksum(values_to_push, num_values);
-    rc = ftrace_vice_stack_push_word(data, context, checksum);
-    if (rc)
-        while (1) ;
-
+    rt_base_t checksum_source[] = {pc, ret_addr, (rt_ubase_t)session};
+    int checksum_src_cnt = sizeof(checksum_source) / sizeof(checksum_source[0]);
+    rt_ubase_t checksum = get_checksum(checksum_source, checksum_src_cnt);
 #endif /* CHECKSUM */
 
+    arch_ctx_t words = {pc, ret_addr, (rt_ubase_t)session, checksum};
+
     /* save the context that is needed by exit tracer in vice stack */
-    rc = ftrace_vice_stack_push(data, context, values_to_push, num_values);
-    if (!rc)
-        rc = ftrace_vice_stack_push_frame(data, trace_sp);
-    else
-        while (1) ;
+    rc = ftrace_vice_stack_push_frame(data, trace_sp, words, num_words);
+    if (rc)
+    {
+        /* restore the status of vice stack */
+        data->vice_ctx.sp = data->vice_ctx.fp;
+    }
 
     return rc;
 }
@@ -188,17 +184,17 @@ void ftrace_arch_pop_context(ftrace_host_data_t data, ftrace_session_t *psession
 {
     ftrace_session_t session;
     rt_ubase_t pc, ret_addr;
+    arch_ctx_t words;
 
-    ftrace_vice_stack_pop_frame(data, context->args[FTRACE_REG_SP]);
+    ftrace_vice_stack_pop_frame(data, context->args[FTRACE_REG_SP], words, num_words);
 
-    *psession = session = (ftrace_session_t)ftrace_vice_stack_pop_word(data, context);
-    *pret_addr = ret_addr = ftrace_vice_stack_pop_word(data, context);
-    *ppc = pc = ftrace_vice_stack_pop_word(data, context);
+    *psession = session = (ftrace_session_t)words[2];
+    *pret_addr = ret_addr = words[1];
+    *ppc = pc = words[0];
 
 #ifdef CHECKSUM
-    rt_ubase_t old_check = ftrace_vice_stack_pop_word(data, context);
-
-    rt_ubase_t array[] = {pc, ret_addr, (rt_ubase_t)session};
+    rt_ubase_t old_check = words[3];
+    rt_base_t array[] = {pc, ret_addr, (rt_ubase_t)session};
     rt_ubase_t checksum = get_checksum(array, sizeof(array)/sizeof(array[0]));
     if (checksum != old_check)
     {

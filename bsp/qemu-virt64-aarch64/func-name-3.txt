@@ -1,3 +1,4 @@
-0xffff0000001a2e88 tidle3
-0xffff00000019dcc0 fgc_th3
-0xffff00000019d5a0 fgc_fc3
+0xffff0000001dbe38 tidle3
+0xffff00000036fc80 getcwd.e
+0xffff0000001d7490 fgc_th3
+0xffff0000001d7bb0 fgc_fc3

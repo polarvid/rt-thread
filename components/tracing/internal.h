@@ -11,16 +11,28 @@
 #define __TRACE_FTRACE_INTERNAL_H__
 
 #include "ftrace.h"
+#include "rtdef.h"
 #include <stdatomic.h>
+
+typedef union ftrace_vice_ctx {
+    struct {
+        atomic_uint sp;
+        atomic_uint fp;
+    };
+    atomic_ulong data;
+} ftrace_vice_ctx_t;
+
+RT_CTASSERT(compact_value, sizeof(ftrace_vice_ctx_t) == sizeof(atomic_ulong));
 
 typedef struct ftrace_host_data {
     /* vice stack context */
     rt_ubase_t *vice_stack;
     size_t vice_stack_size;
-    atomic_uint vice_sp;
-    size_t vice_fp;
+
+    ftrace_vice_ctx_t vice_ctx;
 
     atomic_uint trace_recorded;
+    unsigned int tracer_stacked_count;
 } *ftrace_host_data_t;
 
 #define CONTROL_DISABLE _ftrace_global_disable
@@ -40,8 +52,8 @@ ftrace_session_t ftrace_arch_get_session(void *entry);
 rt_err_t ftrace_arch_push_context(ftrace_host_data_t data, ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
 void ftrace_arch_pop_context(ftrace_host_data_t data, ftrace_session_t *session, rt_ubase_t *pc, rt_ubase_t *ret_addr, ftrace_context_t context);
 rt_err_t ftrace_vice_stack_verify(ftrace_host_data_t data, ftrace_context_t context);
-rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_sp);
-rt_base_t ftrace_vice_stack_pop_frame(ftrace_host_data_t data, rt_ubase_t trace_sp);
+rt_err_t ftrace_vice_stack_push_frame(ftrace_host_data_t data, rt_ubase_t trace_sp, rt_base_t *words, size_t num_words);
+rt_base_t ftrace_vice_stack_pop_frame(ftrace_host_data_t data, rt_ubase_t trace_sp, rt_base_t *words, size_t num_words);
 
 /* binary search utils */
 #define GET_SECTION(sec)        ((void *)ksymtbl + ksymtbl->sec)

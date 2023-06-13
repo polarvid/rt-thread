@@ -296,15 +296,16 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
 
     if (!CONTROL_DISABLE && session)
     {
-        if (session->enabled)
+        data = ftrace_trace_host_data_get();
+        if (session->enabled && data->tracer_stacked_count <= 1)
         {
-            rt_ubase_t level = rt_hw_local_irq_disable();
+            data->tracer_stacked_count++;
+            // rt_ubase_t level = rt_hw_local_irq_disable();
 
             has_exit_tracer = rt_list_len(&session->exit_tracers) > 0;
             if (has_exit_tracer)
             {
                 /* verify and recycle the unsolved frame in vice stack if any */
-                data = ftrace_trace_host_data_get();
                 ftrace_vice_stack_verify(data, context);
             }
 
@@ -322,18 +323,14 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
                 /* record */
                 error = ftrace_arch_push_context(data, session, pc, ret_addr, context);
                 if (!error)
-                {
                     stat = FTE_OVERRIDE_EXIT;
-                }
                 else
-                {
-                    // TODO: restore stack, clear all pushed words if any
-                    // stat = FTE_NOTRACE_EXIT;
-                    while (1) ;
-                }
+                    stat = FTE_NOTRACE_EXIT;
             }
 
-            rt_hw_local_irq_enable(level);
+            /* Exit recursion protection area */
+            // rt_hw_local_irq_enable(level);
+            data->tracer_stacked_count--;
         }
         else if (session->unregistered)
         {
@@ -377,6 +374,8 @@ int ftrace_trace_host_setup(rt_thread_t host)
         RT_ASSERT(err == 0);
 
         atomic_store(&data->trace_recorded, 0);
+        data->tracer_stacked_count = 0;
+
         host->ftrace_host_session = data;
     }
     else
