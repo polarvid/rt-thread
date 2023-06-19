@@ -63,9 +63,9 @@ symbol_name:                \
 #define SYM_TO_ENTRIES(entry)   ((void *)((rt_ubase_t)(entry) - 3 * 4))
 #define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_ubase_t)(pc) - 4))
 
-typedef struct ftrace_context {
+typedef struct ftrace_arch_context {
     rt_ubase_t args[FTRACE_REG_CNT];
-} *ftrace_context_t;
+} *ftrace_arch_context_t;
 
 rt_notrace rt_inline
 rt_ubase_t ftrace_timestamp(void)

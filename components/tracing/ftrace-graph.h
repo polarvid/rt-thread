@@ -42,4 +42,9 @@ ftrace_consumer_session_t ftrace_graph_create_cons_session(ftrace_tracer_t trace
 
 void ftrace_graph_delete_cons_session(ftrace_tracer_t tracer, ftrace_consumer_session_t session);
 
+rt_inline const size_t ftrace_graph_data_buf_num_words(void)
+{
+    return 1;
+}
+
 #endif /* __TRACE_FTRACE_GRAPH_H__ */

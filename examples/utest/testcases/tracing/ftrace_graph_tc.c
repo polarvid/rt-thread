@@ -8,10 +8,8 @@
  * 2023-05-12     WangXiaoyao  fgraph functionality test cases
  */
 
-#include "ftrace-graph.h"
 #include "ftrace.h"
-#include "rtdef.h"
-#include "utest_assert.h"
+#include "ftrace-graph.h"
 #include <ksymtbl.h>
 #include <ftrace-function.h>
 
@@ -52,6 +50,11 @@ typedef struct test_session {
     ftrace_consumer_session_t func_evt;
 } *test_session_t;
 
+static void *_data_buf_get(ftrace_tracer_t tracer, ftrace_context_t context)
+{
+    return context->data_buf;
+}
+
 static ftrace_session_t _get_custom_session(rt_bool_t override)
 {
     test_session_t session;
@@ -62,7 +65,8 @@ static ftrace_session_t _get_custom_session(rt_bool_t override)
     session = rt_malloc(sizeof(*session));
     uassert_true(!!session);
 
-    ftrace_session_init(&session->session);
+    ftrace_session_init(&session->session, _data_buf_get,
+                        ftrace_graph_data_buf_num_words());
     uassert_true(session->session.enabled == 0);
     uassert_true(session->session.trace_point_cnt == 0);
     uassert_true(session->session.unregistered == 0);

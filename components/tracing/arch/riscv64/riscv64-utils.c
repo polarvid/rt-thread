@@ -223,7 +223,7 @@ ftrace_session_t ftrace_arch_get_session(void *entry)
 
 #if 0
 rt_notrace
-rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_err_t ftrace_arch_put_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_arch_context_t context)
 {
     rt_err_t rc;
     rc = ftrace_vice_stack_push_word(context, ret_addr);
@@ -231,7 +231,7 @@ rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ub
 }
 
 rt_notrace
-void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
+void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_arch_context_t context)
 {
     *pret_addr = ftrace_vice_stack_pop_word(context);
 }
@@ -244,7 +244,7 @@ void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_uba
 #define CHECKSUM
 
 rt_notrace
-rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_err_t ftrace_arch_put_context(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_arch_context_t context)
 {
     rt_ubase_t implicit_retval = context->args[0];  /* RISC-V ABI */
 #ifdef DEBUG
@@ -302,7 +302,7 @@ rt_err_t ftrace_arch_push_context(ftrace_session_t session, rt_ubase_t pc, rt_ub
 }
 
 rt_notrace
-void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_context_t context)
+void ftrace_arch_pop_context(ftrace_session_t *psession, rt_ubase_t *ppc, rt_ubase_t *pret_addr, ftrace_arch_context_t context)
 {
     ftrace_session_t session;
     rt_ubase_t ret_addr, pc;

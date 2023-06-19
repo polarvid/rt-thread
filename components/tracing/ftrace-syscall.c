@@ -34,6 +34,11 @@ static struct syscall_session {
     struct ftrace_tracer exit_tracer;
 } syscall_session;
 
+void *_data_buf_get(ftrace_tracer_t tracer, ftrace_context_t context)
+{
+    return (context);
+}
+
 static void _syscall_tracer_init(ftrace_tracer_t entry, ftrace_tracer_t exit)
 {
     ftrace_trace_fn_t entry_handler = &ftrace_arch_syscall_on_entry;
@@ -48,7 +53,7 @@ static ftrace_session_t _get_custom_session(void)
     ftrace_tracer_t entry_tracer = &syscall_session.entry_tracer;
     ftrace_tracer_t exit_tracer = &syscall_session.exit_tracer;
 
-    ftrace_session_init(session);
+    ftrace_session_init(session, _data_buf_get, 1);
 
     _syscall_tracer_init(entry_tracer, exit_tracer);
 

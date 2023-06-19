@@ -83,7 +83,7 @@ static ftrace_session_t _get_custom_session(rt_bool_t override)
 
     session = rt_malloc(sizeof(*session));
     uassert_true(!!session);
-    ftrace_session_init(&session->session);
+    ftrace_session_init(&session->session, RT_NULL, 0);
 
     function_tracer = ftrace_function_tracer_create(BUFFER_SIZE, override);
     uassert_true(!!function_tracer);

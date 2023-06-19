@@ -46,7 +46,7 @@ rt_inline void _log_param(struct rt_hw_stack_frame *frame, const char **types, c
 }
 
 rt_notrace
-rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
+rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_arch_context_t context)
 {
     rt_thread_t tcb = rt_thread_self_sync();
     struct rt_hw_stack_frame *frame = (void *)context->args[0];
@@ -89,11 +89,11 @@ rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt
 }
 
 rt_notrace
-void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context)
+void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_arch_context_t context)
 {
     long syscall = ftrace_vice_stack_pop_word(context);
     rt_thread_t tcb = rt_thread_self_sync();
-    struct ftrace_context *ctx = context;
+    struct ftrace_arch_context *ctx = context;
     rt_ubase_t retval = ctx->args[0];
 
     rt_spin_lock(&print_lock);

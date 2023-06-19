@@ -10,16 +10,24 @@ if RT_USING_TRACING
     if TRACING_KSYMTBL
         config TRACING_FTRACE
             bool "function tracing"
-            default n
+            default y
+        
+        if TRACING_FTRACE
+            config TRACING_FTRACE_DEBUG
+                bool "Debugging mode"
+                default y
+                help
+                    This will enable extra logging for debug information
+        endif
 
         config TRACING_SYSCALL
             bool "Kernel space syscall tracing"
-            default n
+            default y
 
         if TRACING_SYSCALL
             config TRACING_SYSCALL_EXT
-                bool "Extra syscall tracer with parameter list analyzing"
-                default n
+                bool "Parameter list analyzing"
+                default y
                 help
                     This will take up more footprint in system memory, while enabling
                     more detailed dumping for parameter list of each syscall.

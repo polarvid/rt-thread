@@ -8,6 +8,8 @@
  * 2023-05-08     WangXiaoyao  ftrace trap entry
  */
 
+#include "arch/aarch64/aarch64.h"
+#include "rtdef.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
@@ -72,7 +74,8 @@ rt_notrace
 rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context)
 {
     rt_thread_t tcb = rt_thread_self_sync();
-    struct rt_hw_exp_stack *frame = (void *)context->args[0];
+    ftrace_arch_context_t arch = context->arch_context;
+    struct rt_hw_exp_stack *frame = (void *)arch->args[0];
     long syscall = frame->x8;
     const char **types;
     const char **names;
@@ -111,22 +114,31 @@ rt_base_t ftrace_arch_syscall_on_entry(ftrace_tracer_t tracer, rt_ubase_t pc, rt
 
     /* some syscall never return */
     if (syscall != 1)
-        ftrace_vice_stack_push_word(ftrace_trace_host_data_get(), context, syscall);
+    {
+        rt_base_t *pbuf = tracer->session->data_buf_get(tracer, context);
+        if (pbuf)
+            *pbuf = syscall;
+        else
+            return -RT_ENOMEM;
+    }
     return 0;
 }
 
 rt_notrace
 void ftrace_arch_syscall_on_exit(ftrace_tracer_t tracer, rt_ubase_t entry_pc, ftrace_context_t context)
 {
-    long syscall = ftrace_vice_stack_pop_word(ftrace_trace_host_data_get(), context);
-    rt_thread_t tcb = rt_thread_self_sync();
-    rt_ubase_t retval = context->args[FTRACE_REG_X0];
+    long syscall;
+    rt_thread_t tcb = context->current_thread;
+    ftrace_arch_context_t arch = context->arch_context;
+    rt_ubase_t retval = arch->args[FTRACE_REG_X0];
+
+    syscall = *(rt_base_t *)tracer->session->data_buf_get(tracer, context);
 
     rt_spin_lock(&print_lock);
     if (retval > -4096ul)
         LOG_W("[%s:%x] %s() => 0x%lx (-%ld)", tcb->parent.name, (rt_ubase_t)tcb, lwp_get_syscall_name(syscall), retval, -retval);
     else
-        LOG_I("[%s:%x] %s() => 0x%lx", tcb->parent.name, 
+        LOG_I("[%s:%x] %s() => 0x%lx", tcb->parent.name,
               (rt_ubase_t)tcb, lwp_get_syscall_name(syscall), retval);
 
     rt_spin_unlock(&print_lock);

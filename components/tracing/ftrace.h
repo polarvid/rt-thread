@@ -32,9 +32,16 @@
 
 struct ftrace_tracer;
 struct ftrace_evt_ring;
+struct ftrace_context;
 
-typedef rt_base_t (*ftrace_trace_fn_t)(struct ftrace_tracer *tracer, rt_ubase_t pc, rt_ubase_t ret_addr, ftrace_context_t context);
-typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer * tracer, rt_ubase_t entry_pc, ftrace_context_t context);
+typedef struct ftrace_host_data *ftrace_host_data_t;
+
+typedef rt_base_t (*ftrace_trace_fn_t)(struct ftrace_tracer *, rt_ubase_t,
+                                       rt_ubase_t, struct ftrace_context *);
+typedef void (*ftrace_exit_fn_t)(struct ftrace_tracer *, rt_ubase_t,
+                                 struct ftrace_context *);
+
+typedef void *(*data_buf_get_fn_t)(struct ftrace_tracer *, struct ftrace_context *);
 
 enum ftrace_tracer_type {
     TRACER_ENTRY,
@@ -60,9 +67,14 @@ typedef struct ftrace_session {
     struct ftrace_tracer *around;
     rt_list_t exit_tracers;
 
+    /* data buffer management */
+    data_buf_get_fn_t data_buf_get;
+    const size_t data_buf_num_words;
+
     /* control bits, default as zero */
     unsigned int enabled:1;
     unsigned int unregistered:1;
+    unsigned int has_exit_tracer:1;
 
 } *ftrace_session_t;
 
@@ -88,6 +100,23 @@ typedef struct ftrace_tracer {
     void *data;
 } *ftrace_tracer_t;
 
+typedef struct ftrace_context {
+    /* architecture specified context */
+    void *arch_context;
+
+    /* current active thread */
+    rt_thread_t current_thread;
+
+    /* host data of current thread */
+    ftrace_host_data_t host_data;
+
+    rt_ubase_t pc;
+    rt_ubase_t ret_addr;
+
+    /* data buffer for tracer */
+    void *data_buf;
+} *ftrace_context_t;
+
 /** should not access directly or modify any fields */
 typedef const struct ftrace_consumer_session {
     void *buffer;
@@ -107,9 +136,9 @@ rt_inline void ftrace_tracer_detach(ftrace_tracer_t tracer) {}
 
 /** Session */
 
-void ftrace_session_init(ftrace_session_t session);
+void ftrace_session_init(ftrace_session_t session, data_buf_get_fn_t data_buf_get, const size_t data_buf_num_words);
 
-ftrace_session_t ftrace_session_create(void);
+ftrace_session_t ftrace_session_create(data_buf_get_fn_t data_buf_get, const size_t data_buf_num_words);
 
 void ftrace_session_delete(ftrace_session_t session);
 
@@ -132,16 +161,6 @@ void ftrace_session_set_status(ftrace_session_t session, rt_bool_t enable)
 {
     session->enabled = enable;
 }
-
-/** VICE stack */
-typedef struct ftrace_host_data *ftrace_host_data_t;
-
-ftrace_host_data_t ftrace_trace_host_data_get(void);
-
-rt_err_t ftrace_vice_stack_push_word(ftrace_host_data_t data, ftrace_context_t context, rt_base_t word);
-rt_err_t ftrace_vice_stack_push(ftrace_host_data_t data, ftrace_context_t context, rt_base_t *words, size_t num_words);
-
-rt_base_t ftrace_vice_stack_pop_word(ftrace_host_data_t data, ftrace_context_t context);
 
 /** Consumer Session - the event buffer */
 
@@ -178,6 +197,8 @@ long ftrace_consumer_session_refresh(ftrace_consumer_session_t session, time_t t
 
 size_t ftrace_consumer_session_count_event(ftrace_consumer_session_t session);
 size_t ftrace_consumer_session_count_drops(ftrace_consumer_session_t session);
+
+void *ftrace_data_buf_get(ftrace_session_t session, ftrace_context_t context, const size_t num_of_words);
 
 #endif /* __ASSEMBLY__ */
 

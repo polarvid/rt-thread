@@ -214,10 +214,15 @@ static rt_ssize_t _fgraph_tracer_read(ftrace_dev_session_t session, rt_off_t pos
     return rc;
 }
 
+void *_fgraph_data_buf_get(ftrace_tracer_t tracer, ftrace_context_t context)
+{
+    /* TODO: */
+    return RT_NULL;
+}
+
 static rt_err_t _setup_session(rt_device_t dev, rt_uint16_t oflag)
 {
     ftrace_dev_session_t session = &_dev_session;
-    ftrace_session_init(FTRACE_SESSION(session));
     dev->user_data = session;
     return 0;
 }
@@ -293,6 +298,8 @@ static rt_ssize_t ftrace_write(rt_device_t dev, rt_off_t pos, const void *buffer
             rc = _setup_function_tracer(session, control);
             break;
         case FTRACE_EVT_CLZ_FGRAPH:
+            ftrace_session_init(FTRACE_SESSION(session), _fgraph_data_buf_get,
+                                ftrace_graph_data_buf_num_words());
             session->event_generator_class = control->event_class;
             rc = _setup_fgraph_tracer(session, control);
             break;

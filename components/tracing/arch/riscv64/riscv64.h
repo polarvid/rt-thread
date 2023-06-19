@@ -80,9 +80,9 @@ symbol_name:                \
 #define SYM_TO_ENTRIES(symbol)  ((void *)((rt_ubase_t)SYM2ENT(symbol)))
 #define FTRACE_PC_TO_SYM(pc)    ((void *)((rt_uint16_t *)(pc) - (*((rt_uint16_t *)(pc) - 3) ? 3 : 2)))
 
-typedef struct ftrace_context {
+typedef struct ftrace_arch_context {
     rt_ubase_t args[FTRACE_REG_CNT];
-} *ftrace_context_t;
+} *ftrace_arch_context_t;
 
 rt_inline rt_notrace
 void _ftrace_enable_global(void)
@@ -104,7 +104,7 @@ rt_ubase_t ftrace_timestamp(void)
 }
 
 rt_inline rt_notrace
-rt_ubase_t ftrace_arch_get_sp(ftrace_context_t context)
+rt_ubase_t ftrace_arch_get_sp(ftrace_arch_context_t context)
 {
     return context->args[FTRACE_REG_SP];
 }

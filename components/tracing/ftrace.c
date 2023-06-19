@@ -60,26 +60,29 @@ void ftrace_tracer_delete(ftrace_tracer_t tracer)
     rt_free(tracer);
 }
 
-void ftrace_session_init(ftrace_session_t session)
+void ftrace_session_init(ftrace_session_t session, data_buf_get_fn_t data_buf_get, const size_t data_buf_num_words)
 {
     session->enabled = 0;
     session->unregistered = 0;
+    session->has_exit_tracer = 0;
     session->trace_point_cnt = 0;
     session->around = RT_NULL;
+    session->data_buf_get = data_buf_get;
+    *(size_t *)&session->data_buf_num_words = data_buf_num_words;
     atomic_store_explicit(&session->reference, 0, memory_order_release);
     rt_list_init(&session->entry_tracers);
     rt_list_init(&session->exit_tracers);
     return ;
 }
 
-ftrace_session_t ftrace_session_create(void)
+ftrace_session_t ftrace_session_create(data_buf_get_fn_t data_buf_get, const size_t data_buf_num_words)
 {
     ftrace_session_t session;
     session = rt_malloc(sizeof(*session));
     if (!session)
         return RT_NULL;
 
-    ftrace_session_init(session);
+    ftrace_session_init(session, data_buf_get, data_buf_num_words);
     return session;
 }
 
@@ -101,6 +104,7 @@ int ftrace_session_bind(ftrace_session_t session, ftrace_tracer_t tracer)
             break;
         case TRACER_EXIT:
             rt_list_insert_after(&session->exit_tracers, &tracer->node);
+            session->has_exit_tracer = 1;
             break;
         case TRACER_AROUND:
             if (session->around == RT_NULL)
@@ -263,74 +267,61 @@ int ftrace_session_unregister(ftrace_session_t session)
     return 0;
 }
 
-/* current implementation of enter/exit critical is unreasonable */
-#define stack_prot_threshold    0x2000
-
-rt_notrace
-ftrace_host_data_t ftrace_trace_host_data_get(void)
+rt_inline rt_notrace
+void _setup_context(ftrace_context_t context, rt_ubase_t pc, rt_ubase_t ret_addr, void *arch_context)
 {
-    rt_thread_t thread;
-    ftrace_host_data_t data;
-
-    thread = rt_thread_self_sync();
-    if (thread)
-    {
-        data = thread->ftrace_host_session;
-    }
-    else
-    {
-        data = RT_NULL;
-    }
-    return data;
+    context->arch_context = arch_context;
+    context->current_thread = rt_thread_self_sync();
+    context->host_data = context->current_thread->ftrace_host_session;
+    context->pc = pc;
+    context->ret_addr = ret_addr;
 }
 
 /* generic entry to test if session is ready to handle trace event */
 rt_notrace
-rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *context)
+rt_err_t ftrace_controller_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t ret_addr, void *arch_context)
 {
     rt_err_t error;
-    int has_exit_tracer;
-    ftrace_tracer_t tracer;
-    ftrace_host_data_t data;
     rt_err_t stat = FTE_NOTRACE_EXIT;
 
     if (!CONTROL_DISABLE && session)
     {
-        data = ftrace_trace_host_data_get();
-        if (session->enabled && data->tracer_stacked_count <= 1)
-        {
-            data->tracer_stacked_count++;
-            // rt_ubase_t level = rt_hw_local_irq_disable();
+        struct ftrace_context context;
+        _setup_context(&context, pc, ret_addr, arch_context);
 
-            has_exit_tracer = rt_list_len(&session->exit_tracers) > 0;
-            if (has_exit_tracer)
+        if (session->enabled && context.host_data->tracer_stacked_count <= 1)
+        {
+            ftrace_tracer_t tracer;
+
+            /* it prevent controller from entering synchronous recursion */
+            context.host_data->tracer_stacked_count++;
+
+            if (session->has_exit_tracer)
             {
                 /* verify and recycle the unsolved frame in vice stack if any */
-                ftrace_vice_stack_verify(data, context);
+                ftrace_vice_stack_verify(context.host_data, context.arch_context);
+                /* prepare context and data buffer for exit tracer */
+                ftrace_arch_put_context(&context, session);
             }
 
             /* handling entry */
             rt_list_for_each_entry(tracer, &session->entry_tracers, node)
             {
-                error = tracer->on_entry(tracer, pc, ret_addr, context);
+                error = tracer->on_entry(tracer, pc, ret_addr, &context);
                 if (error != RT_EOK)
                     break;
             }
 
-            /* prepare for handling exit */
-            if (error == RT_EOK && has_exit_tracer)
+            if (error != RT_EOK)
             {
-                /* record */
-                error = ftrace_arch_push_context(data, session, pc, ret_addr, context);
-                if (!error)
-                    stat = FTE_OVERRIDE_EXIT;
-                else
-                    stat = FTE_NOTRACE_EXIT;
+                /* TODO: complete error handling */
+                // ftrace_vice_stack_reset();
             }
+            else
+                stat = FTE_OVERRIDE_EXIT;
 
             /* Exit recursion protection area */
-            // rt_hw_local_irq_enable(level);
-            data->tracer_stacked_count--;
+            context.host_data->tracer_stacked_count--;
         }
         else if (session->unregistered)
         {
@@ -345,23 +336,27 @@ rt_err_t ftrace_trace_entry(ftrace_session_t session, rt_ubase_t pc, rt_ubase_t 
 }
 
 rt_notrace
-rt_ubase_t ftrace_trace_exit(void *context)
+rt_ubase_t ftrace_controller_exit(void *arch_context)
 {
-    rt_ubase_t pc;
-    rt_ubase_t ret_addr;
-    ftrace_host_data_t data;
-    ftrace_session_t session;
-
-    data = ftrace_trace_host_data_get();
-    ftrace_arch_pop_context(data, &session, &pc, &ret_addr, context);
-
     ftrace_tracer_t tracer;
+    ftrace_session_t session;
+    struct ftrace_context context;
+
+    context.arch_context = arch_context;
+    context.current_thread = rt_thread_self_sync();
+    context.host_data = context.current_thread->ftrace_host_session;
+
+    ftrace_vice_stack_verify(context.host_data, context.arch_context);
+    ftrace_arch_get_context(&context, &session);
+
     rt_list_for_each_entry(tracer, &session->exit_tracers, node)
     {
-        tracer->on_exit(tracer, pc, context);
+        tracer->on_exit(tracer, context.pc, &context);
     }
 
-    return ret_addr;
+    ftrace_vice_stack_pop_frame(&context);
+
+    return context.ret_addr;
 }
 
 int ftrace_trace_host_setup(rt_thread_t host)

@@ -8,7 +8,6 @@
  * 2023-05-12     WangXiaoyao  fgraph functionality test cases
  */
 
-#include "ftrace.h"
 #define DBG_TAG "tracing.ftrace"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
@@ -39,6 +38,12 @@ typedef struct test_session {
     ftrace_consumer_session_t func_evt[RT_CPUS_NR];
 } *test_session_t;
 
+rt_notrace
+static void *_data_buf_get(ftrace_tracer_t tracer, ftrace_context_t context)
+{
+    return context->data_buf;
+}
+
 static ftrace_session_t _get_custom_session(rt_bool_t override)
 {
     test_session_t session;
@@ -48,7 +53,8 @@ static ftrace_session_t _get_custom_session(rt_bool_t override)
 
     session = rt_malloc(sizeof(*session));
 
-    ftrace_session_init(&session->session);
+    ftrace_session_init(&session->session, _data_buf_get,
+                        ftrace_graph_data_buf_num_words());
 
     graph_tracer = ftrace_graph_tracer_create(BUFFER_SIZE, override);
 

@@ -40,7 +40,7 @@ _trace_exit:
 
     /* restore session of caller */
     mov     x0, sp
-    bl      ftrace_trace_exit
+    bl      ftrace_controller_exit
     mov     lr, x0
 
     ldp     x0, x1, [sp, #OFFTO(FTRACE_REG_X0)]
@@ -99,7 +99,7 @@ _do_ftrace:
     movk    x1, 0x201f, lsl 32
     movk    x1, 0xd503, lsl 48
     cmp     x0, x1
-    /* prepare parameters for ftrace_trace_entry */
+    /* prepare parameters for ftrace_controller_entry */
     csel    x0, x0, xzr, ne
     str     x0, [sp, #OFFTO(FTRACE_TRACER)]
 
@@ -107,7 +107,7 @@ _do_ftrace:
     mov     x2, TRACE_LR    /* return address */
     mov     x3, sp
 
-    bl      ftrace_trace_entry
+    bl      ftrace_controller_entry
     cmp     x0, xzr
 
     /* restore the context and return */

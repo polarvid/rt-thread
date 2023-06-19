@@ -24,7 +24,7 @@ _trace_exit:
     STORE   s0, OFFTO(FTRACE_REG_FP)(sp)
 
     mv      a0, sp
-    call    ftrace_trace_exit
+    call    ftrace_controller_exit
     mv      ra, a0
 
     LOAD    a0, OFFTO(FTRACE_REG_A0)(sp)
@@ -87,7 +87,7 @@ mcount:
     mv      a1, TRACE_IP
     mv      a2, TRACE_RA
     mv      a3, sp
-    call    ftrace_trace_entry
+    call    ftrace_controller_entry
 
     /* reserve the return value */
     mv      TEMPX, a0

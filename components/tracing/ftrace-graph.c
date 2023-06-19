@@ -39,14 +39,22 @@ rt_base_t _graph_on_entry(
     ftrace_context_t context)
 {
     rt_err_t rc;
-    rt_ubase_t time = ftrace_timestamp();
-    rc = ftrace_vice_stack_push_word(ftrace_trace_host_data_get(), context, time);
+
+    rt_base_t *time = tracer->session->data_buf_get(tracer, context);
+    if (time)
+    {
+        *time = ftrace_timestamp();
+        rc = RT_EOK;
+    }
+    else
+        rc = -RT_ENOMEM;
 
     return rc;
 }
 
 rt_inline rt_notrace
-char* _strncpy_notrace(char* dest, const char* src, size_t n) {
+char* _strncpy_notrace(char* dest, const char* src, size_t n)
+{
     size_t i;
     for (i = 0; i < n && src[i] != '\0'; i++)
     {
@@ -66,10 +74,12 @@ void _graph_on_exit(
     ftrace_context_t context)
 {
     /* thread event */
-    rt_thread_t tcb = rt_thread_self_sync();
+    rt_base_t entry_time;
+    rt_thread_t tcb = context->current_thread;
+    rt_ubase_t exit_time = ftrace_timestamp();
     ftrace_host_data_t host_data = tcb->ftrace_host_session;
 
-    /* TODO: handling the enqueue if the session is disable */
+    /* TODO: handling the enqueue if the session has been deconstructed */
 
     unsigned int expected = 0;
     if (atomic_compare_exchange_strong(&host_data->trace_recorded, &expected, (rt_ubase_t)tracer))
@@ -84,8 +94,7 @@ void _graph_on_exit(
     }
 
     /* function event */
-    rt_ubase_t entry_time = ftrace_vice_stack_pop_word(ftrace_trace_host_data_get(), context);
-    rt_ubase_t exit_time = ftrace_timestamp();
+    entry_time = *(rt_base_t *)tracer->session->data_buf_get(tracer, context);
     ftrace_evt_ring_t func_ring = TRACER_GET_FUNC_RING(tracer);
     struct ftrace_graph_evt event = {
         .entry_address = entry_pc,
