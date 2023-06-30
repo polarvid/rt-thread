@@ -3386,6 +3386,69 @@ sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t
     return (ret < 0 ? -EFAULT: ret);
 }
 
+sysret_t sys_rt_sigtimedwait(const sigset_t *sigset, siginfo_t *info, const struct timespec *timeout, size_t sigsize)
+{
+    int sig;
+    size_t ret;
+    lwp_sigset_t lwpset;
+    siginfo_t kinfo;
+    struct timespec ktimeout;
+    struct timespec *ptimeout;
+
+    /* Fit sigset size to lwp set */
+    if (sizeof(lwpset) < sigsize)
+    {
+        LOG_W("%s: sigsize (%lx) extends lwp sigset chunk\n", __func__, sigsize);
+        sigsize = sizeof(lwpset);
+    }
+    else
+    {
+        memset(&lwpset, 0, sizeof(lwpset));
+    }
+
+    /* Verify and Get sigset, timeout */
+    if (!sigset || !lwp_user_accessable((void *)sigset, sigsize))
+    {
+        return -EFAULT;
+    }
+    else
+    {
+        ret = lwp_get_from_user(&lwpset, (void *)sigset, sigsize);
+        RT_ASSERT(ret == sigsize);
+    }
+
+    if (timeout)
+    {
+        if (!lwp_user_accessable((void *)timeout, sizeof(*timeout)))
+            return -EFAULT;
+        else
+        {
+            ret = lwp_get_from_user(&ktimeout, (void *)timeout, sizeof(*timeout));
+            ptimeout = &ktimeout;
+            RT_ASSERT(ret == sizeof(*timeout));
+        }
+    }
+    else
+    {
+        ptimeout = RT_NULL;
+    }
+
+    sig = lwp_sigtimedwait(&lwpset, &kinfo, ptimeout);
+
+    if (info)
+    {
+        if (!lwp_user_accessable((void *)info, sizeof(*info)))
+            return -EFAULT;
+        else
+        {
+            ret = lwp_put_to_user(info, &kinfo, sizeof(*info));
+            RT_ASSERT(ret == sizeof(*info));
+        }
+    }
+
+    return sig;
+}
+
 sysret_t sys_tkill(int tid, int sig)
 {
 #ifdef ARCH_MM_MMU
@@ -5386,6 +5449,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_symlink),
     SYSCALL_SIGN(sys_getaffinity),                      /* 180 */
     SYSCALL_SIGN(sys_sysinfo),
+    SYSCALL_SIGN(sys_rt_sigtimedwait),
 };
 
 const void *lwp_get_sys_api(rt_uint32_t number)

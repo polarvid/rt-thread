@@ -6,10 +6,12 @@
  * Change Logs:
  * Date           Author       Notes
  * 2019-11-12     Jesven       first version
+ * 2023-02-23     shell        Support sigtimedwait
  */
 
 #include <rthw.h>
 #include <rtthread.h>
+#include <string.h>
 
 #include "lwp.h"
 #include "lwp_arch.h"
@@ -420,6 +422,22 @@ rt_inline void sigandsets(lwp_sigset_t *dset, const lwp_sigset_t *set0, const lw
     }
 }
 
+rt_inline void signotsets(lwp_sigset_t *dset, const lwp_sigset_t *set)
+{
+    switch (_LWP_NSIG_WORDS)
+    {
+        case 4:
+            dset->sig[3] = ~set->sig[3];
+            dset->sig[2] = ~set->sig[2];
+        case 2:
+            dset->sig[1] = ~set->sig[1];
+        case 1:
+            dset->sig[0] = ~set->sig[0];
+        default:
+            return;
+    }
+}
+
 int lwp_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset)
 {
     int ret = -1;
@@ -538,6 +556,18 @@ static void _do_signal_wakeup(rt_thread_t thread, int sig)
     }
 }
 
+typedef struct ksiginfo {
+    rt_list_t node;
+    siginfo_t si;
+} *ksiginfo_t;
+
+#define _KSI(obj) ((ksiginfo_t)obj)
+
+static int _do_kill()
+{
+    return 0;
+}
+
 int lwp_kill(pid_t pid, int sig)
 {
     rt_base_t level;
@@ -603,4 +633,126 @@ int lwp_thread_kill(rt_thread_t thread, int sig)
 out:
     rt_hw_interrupt_enable(level);
     return ret;
+}
+
+static rt_bool_t _dequeue_info(rt_thread_t thread, siginfo_t *info, int sig)
+{
+    rt_bool_t isempty; 
+    ksiginfo_t iter;
+    ksiginfo_t candidate = RT_NULL;
+
+    /* TODO: COMPLETE siginfo list */
+    return RT_TRUE; // TODO
+    rt_list_for_each_entry(iter, &_KSI(thread->siginfo_list)->node, node)
+    {
+        if (iter->si.si_signo == sig)
+        {
+            candidate = iter;
+        }
+    }
+    /* real-time signals should check if same signal is still queuing */
+    isempty = RT_TRUE;
+
+    if (candidate)
+    {
+        memcpy(info, &candidate->si, sizeof(*info));
+    }
+    return isempty;
+}
+
+static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *info)
+{
+    lwp_sigset_t *pending;
+    int sig;
+    pending = &thread->signal;
+    sig = next_signal(pending, mask);
+    if (!sig)
+    {
+        pending = &((struct rt_lwp *)thread->lwp)->signal;
+        sig = next_signal(pending, mask);
+    }
+
+    if (!sig)
+        return sig;
+
+    if (_dequeue_info(thread, info, sig))
+    {
+        /* No more signal */
+        lwp_sigdelset(pending, sig);
+    }
+
+    info->si_code = SI_TIMER;
+    lwp_sigdelset(pending, sig);
+    return sig;
+}
+
+int lwp_sigtimedwait(lwp_sigset_t *sigset, siginfo_t *info, struct timespec *timeout)
+{
+    rt_err_t ret;
+    int sig;
+    rt_thread_t thread = rt_thread_self();
+
+    /**
+     * @brief POSIX
+     * If one of the signals in set is already pending for the calling thread,
+     * sigwaitinfo() will return immediately
+     */
+
+    /* Create a mask of signals user dont want or cannot catch */
+    lwp_sigdelset(sigset, SIGKILL);
+    lwp_sigdelset(sigset, SIGSTOP);
+    signotsets(sigset, sigset);
+
+    sig = _dequeue_signal(thread, sigset, info);
+    if (sig)
+        return sig;
+
+    /* WARNING atomic problem, what if pending signal arrives before we sleep */
+
+    /**
+     * @brief POSIX
+     * if none of the signals specified by set are pending, sigtimedwait() shall
+     * wait for the time interval specified in the timespec structure referenced
+     * by timeout.
+     * If timeout is the null pointer, the behavior is unspecified.
+     */
+    if (timeout)
+    {
+        /* TODO verify timeout valid ? not overflow 32bits, nanosec valid, ... */
+        rt_uint32_t time;
+        time = rt_timespec_to_tick(timeout);
+
+        /**
+         * @brief POSIX
+         * If the timespec structure pointed to by timeout is zero-valued and
+         * if none of the signals specified by set are pending, then 
+         * sigtimedwait() shall return immediately with an error
+         */
+        if (time == 0)
+            return -EAGAIN;
+
+        rt_enter_critical();
+        ret = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
+        rt_timer_control(&(thread->thread_timer),
+                         RT_TIMER_CTRL_SET_TIME,
+                         &timeout);
+        rt_timer_start(&(thread->thread_timer));
+        rt_exit_critical();
+    }
+    else
+    {
+        /* suspend kernel forever until signal was received */
+        ret = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
+    }
+
+    if (ret == RT_EOK)
+    {
+        rt_schedule();
+        ret = -EAGAIN;
+    }
+    /* else ret == -EINTR */
+
+    sig = _dequeue_signal(thread, sigset, info);
+
+    return sig ? sig : ret;
 }

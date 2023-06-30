@@ -931,7 +931,23 @@ static void rtthread_timer_wrapper(void *timerobj)
     }
 
 #ifdef RT_USING_SMART
-    sys_kill(timer->pid, timer->sigev_signo);
+    int ret;
+    int tid = *(int *)&timer->sigev_notify_function;
+    if (!tid)
+    {
+        ret = lwp_kill(timer->pid, timer->sigev_signo);
+    }
+    else
+    {
+        rt_thread_t thread = lwp_tid_get_thread(tid);
+        ret = lwp_thread_kill(thread, timer->sigev_signo);
+    }
+
+    if (ret != RT_EOK)
+    {
+        LOG_W("%s: Do kill failed(pid %d)", __func__, timer->pid);
+    }
+
 #else
     if(timer->sigev_notify_function != RT_NULL)
     {
@@ -960,9 +976,7 @@ int timer_create(clockid_t clockid, struct sigevent *evp, timer_t *timerid)
     struct timer_obj *timer;
     char timername[RT_NAME_MAX] = {0};
 
-    if (clockid > CLOCK_ID_MAX ||
-        (evp->sigev_notify != SIGEV_NONE &&
-         evp->sigev_notify != SIGEV_SIGNAL))
+    if (clockid > CLOCK_ID_MAX)
     {
         rt_set_errno(EINVAL);
         return -1;

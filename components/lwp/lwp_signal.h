@@ -28,6 +28,7 @@ void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func);
 int lwp_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset);
 int lwp_sigaction(int sig, const struct lwp_sigaction *act, struct lwp_sigaction * oact, size_t sigsetsize);
 int lwp_thread_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset);
+int lwp_sigtimedwait(lwp_sigset_t *sigset, siginfo_t *info, struct timespec *timeout);
 
 int lwp_kill(pid_t pid, int sig);
 int lwp_thread_kill(rt_thread_t thread, int sig);

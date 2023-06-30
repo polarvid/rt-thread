@@ -857,6 +857,7 @@ struct rt_thread
     lwp_sigset_t signal_mask;
     int signal_mask_bak;
     rt_uint32_t signal_in_process;
+    void *siginfo_list;
 #ifndef ARCH_MM_MMU
     lwp_sighandler_t signal_handler[32];
 #endif
