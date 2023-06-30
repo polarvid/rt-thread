@@ -250,6 +250,7 @@ arch_syscall_exit:
 
 .global arch_ret_to_user
 arch_ret_to_user:
+    /* save exception frame */
     SAVE_FPU sp
     stp x0, x1, [sp, #-0x10]!
     stp x2, x3, [sp, #-0x10]!
@@ -272,12 +273,16 @@ arch_ret_to_user:
     stp x0, x1, [sp, #-0x10]!
     stp x29, x30, [sp, #-0x10]!
 
+    /* pre-action */
     bl lwp_check_debug
+
     bl lwp_check_exit_request
     cbz w0, 1f
+    /* exit on event */
     mov x0, xzr
     b sys_exit
 1:
+    /* check if dbg ops exist */
     ldr x0, =rt_dbg_ops
     ldr x0, [x0]
     cbz x0, 3f
@@ -295,6 +300,7 @@ arch_ret_to_user:
     bl lwp_signal_check
     cmp x0, xzr
 
+    /* restore exception frame */
     ldp x29, x30, [sp], #0x10
     ldp x0, x1, [sp], #0x10
     msr fpcr, x0
@@ -325,6 +331,8 @@ arch_ret_to_user:
     cmp x0, xzr
     ldp x0, x1, [sp], #0x10
     beq 1f
+
+    /* save */
     SAVE_FPU sp
     stp x0, x1, [sp, #-0x10]!
     stp x2, x3, [sp, #-0x10]!
@@ -345,8 +353,13 @@ arch_ret_to_user:
     mrs x1, fpsr
     stp x0, x1, [sp, #-0x10]!
     stp x29, x30, [sp, #-0x10]!
+
+
     mrs x0, elr_el1
     bl dbg_attach_req
+
+
+    /* restore */
     ldp x29, x30, [sp], #0x10
     ldp x0, x1, [sp], #0x10
     msr fpcr, x0
@@ -513,6 +526,7 @@ arch_signal_quit:
     b arch_ret_to_user
 
 user_do_signal:
+    /* switch to user stack and save exception frame */
     msr spsel, #0
     SAVE_FPU sp
     stp x0, x1, [sp, #-0x10]!
@@ -536,7 +550,7 @@ user_do_signal:
     stp x29, x30, [sp, #-0x10]!
 
     sub sp, sp, #0x10
-    adr x0, lwp_sigreturn
+    adr x0, lwp_sigreturn   /* TODO: fix sys_sigreturn */
     ldr w1, [x0]
     str w1, [sp]
     ldr w1, [x0, #4]
