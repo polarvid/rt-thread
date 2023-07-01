@@ -8,8 +8,10 @@
  * 2021-05-18     Jesven       first version
  */
 
+#include <armv8.h>
 #include <rthw.h>
 #include <rtthread.h>
+#include <string.h>
 
 #ifdef ARCH_MM_MMU
 
@@ -92,3 +94,24 @@ int arch_expand_user_stack(void *addr)
 }
 
 #endif
+
+void *arch_copy_exp_frame(rt_base_t user_sp, struct rt_hw_exp_stack *exp_frame, rt_base_t elr, rt_base_t spsr)
+{
+    size_t item_copied = sizeof(*exp_frame) / sizeof(rt_base_t);
+    rt_base_t *new_sp = (rt_base_t *)user_sp - item_copied;
+
+    if (lwp_user_accessable(new_sp, sizeof(*exp_frame)))
+        memcpy(new_sp, exp_frame, sizeof(*exp_frame));
+    else
+    {
+        LOG_I("%s: User stack overflow", __func__);
+        sys_exit(EXIT_FAILURE);
+    }
+
+    /* TODO: fix the 3 fields in exception frame, so that memcpy will be fine */
+    ((struct rt_hw_exp_stack *)new_sp)->pc = elr;
+    ((struct rt_hw_exp_stack *)new_sp)->cpsr = spsr;
+    ((struct rt_hw_exp_stack *)new_sp)->sp_el0 = user_sp;
+
+    return new_sp;
+}

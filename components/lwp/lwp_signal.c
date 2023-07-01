@@ -159,43 +159,52 @@ int lwp_suspend_sigcheck(rt_thread_t thread, int suspend_flag)
 
 int lwp_signal_check(void)
 {
+    int signal;
     rt_base_t level;
     struct rt_thread *thread;
     struct rt_lwp *lwp;
-    uint32_t have_signal = 0;
+    lwp_sigset_t *pending;
+    lwp_sigset_t *mask;
 
+    /* TODO: remove rt_hw_interrupt_disable here */
     level = rt_hw_interrupt_disable();
 
     thread = rt_thread_self();
-
-    if (thread->signal_in_process)
-    {
-        goto out;
-    }
-
     lwp = (struct rt_lwp*)thread->lwp;
 
-    if (lwp->signal_in_process)
+    /* TODO: move lwp signal to strcut rt_lwp, but not rt_thread_t */
+    if (!lwp_sigisemptyset(&thread->signal))
     {
-        goto out;
+        pending = &thread->signal;
+        mask = &thread->signal_mask;
+    }
+    else if (!lwp_sigisemptyset(&lwp->signal))
+    {
+        pending = &lwp->signal;
+        mask = &lwp->signal_mask;
+    }
+    else
+    {
+        pending = RT_NULL;
     }
 
-    have_signal = !lwp_sigisemptyset(&thread->signal);
-    if (have_signal)
+    if (pending)
     {
-        thread->signal_in_process = 1;
-        goto out;
+        signal = next_signal(pending, mask);
+        RT_ASSERT(signal != 0);
+        lwp_sigdelset(pending, signal);
     }
-    have_signal = !lwp_sigisemptyset(&lwp->signal);
-    if (have_signal)
+    else
     {
-        lwp->signal_in_process = 1;
+        signal = 0;
     }
-out:
+
     rt_hw_interrupt_enable(level);
-    return have_signal;
+
+    return signal;
 }
 
+#if 0
 int lwp_signal_backup(void *user_sp, void *user_pc, void* user_flag)
 {
     rt_base_t level;
@@ -207,28 +216,28 @@ int lwp_signal_backup(void *user_sp, void *user_pc, void* user_flag)
     thread = rt_thread_self();
     if (thread->signal_in_process)
     {
-        thread->user_ctx.sp = user_sp;
-        thread->user_ctx.pc = user_pc;
-        thread->user_ctx.flag = user_flag;
+        // thread->user_ctx.sp = user_sp;
+        // thread->user_ctx.pc = user_pc;
+        // thread->user_ctx.flag = user_flag;
 
-        signal = next_signal(&thread->signal, &thread->signal_mask);
-        RT_ASSERT(signal != 0);
-        lwp_sigaddset(&thread->signal_mask, signal);
-        thread->signal_mask_bak = signal;
-        lwp_sigdelset(&thread->signal, signal);
+        // signal = next_signal(&thread->signal, &thread->signal_mask);
+        // RT_ASSERT(signal != 0);
+        // lwp_sigaddset(&thread->signal_mask, signal);
+        // thread->signal_mask_bak = signal;
+        // lwp_sigdelset(&thread->signal, signal);
     }
     else
     {
-        lwp = (struct rt_lwp*)thread->lwp;
-        lwp->user_ctx.sp = user_sp;
-        lwp->user_ctx.pc = user_pc;
-        lwp->user_ctx.flag = user_flag;
+        // lwp = (struct rt_lwp*)thread->lwp;
+        // lwp->user_ctx.sp = user_sp;
+        // lwp->user_ctx.pc = user_pc;
+        // lwp->user_ctx.flag = user_flag;
 
-        signal = next_signal(&lwp->signal, &lwp->signal_mask);
-        RT_ASSERT(signal != 0);
-        lwp_sigaddset(&lwp->signal_mask, signal);
-        lwp->signal_mask_bak = signal;
-        lwp_sigdelset(&lwp->signal, signal);
+        // signal = next_signal(&lwp->signal, &lwp->signal_mask);
+        // RT_ASSERT(signal != 0);
+        // lwp_sigaddset(&lwp->signal_mask, signal);
+        // lwp->signal_mask_bak = signal;
+        // lwp_sigdelset(&lwp->signal, signal);
     }
     rt_hw_interrupt_enable(level);
     return signal;
@@ -245,25 +254,26 @@ struct rt_user_context *lwp_signal_restore(void)
     thread = rt_thread_self();
     if (thread->signal_in_process)
     {
-        ctx = &thread->user_ctx;
-        thread->signal_in_process = 0;
+        // ctx = &thread->user_ctx;
+        // thread->signal_in_process = 0;
 
-        lwp_sigdelset(&thread->signal_mask, thread->signal_mask_bak);
-        thread->signal_mask_bak = 0;
+        // lwp_sigdelset(&thread->signal_mask, thread->signal_mask_bak);
+        // thread->signal_mask_bak = 0;
     }
     else
     {
-        lwp = (struct rt_lwp*)thread->lwp;
-        ctx = &lwp->user_ctx;
-        RT_ASSERT(lwp->signal_in_process != 0);
-        lwp->signal_in_process = 0;
+        // lwp = (struct rt_lwp*)thread->lwp;
+        // ctx = &lwp->user_ctx;
+        // RT_ASSERT(lwp->signal_in_process != 0);
+        // lwp->signal_in_process = 0;
 
-        lwp_sigdelset(&lwp->signal_mask, lwp->signal_mask_bak);
-        lwp->signal_mask_bak = 0;
+        // lwp_sigdelset(&lwp->signal_mask, lwp->signal_mask_bak);
+        // lwp->signal_mask_bak = 0;
     }
     rt_hw_interrupt_enable(level);
     return ctx;
 }
+#endif
 
 rt_inline int _lwp_check_ignore(int sig)
 {

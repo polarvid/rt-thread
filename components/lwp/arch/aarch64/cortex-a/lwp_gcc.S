@@ -6,11 +6,14 @@
  * Change Logs:
  * Date           Author       Notes
  * 2021-05-18     Jesven       first version
+ * 2023-06-30     shell        Reduce save/restore of exception context
  */
+#define __ASSEMBLY__
 
-#include "rtconfig.h"
-#include "asm-generic.h"
-#include "asm-fpu.h"
+#include <armv8.h>
+#include <asm-fpu.h>
+#include <asm-generic.h>
+#include <rtconfig.h>
 
 /*********************
  *      SPSR BIT     *
@@ -299,7 +302,11 @@ arch_ret_to_user:
 3:
     bl lwp_signal_check
     cmp x0, xzr
+    beq _check_debug
+    add sp, sp, #-0x10
+    b _signal_accept
 
+_check_debug:
     /* restore exception frame */
     ldp x29, x30, [sp], #0x10
     ldp x0, x1, [sp], #0x10
@@ -322,8 +329,6 @@ arch_ret_to_user:
     ldp x2, x3, [sp], #0x10
     ldp x0, x1, [sp], #0x10
     RESTORE_FPU sp
-
-    bne user_do_signal
 
     stp x0, x1, [sp, #-0x10]!
     ldr x0, =rt_dbg_ops
@@ -484,26 +489,25 @@ lwp_check_debug_quit:
 
 arch_signal_quit:
     msr daifset, #3
-/*
-    drop stack data
-*/
-    add sp, sp, #CONTEXT_SIZE
-    bl lwp_signal_restore
-    /* x0 is user_ctx : ori sp, pc, cpsr */
-    ldr x1, [x0]
-    ldr x2, [x0, #8]
-    ldr x3, [x0, #16]
-    msr spsr_el1, x3
-    msr elr_el1, x2
-    add x1, x1, #16
-    msr sp_el0, x1
 
+    /* drop current exception frame */
+    add sp, sp, #CONTEXT_SIZE
+
+    /* restore previous exception frame */
     msr spsel, #0
 
+    add sp, sp, #0x10
+    ldp x2, x3, [sp], #0x10
+    msr elr_el1, x2
+    msr spsr_el1, x3
+
     ldp x29, x30, [sp], #0x10
+    // msr sp_el0, x29
+
     ldp x28, x29, [sp], #0x10
     msr fpcr, x28
     msr fpsr, x29
+
     ldp x28, x29, [sp], #0x10
     ldp x26, x27, [sp], #0x10
     ldp x24, x25, [sp], #0x10
@@ -525,29 +529,24 @@ arch_signal_quit:
 
     b arch_ret_to_user
 
-user_do_signal:
-    /* switch to user stack and save exception frame */
+/* __attribute__ ((noreturn)) void _signal_accept(int signal) */
+.local _signal_accept
+_signal_accept:
+    mov x19, x0
+
+    /* move exception frame to user stack */
+    mov x1, sp
+    mrs x0, sp_el0
+    mrs x2, elr_el1
+    mrs x3, spsr_el1
+    bl arch_copy_exp_frame
+
+    /* drop exp frame on kernel stack, reset user sp */
+    add sp, sp, #RT_HW_EXCEPTION_FRAME_SIZE
+    msr sp_el0, x0
+
+    /* copy lwp_sigreturn */
     msr spsel, #0
-    SAVE_FPU sp
-    stp x0, x1, [sp, #-0x10]!
-    stp x2, x3, [sp, #-0x10]!
-    stp x4, x5, [sp, #-0x10]!
-    stp x6, x7, [sp, #-0x10]!
-    stp x8, x9, [sp, #-0x10]!
-    stp x10, x11, [sp, #-0x10]!
-    stp x12, x13, [sp, #-0x10]!
-    stp x14, x15, [sp, #-0x10]!
-    stp x16, x17, [sp, #-0x10]!
-    stp x18, x19, [sp, #-0x10]!
-    stp x20, x21, [sp, #-0x10]!
-    stp x22, x23, [sp, #-0x10]!
-    stp x24, x25, [sp, #-0x10]!
-    stp x26, x27, [sp, #-0x10]!
-    stp x28, x29, [sp, #-0x10]!
-    mrs x28, fpcr
-    mrs x29, fpsr
-    stp x28, x29, [sp, #-0x10]!
-    stp x29, x30, [sp, #-0x10]!
 
     sub sp, sp, #0x10
     adr x0, lwp_sigreturn   /* TODO: fix sys_sigreturn */
@@ -566,14 +565,16 @@ user_do_signal:
 
     msr spsel, #1
 
-    mrs x1, elr_el1
-    mrs x2, spsr_el1
-    bl lwp_signal_backup
-    /* x0 is signal */
-    mov x19, x0
+    mov x0, x19
     bl lwp_sighandler_get
     adds x1, x0, xzr
     mov x0, x19
+
+    /**
+     * x0 -> signal number
+     * x1 -> signal handler
+     * x20 -> lwp_sigreturn
+     */
     bne 1f
     mov x1, x20
 1:

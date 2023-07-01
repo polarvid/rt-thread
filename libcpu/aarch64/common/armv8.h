@@ -11,6 +11,17 @@
 #ifndef __ARMV8_H__
 #define __ARMV8_H__
 
+#define RT_HW_EXCEPTION_FRAME_SIZE 544
+
+#define SP_ELx     ((unsigned long)0x01)
+#define SP_EL0     ((unsigned long)0x00)
+#define PSTATE_EL1 ((unsigned long)0x04)
+#define PSTATE_EL2 ((unsigned long)0x08)
+#define PSTATE_EL3 ((unsigned long)0x0c)
+
+#ifndef __ASSEMBLY__
+#include <rtthread.h>
+
 /* the exception stack without VFP registers */
 struct rt_hw_exp_stack
 {
@@ -51,17 +62,14 @@ struct rt_hw_exp_stack
     unsigned long x0;
     unsigned long x1;
 
-    unsigned long long fpu[16];
+    unsigned long fpu[32];
 };
 
-#define SP_ELx     ((unsigned long)0x01)
-#define SP_EL0     ((unsigned long)0x00)
-#define PSTATE_EL1 ((unsigned long)0x04)
-#define PSTATE_EL2 ((unsigned long)0x08)
-#define PSTATE_EL3 ((unsigned long)0x0c)
+RT_CTASSERT(frame_size_identical, sizeof(struct rt_hw_exp_stack) == RT_HW_EXCEPTION_FRAME_SIZE);
 
 rt_ubase_t rt_hw_get_current_el(void);
 void rt_hw_set_elx_env(void);
 void rt_hw_set_current_vbar(rt_ubase_t addr);
 
+#endif /* __ASSEMBLY__ */
 #endif
