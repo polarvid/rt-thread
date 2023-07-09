@@ -29,7 +29,7 @@
 #endif
 
 #define DBG_TAG    "LWP_PID"
-#define DBG_LVL    DBG_INFO
+#define DBG_LVL    DBG_LOG
 #include <rtdbg.h>
 
 #define PID_MAX 10000
@@ -331,6 +331,8 @@ struct rt_lwp* lwp_new(void)
     rt_wqueue_init(&lwp->wait_queue);
     lwp->ref = 1;
 
+    lwp_signal_init(&lwp->signal);
+
     level = rt_hw_interrupt_disable();
     pid = lwp_pid_get();
     if (pid == 0)
@@ -475,34 +477,33 @@ void lwp_free(struct rt_lwp* lwp)
     }
 
     /* for parent */
+    if (lwp->parent)
     {
-        if (lwp->parent)
+        struct rt_thread *thread;
+        if (!rt_list_isempty(&lwp->wait_list))
         {
-            struct rt_thread *thread;
-            if (!rt_list_isempty(&lwp->wait_list))
-            {
-                thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
-                thread->error = RT_EOK;
-                thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
-                rt_thread_resume(thread);
-                rt_hw_interrupt_enable(level);
-                return;
-            }
-            else
-            {
-                struct rt_lwp **it = &lwp->parent->first_child;
-
-                while (*it != lwp)
-                {
-                    it = &(*it)->sibling;
-                }
-                *it = lwp->sibling;
-            }
+            thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
+            thread->error = RT_EOK;
+            thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
+            rt_thread_resume(thread);
+            rt_hw_interrupt_enable(level);
+            return;
         }
-        lwp_pid_put(lwp_to_pid(lwp));
-        rt_hw_interrupt_enable(level);
-        rt_free(lwp);
+        else
+        {
+            struct rt_lwp **it = &lwp->parent->first_child;
+
+            while (*it != lwp)
+            {
+                it = &(*it)->sibling;
+            }
+            *it = lwp->sibling;
+        }
     }
+
+    lwp_pid_put(lwp_to_pid(lwp));
+    rt_hw_interrupt_enable(level);
+    rt_free(lwp);
 }
 
 int lwp_ref_inc(struct rt_lwp *lwp)
@@ -979,6 +980,11 @@ void lwp_terminate(struct rt_lwp *lwp)
     }
 
     level = rt_hw_interrupt_disable();
+
+    /* stop the receiving of signals */
+    lwp->terminated = RT_TRUE;
+
+    /* broad cast exit request for sibling threads */
     for (list = lwp->t_grp.next; list != &lwp->t_grp; list = list->next)
     {
         rt_thread_t thread;

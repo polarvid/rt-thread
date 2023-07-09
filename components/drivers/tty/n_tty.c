@@ -50,7 +50,6 @@
 #define ECHO_BLOCK      256
 #define ECHO_DISCARD_WATERMARK  RT_TTY_BUF - (ECHO_BLOCK + 32)
 
-
 struct n_tty_data
 {
     /* producer-published */
@@ -136,6 +135,7 @@ rt_inline int test_and_clear_bit(int nr, volatile void *addr)
     return retval;
 }
 
+/* switch to rt_ffs -> __builtin_ffsl */
 rt_inline unsigned long __ffs(unsigned long word)
 {
     int num = 0;
@@ -239,7 +239,7 @@ found_first:
     }
 
 found_middle:
-    return result + __ffs(tmp);
+    return result + __builtin_ffsl(tmp);
 }
 
 rt_inline void tty_sigaddset(lwp_sigset_t *set, int _sig)

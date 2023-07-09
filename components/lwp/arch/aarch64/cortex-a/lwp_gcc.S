@@ -300,13 +300,15 @@ arch_ret_to_user:
     bic x2, x2, x1
     msr spsr_el1, x2
 3:
-    bl lwp_signal_check
-    cmp x0, xzr
-    beq _check_debug
-    add sp, sp, #-0x10
-    b _signal_accept
 
-_check_debug:
+    /**
+     * push 2 dummy words to simulate a exception frame of interrupt
+     */
+    add sp, sp, #-0x10
+    mov x0, sp
+    bl lwp_thread_signal_catch
+
+    /* check debug */
     /* restore exception frame */
     ldp x29, x30, [sp], #0x10
     ldp x0, x1, [sp], #0x10
@@ -529,13 +531,13 @@ arch_signal_quit:
 
     b arch_ret_to_user
 
-/* __attribute__ ((noreturn)) void _signal_accept(int signal) */
-.local _signal_accept
-_signal_accept:
-    mov x19, x0
+
+/* void arch_thread_signal_prepare(void *exp_frame, bool_t need_siginfo) */
+.global arch_thread_signal_prepare
+arch_thread_signal_prepare:
 
     /* move exception frame to user stack */
-    mov x1, sp
+    mov x1, x0
     mrs x0, sp_el0
     mrs x2, elr_el1
     mrs x3, spsr_el1
@@ -564,7 +566,18 @@ _signal_accept:
     dsb sy
 
     msr spsel, #1
+    ret
 
+/**
+ * __attribute__ ((noreturn))
+ * void arch_thread_signal_enter(
+ *      int signo,
+ *      siginfo_t *info,
+ *      void *context,
+ *      void *entry_uaddr)
+ */
+.global arch_thread_signal_enter
+arch_thread_signal_enter:
     mov x0, x19
     bl lwp_sighandler_get
     adds x1, x0, xzr
@@ -573,13 +586,15 @@ _signal_accept:
     /**
      * x0 -> signal number
      * x1 -> signal handler
-     * x20 -> lwp_sigreturn
      */
     bne 1f
     mov x1, x20
 1:
     msr elr_el1, x1
-    mov x30, x20
+
+    /** set the return address to the sigreturn */
+    /** TODO: fix this with a __kernel_sigreturn */
+    mrs x30, sp_el0
     eret
 
 lwp_debugreturn:

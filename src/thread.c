@@ -258,11 +258,12 @@ static rt_err_t _thread_init(struct rt_thread *thread,
 #ifdef RT_USING_SMART
     thread->lwp = RT_NULL;
     rt_list_init(&(thread->sibling));
-    rt_memset(&thread->signal, 0, sizeof(lwp_sigset_t));
-    rt_memset(&thread->signal_mask, 0, sizeof(lwp_sigset_t));
-    thread->signal_mask_bak = 0;
-    thread->signal_in_process = 0;
-    thread->siginfo_list = RT_NULL;
+
+    /* signal init */
+    rt_memset(&thread->signal.sigset_mask, 0, sizeof(lwp_sigset_t));
+    rt_memset(&thread->signal.sig_queue.sigset_pending, 0, sizeof(lwp_sigset_t));
+    rt_list_init(&thread->signal.sig_queue.siginfo_list);
+
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
 #endif
 

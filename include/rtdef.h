@@ -218,6 +218,7 @@ typedef __gnuc_va_list              va_list;
 #define rt_used                     __attribute__((used))
 #define rt_align(n)                 __attribute__((aligned(n)))
 #define rt_weak                     __attribute__((weak))
+#define rt_noreturn                 __attribute__ ((noreturn))
 #define rt_inline                   static __inline
 #define RTT_API
 #elif defined (__ADSPBLACKFIN__)        /* for VisualDSP++ Compiler */
@@ -740,6 +741,7 @@ struct rt_wakeup
 #define _LWP_NSIG_WORDS (_LWP_NSIG / _LWP_NSIG_BPW)
 
 typedef void (*lwp_sighandler_t)(int);
+typedef void (*lwp_sigaction_t)(int signo, siginfo_t *info, void *context);
 
 typedef struct {
     unsigned long sig[_LWP_NSIG_WORDS];
@@ -753,6 +755,29 @@ struct lwp_sigaction {
     lwp_sigset_t sa_mask;
     int sa_flags;
     void (*sa_restorer)(void);
+};
+
+typedef struct lwp_siginfo {
+    rt_list_t node;
+
+    struct {
+        int signo;
+        int value;
+        int code;
+
+        int from_tid;
+        pid_t from_pid;
+    } ksiginfo;
+} *lwp_siginfo_t;
+
+typedef struct lwp_sigqueue {
+    rt_list_t siginfo_list;
+    lwp_sigset_t sigset_pending;
+} *lwp_sigqueue_t;
+
+struct lwp_thread_signal {
+    lwp_sigset_t sigset_mask;
+    struct lwp_sigqueue sig_queue;
 };
 
 struct rt_user_context
@@ -824,10 +849,6 @@ struct rt_thread
     void            *si_list;                           /**< the signal infor list */
 #endif /* RT_USING_SIGNALS */
 
-#ifdef RT_USING_SMART
-    void            *msg_ret;                           /**< the return msg */
-#endif
-
     rt_ubase_t  init_tick;                              /**< thread's initialized tick */
     rt_ubase_t  remaining_tick;                         /**< remaining tick */
 
@@ -845,6 +866,8 @@ struct rt_thread
 
     /* light weight process if present */
 #ifdef RT_USING_SMART
+    void        *msg_ret;                               /**< the return msg */
+
     void        *lwp;
     /* for user create */
     void        *user_entry;
@@ -853,19 +876,15 @@ struct rt_thread
     rt_uint32_t *kernel_sp;                             /**< kernel stack point */
     rt_list_t   sibling;                                /**< next thread of same process */
 
-    lwp_sigset_t signal;
-    lwp_sigset_t signal_mask;
-    int signal_mask_bak;
-    rt_uint32_t signal_in_process;
-    void *siginfo_list;
-#ifndef ARCH_MM_MMU
-    lwp_sighandler_t signal_handler[32];
-#endif
+    struct lwp_thread_signal signal;
     struct rt_user_context user_ctx;
-
     struct rt_wakeup wakeup;                            /**< wakeup data */
     int exit_request;
-#if defined(ARCH_MM_MMU)
+    int tid;
+
+#ifndef ARCH_MM_MMU
+    lwp_sighandler_t signal_handler[32];
+#else
     int step_exec;
     int debug_attach_req;
     int debug_ret_user;
@@ -873,9 +892,8 @@ struct rt_thread
     struct rt_hw_exp_stack *regs;
     void * thread_idr;                                 /** lwp thread indicator */
     int *clear_child_tid;
-#endif
-    int tid;
-#endif
+#endif /* ARCH_MM_MMU */
+#endif /* RT_USING_SMART */
 
     rt_ubase_t user_data;                             /**< private user data beyond this thread */
 };

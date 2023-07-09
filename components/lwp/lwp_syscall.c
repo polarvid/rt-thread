@@ -11,8 +11,11 @@
  * 2021-02-12     lizhirui     add 64-bit support for sys_brk
  * 2021-02-20     lizhirui     fix some warnings
  * 2023-03-13     WangXiaoyao  Format & fix syscall return value
+ * 2023-07-06     Shell        adapt the sys_kill to new implementation of POSIX signal
  */
+
 #define _GNU_SOURCE
+
 /* RT-Thread System call */
 #include <rtthread.h>
 #include <rthw.h>
@@ -1007,11 +1010,74 @@ sysret_t sys_exec(char *filename, int argc, char **argv, char **envp)
     return lwp_execve(filename, 0, argc, argv, envp);
 }
 
-sysret_t sys_kill(int pid, int sig)
+sysret_t sys_kill(int pid, int signo)
 {
-    int ret = 0;
-    ret = lwp_kill(pid, sig);
-    return (ret < 0 ? GET_ERRNO() : ret);
+    rt_err_t kret;
+    sysret_t sysret;
+    rt_base_t level;
+    struct rt_lwp *lwp;
+
+    /* handling the semantics of sys_kill */
+    if (pid > 0)
+    {
+        /* TODO: lock the lwp strcut */
+        level = rt_hw_interrupt_disable();
+        lwp = lwp_from_pid(pid);
+
+        /* lwp_signal_kill() can handle NULL lwp */
+        if (lwp)
+            kret = lwp_signal_kill(lwp, signo, SI_USER, 0);
+        else
+            kret = -RT_ENOENT;
+
+        rt_hw_interrupt_enable(level);
+    }
+    else if (pid == 0)
+    {
+        /**
+         * sig shall be sent to all processes (excluding an unspecified set
+         * of system processes) whose process group ID is equal to the process
+         * group ID of the sender, and for which the process has permission to
+         * send a signal.
+         */
+    }
+    else if (pid == -1)
+    {
+        /**
+         * sig shall be sent to all processes (excluding an unspecified set
+         * of system processes) for which the process has permission to send
+         * that signal.
+         */
+    }
+    else /* pid < -1 */
+    {
+        /**
+         * sig shall be sent to all processes (excluding an unspecified set
+         * of system processes) whose process group ID is equal to the absolute
+         * value of pid, and for which the process has permission to send a signal.
+         */
+    }
+
+    switch (kret)
+    {
+        case -RT_ENOENT:
+            sysret = -ESRCH;
+            break;
+        case -RT_EINVAL:
+            sysret = -EINVAL;
+            break;
+
+        /**
+         * kill() never returns ENOMEM, so return normally to caller.
+         * IEEE Std 1003.1-2017 says the kill() function is successful
+         * if the process has permission to send sig to any of the
+         * processes specified by pid.
+         */
+        case -RT_ENOMEM:
+        default:
+            sysret = 0;
+    }
+    return sysret;
 }
 
 sysret_t sys_getpid(void)
@@ -1500,40 +1566,9 @@ fail:
     }
     return RT_NULL;
 }
-#ifdef ARCH_MM_MMU
-#define CLONE_VM    0x00000100
-#define CLONE_FS    0x00000200
-#define CLONE_FILES 0x00000400
-#define CLONE_SIGHAND   0x00000800
-#define CLONE_PTRACE    0x00002000
-#define CLONE_VFORK 0x00004000
-#define CLONE_PARENT    0x00008000
-#define CLONE_THREAD    0x00010000
-#define CLONE_NEWNS 0x00020000
-#define CLONE_SYSVSEM   0x00040000
-#define CLONE_SETTLS    0x00080000
-#define CLONE_PARENT_SETTID 0x00100000
-#define CLONE_CHILD_CLEARTID    0x00200000
-#define CLONE_DETACHED  0x00400000
-#define CLONE_UNTRACED  0x00800000
-#define CLONE_CHILD_SETTID  0x01000000
-#define CLONE_NEWCGROUP 0x02000000
-#define CLONE_NEWUTS    0x04000000
-#define CLONE_NEWIPC    0x08000000
-#define CLONE_NEWUSER   0x10000000
-#define CLONE_NEWPID    0x20000000
-#define CLONE_NEWNET    0x40000000
-#define CLONE_IO    0x80000000
 
-/* arg[] -> flags
- *          stack
- *          new_tid
- *          tls
- *          set_clear_tid_address
- *          quit_func
- *          start_args
- *          */
-#define SYS_CLONE_ARGS_NR 7
+#ifdef ARCH_MM_MMU
+#include "lwp_clone.h"
 
 long _sys_clone(void *arg[])
 {

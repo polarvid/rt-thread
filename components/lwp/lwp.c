@@ -32,6 +32,7 @@
 #include "lwp.h"
 #include "lwp_arch.h"
 #include "lwp_arch_comm.h"
+#include "lwp_signal.h"
 #include "console.h"
 
 #define DBG_TAG "LWP"
@@ -1025,37 +1026,30 @@ out:
     return ret;
 }
 
+/* kernel thread clean up */
 void lwp_cleanup(struct rt_thread *tid)
 {
     rt_base_t level;
     struct rt_lwp *lwp;
-    struct tty_node *tty_head = RT_NULL;
 
     if (tid == NULL)
     {
+        LOG_I("%s: invalid parameter tid == NULL");
         return;
     }
-
-    LOG_I("cleanup thread: %s, stack_addr: %08X", tid->parent.name, tid->stack_addr);
+    else
+        LOG_D("cleanup thread: %s, stack_addr: 0x%x", tid->parent.name, tid->stack_addr);
 
     level = rt_hw_interrupt_disable();
     lwp = (struct rt_lwp *)tid->lwp;
 
     lwp_tid_put(tid->tid);
     rt_list_remove(&tid->sibling);
-    rt_hw_interrupt_enable(level);
-    if (lwp->tty != RT_NULL)
-    {
-        tty_head = lwp->tty->head;
-    }
-    if (!lwp_ref_dec(lwp))
-    {
-        if (tty_head)
-        {
-            tty_pop(&tty_head, lwp);
-        }
-    }
 
+    lwp_sigqueue_clear(&tid->signal.sig_queue);
+    rt_hw_interrupt_enable(level);
+
+    lwp_ref_dec(lwp);
     return;
 }
 
