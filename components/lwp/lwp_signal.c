@@ -272,6 +272,8 @@ static lwp_siginfo_t sigqueue_dequeue(lwp_sigqueue_t sigqueue, int signo)
 static void siginfo_copy_to_user(lwp_siginfo_t ksigi, siginfo_t *usigi)
 {
     usigi->si_code = ksigi->ksiginfo.code;
+    usigi->si_signo = ksigi->ksiginfo.signo;
+    usigi->si_errno = 0;
 }
 
 rt_inline lwp_sighandler_t _sighandler_get_locked(struct rt_lwp *lwp, int signo)
@@ -378,10 +380,10 @@ void lwp_thread_signal_catch(void *exp_frame)
         if (signo)
         {
             siginfo = sigqueue_dequeue(pending, signo);
+            RT_ASSERT(siginfo != RT_NULL);
             handler = _sighandler_get_locked(lwp, signo);
 
             NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
-            RT_ASSERT(siginfo != RT_NULL);
 
             /* arch signal entry */
             if (lwp->signal.sig_action_flags[signo] & SA_SIGINFO)
@@ -392,6 +394,7 @@ void lwp_thread_signal_catch(void *exp_frame)
             else
                 p_usi = RT_NULL;
 
+            /* FIXME: rt_free() of sigqueue should be done in internal API */
             rt_free(siginfo);
 
             /**
