@@ -8,6 +8,7 @@
  * 2021-05-18     Jesven       first version
  */
 
+#include "rtdef.h"
 #include <armv8.h>
 #include <rthw.h>
 #include <rtthread.h>
@@ -98,7 +99,7 @@ int arch_expand_user_stack(void *addr)
 
 void *arch_ucontext_save(rt_base_t user_sp, siginfo_t *psiginfo,
                          struct rt_hw_exp_stack *exp_frame, rt_base_t elr,
-                         rt_base_t spsr)
+                         rt_base_t spsr, lwp_sigset_t *save_sig_mask)
 {
     rt_base_t *new_sp;
     size_t item_copied = sizeof(*exp_frame) / sizeof(rt_base_t);
@@ -126,11 +127,16 @@ void *arch_ucontext_save(rt_base_t user_sp, siginfo_t *psiginfo,
     ((struct rt_hw_exp_stack *)new_sp)->cpsr = spsr;
     ((struct rt_hw_exp_stack *)new_sp)->sp_el0 = user_sp;
 
+    /* copy the save_sig_mask */
+    new_sp -= RT_ALIGN(sizeof(lwp_sigset_t), sizeof(*new_sp));
+    memcpy(new_sp, save_sig_mask, sizeof(lwp_sigset_t));
+
     /* copy lwp_sigreturn */
+    const size_t lwp_sigreturn_bytes = 8;
     extern void lwp_sigreturn(void);
-    void *fn_sigreturn = &lwp_sigreturn;
-    new_sp -= ALGIN_BYTES / sizeof(new_sp);
-    memcpy(new_sp, fn_sigreturn, 8);
+    /* -> ensure that the sigreturn start at the outer most boundary */
+    new_sp = (rt_base_t *)(RT_ALIGN((rt_ubase_t)new_sp - lwp_sigreturn_bytes, ALGIN_BYTES));
+    memcpy(new_sp,  &lwp_sigreturn, lwp_sigreturn_bytes);
 
     return new_sp;
 }

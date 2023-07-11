@@ -320,6 +320,57 @@ rt_inline lwp_sighandler_t _sighandler_get_locked(struct rt_lwp *lwp, int signo)
     return lwp->signal.sig_action[signo - 1];
 }
 
+static lwp_sigset_t *_mask_block_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
+{
+    _sigorsets(new_set, &thread->signal.sigset_mask, sigset);
+    return new_set;
+}
+
+static lwp_sigset_t *_mask_unblock_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
+{
+    lwp_sigset_t complement;
+    _signotsets(&complement, sigset);
+    _sigandsets(new_set, &thread->signal.sigset_mask, &complement);
+    return new_set;
+}
+
+static lwp_sigset_t *_mask_set_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
+{
+    memcpy(new_set, sigset, sizeof(*sigset));
+    return new_set;
+}
+
+static lwp_sigset_t *(*_sig_mask_fn[__LWP_SIG_MASK_CMD_WATERMARK])
+    (rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set) = {
+        [LWP_SIG_MASK_CMD_BLOCK] = _mask_block_fn,
+        [LWP_SIG_MASK_CMD_UNBLOCK] = _mask_unblock_fn,
+        [LWP_SIG_MASK_CMD_SET_MASK] = _mask_set_fn,
+    };
+
+static void _thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
+                                const lwp_sigset_t *sigset, lwp_sigset_t *oset)
+{
+    lwp_sigset_t new_set;
+
+    /**
+     * @note POSIX wants this API to be capable to query the current mask
+     *       by passing NULL in `sigset`
+     */
+    if (oset)
+        memcpy(oset, &thread->signal.sigset_mask, sizeof(lwp_sigset_t));
+
+    if (sigset)
+    {
+        _sig_mask_fn[how](thread, sigset, &new_set);
+
+        /* remove un-maskable signal from set */
+        _sigdelset(&new_set, SIGKILL);
+        _sigdelset(&new_set, SIGSTOP);
+
+        memcpy(&thread->signal.sigset_mask, &new_set, sizeof(lwp_sigset_t));
+    }
+}
+
 void lwp_sigqueue_clear(lwp_sigqueue_t sigq)
 {
     lwp_siginfo_t this, next;
@@ -388,7 +439,9 @@ void lwp_thread_signal_catch(void *exp_frame)
     struct rt_lwp *lwp;
     lwp_siginfo_t siginfo;
     lwp_sigqueue_t pending;
-    lwp_sigset_t *mask;
+    lwp_sigset_t *sig_mask;
+    lwp_sigset_t save_sig_mask;
+    lwp_sigset_t new_sig_mask;
     lwp_sighandler_t handler;
     siginfo_t usiginfo;
     siginfo_t *p_usi;
@@ -402,12 +455,12 @@ void lwp_thread_signal_catch(void *exp_frame)
     if (!sigqueue_isempty(_SIGQ(thread)))
     {
         pending = _SIGQ(thread);
-        mask = &thread->signal.sigset_mask;
+        sig_mask = &thread->signal.sigset_mask;
     }
     else if (!sigqueue_isempty(_SIGQ(lwp)))
     {
         pending = _SIGQ(lwp);
-        mask = &thread->signal.sigset_mask;
+        sig_mask = &thread->signal.sigset_mask;
     }
     else
     {
@@ -417,7 +470,7 @@ void lwp_thread_signal_catch(void *exp_frame)
     if (pending)
     {
         /* peek the pending signal */
-        signo = sigqueue_peek(pending, mask);
+        signo = sigqueue_peek(pending, sig_mask);
         if (signo)
         {
             siginfo = sigqueue_dequeue(pending, signo);
@@ -425,10 +478,18 @@ void lwp_thread_signal_catch(void *exp_frame)
             handler = _sighandler_get_locked(lwp, signo);
             RT_ASSERT(handler != LWP_SIG_ACT_IGN);
 
+            /*  */
+            memcpy(&new_sig_mask, &lwp->signal.sig_action_mask[signo - 1], sizeof(new_sig_mask));
+
+            if (!_sigismember(&lwp->signal.sig_action_nodefer, signo))
+                _sigaddset(&new_sig_mask, signo);
+
+            _thread_signal_mask(thread, LWP_SIG_MASK_CMD_BLOCK, &new_sig_mask, &save_sig_mask);
+
             NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
 
             /* arch signal entry */
-            if (lwp->signal.sig_action_flag[signo] & SA_SIGINFO)
+            if (_sigismember(&lwp->signal.sig_action_siginfo, signo))
             {
                 siginfo_copy_to_user(siginfo, &usiginfo);
                 p_usi = &usiginfo;
@@ -450,7 +511,7 @@ void lwp_thread_signal_catch(void *exp_frame)
              * @note that the p_usi is release before entering signal action by
              * reseting the kernel sp.
              */
-            arch_thread_signal_enter(signo, p_usi, exp_frame, handler);
+            arch_thread_signal_enter(signo, p_usi, exp_frame, handler, &save_sig_mask);
             /* the arch_thread_signal_enter() never return */
             RT_ASSERT(0);
         }
@@ -491,7 +552,7 @@ static rt_thread_t _signal_find_catcher(struct rt_lwp *lwp, int signo)
     rt_thread_t catcher;
     rt_thread_t candidate;
 
-    candidate = lwp->signal.sig_action_thr[signo];
+    candidate = lwp->signal.sig_dispatch_thr[signo - 1];
     if (candidate != RT_NULL && !_sigismember(&candidate->signal.sigset_mask, signo))
     {
         catcher = candidate;
@@ -523,7 +584,7 @@ static rt_thread_t _signal_find_catcher(struct rt_lwp *lwp, int signo)
         }
 
         /* reset the cache thread to catcher (even if catcher is main thread) */
-        lwp->signal.sig_action_thr[signo] = catcher;
+        lwp->signal.sig_dispatch_thr[signo - 1] = catcher;
     }
 
     return catcher;
@@ -608,6 +669,34 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
     return ret;
 }
 
+static void _signal_action_flag_k2u(int signo, struct lwp_signal *signal, struct lwp_sigaction *act)
+{
+    long flags = 0;
+    if (_sigismember(&signal->sig_action_nodefer, signo))
+        flags |= SA_NODEFER;
+    if (_sigismember(&signal->sig_action_onstack, signo))
+        flags |= SA_ONSTACK;
+    if (_sigismember(&signal->sig_action_restart, signo))
+        flags |= SA_RESTART;
+    if (_sigismember(&signal->sig_action_siginfo, signo))
+        flags |= SA_SIGINFO;
+
+    act->sa_flags = flags;
+}
+
+static void _signal_action_flag_u2k(int signo, struct lwp_signal *signal, const struct lwp_sigaction *act)
+{
+    long flags = act->sa_flags;
+    if (flags & SA_NODEFER)
+        _sigaddset(&signal->sig_action_nodefer, signo);
+    if (flags & SA_ONSTACK)
+        _sigaddset(&signal->sig_action_onstack, signo);
+    if (flags & SA_RESTART)
+        _sigaddset(&signal->sig_action_restart, signo);
+    if (flags & SA_SIGINFO)
+        _sigaddset(&signal->sig_action_siginfo, signo);
+}
+
 rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
                            const struct lwp_sigaction *restrict act,
                            struct lwp_sigaction *restrict oact)
@@ -623,16 +712,16 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
 
         if (oact)
         {
-            oact->sa_mask = lwp->signal.sig_mask[signo - 1];
-            oact->sa_flags = lwp->signal.sig_action_flag[signo - 1];
+            oact->sa_mask = lwp->signal.sig_action_mask[signo - 1];
             oact->__sa_handler._sa_handler = lwp->signal.sig_action[signo - 1];
             oact->sa_restorer = RT_NULL;
+            _signal_action_flag_k2u(signo, &lwp->signal, oact);
         }
         if (act)
         {
-            lwp->signal.sig_mask[signo - 1] = act->sa_mask;
-            lwp->signal.sig_action_flag[signo - 1] = act->sa_flags;
+            lwp->signal.sig_action_mask[signo - 1] = act->sa_mask;
             lwp->signal.sig_action[signo - 1] = act->__sa_handler._sa_handler;
+            _signal_action_flag_u2k(signo, &lwp->signal, act);
         }
 
         rt_hw_interrupt_enable(level);
@@ -772,40 +861,12 @@ void lwp_sighandler_set(int sig, lwp_sighandler_t func)
     rt_hw_interrupt_enable(level);
 }
 
-static lwp_sigset_t *_mask_block_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
-{
-    _sigorsets(new_set, &thread->signal.sigset_mask, sigset);
-    return new_set;
-}
-
-static lwp_sigset_t *_mask_unblock_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
-{
-    lwp_sigset_t complement;
-    _signotsets(&complement, sigset);
-    _sigandsets(new_set, &thread->signal.sigset_mask, &complement);
-    return new_set;
-}
-
-static lwp_sigset_t *_mask_set_fn(rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set)
-{
-    memcpy(new_set, sigset, sizeof(*sigset));
-    return new_set;
-}
-
-static lwp_sigset_t *(*_sig_mask_fn[__LWP_SIG_MASK_CMD_WATERMARK])
-    (rt_thread_t thread, const lwp_sigset_t *sigset, lwp_sigset_t *new_set) = {
-        [LWP_SIG_MASK_CMD_BLOCK] = _mask_block_fn,
-        [LWP_SIG_MASK_CMD_UNBLOCK] = _mask_unblock_fn,
-        [LWP_SIG_MASK_CMD_SET_MASK] = _mask_set_fn,
-    };
-
 rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
                                 const lwp_sigset_t *sigset, lwp_sigset_t *oset)
 {
     rt_err_t ret;
     rt_base_t level;
     struct rt_lwp *lwp;
-    lwp_sigset_t new_set;
 
     if (thread)
     {
@@ -821,23 +882,7 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
         {
             NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
 
-            /**
-             * @note POSIX wants this API to be capable to query the current mask
-             *       by passing NULL in `sigset`
-             */
-            if (oset)
-                memcpy(oset, &thread->signal.sigset_mask, sizeof(lwp_sigset_t));
-
-            if (sigset)
-            {
-                _sig_mask_fn[how](thread, sigset, &new_set);
-
-                /* remove un-maskable signal from set */
-                _sigdelset(&new_set, SIGKILL);
-                _sigdelset(&new_set, SIGSTOP);
-
-                memcpy(&thread->signal.sigset_mask, &new_set, sizeof(lwp_sigset_t));
-            }
+            _thread_signal_mask(thread, how, sigset, oset);
 
             NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
         }

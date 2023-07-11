@@ -17,7 +17,8 @@
 #include <rtthread.h>
 #include <sys/signal.h>
 
-#define LWP_SIG_IGNORE_SET      (sigmask(SIGCHLD) | sigmask(SIGURG))
+#define _USIGNAL_SIGMASK(signo) (1u << ((signo)-1))
+#define LWP_SIG_IGNORE_SET      (_USIGNAL_SIGMASK(SIGCHLD) | _USIGNAL_SIGMASK(SIGURG))
 #define LWP_SIG_ACT_DFL         ((lwp_sighandler_t)0)
 #define LWP_SIG_ACT_IGN         ((lwp_sighandler_t)1)
 
@@ -43,14 +44,15 @@ struct lwp_signal {
     struct rt_mutex sig_lock;
 
     struct lwp_sigqueue sig_queue;
+    rt_thread_t sig_dispatch_thr[_LWP_NSIG];
 
-    lwp_sigset_t sig_mask[_LWP_NSIG];
-    rt_thread_t sig_action_thr[_LWP_NSIG];
     lwp_sighandler_t sig_action[_LWP_NSIG];
-    int sig_action_flag[_LWP_NSIG];
-    lwp_sigset_t sig_action_siginfo;
-    lwp_sigset_t sig_action_altstack;
+    lwp_sigset_t sig_action_mask[_LWP_NSIG];
+
+    lwp_sigset_t sig_action_nodefer;
+    lwp_sigset_t sig_action_onstack;
     lwp_sigset_t sig_action_restart;
+    lwp_sigset_t sig_action_siginfo;
 };
 
 struct rt_lwp;
@@ -74,8 +76,13 @@ rt_inline rt_err_t lwp_signal_init(struct lwp_signal *sig)
     rc = rt_mutex_init(&sig->sig_lock, "lwpsig", RT_IPC_FLAG_FIFO);
     if (rc == RT_EOK)
     {
+        memset(&sig->sig_dispatch_thr, 0, sizeof(sig->sig_dispatch_thr));
+
         memset(&sig->sig_action, 0, sizeof(sig->sig_action));
-        memset(&sig->sig_action_flag, 0, sizeof(sig->sig_action_flag));
+        memset(&sig->sig_action_nodefer, 0, sizeof(sig->sig_action_nodefer));
+        memset(&sig->sig_action_onstack, 0, sizeof(sig->sig_action_onstack));
+        memset(&sig->sig_action_restart, 0, sizeof(sig->sig_action_restart));
+        memset(&sig->sig_action_siginfo, 0, sizeof(sig->sig_action_siginfo));
         lwp_sigqueue_init(&sig->sig_queue);
     }
     return rc;
@@ -144,7 +151,8 @@ int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                 siginfo_t *info, struct timespec *timeout);
 
 rt_noreturn void arch_thread_signal_enter(int signo, siginfo_t *psiginfo,
-                                          void *exp_frame, void *entry_uaddr);
+                                          void *exp_frame, void *entry_uaddr,
+                                          lwp_sigset_t *save_sig_mask);
 
 #ifdef __cplusplus
 }

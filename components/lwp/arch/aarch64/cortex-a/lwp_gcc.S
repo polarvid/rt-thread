@@ -534,10 +534,13 @@ arch_signal_quit:
 /**
  * rt_noreturn
  * void arch_thread_signal_enter(
- *      int signo,
- *      siginfo_t *info,
- *      void *exp_frame,
- *      void *entry_uaddr)
+ *      int signo,                      -> x0
+ *      siginfo_t *psiginfo,            -> x1
+ *      void *exp_frame,                -> x2
+ *      lwp_sigset_t save_mask,         -> x3
+ *      void *entry_uaddr,              -> x4
+ *      lwp_sigset_t *save_sig_mask,    -> x5
+ *      )
  */
 .global arch_thread_signal_enter
 arch_thread_signal_enter:
@@ -547,14 +550,13 @@ arch_thread_signal_enter:
 
     /**
      * move exception frame to user stack
-     * arch_ucontext_save(user_sp, exp_frame, psiginfo, elr, spsr);
      */
     mrs x0, sp_el0
-    /* x1 is the psiginfo */
-    /* x2 is the exp_frame */
     mrs x3, elr_el1
     /** FIXME: spsr must restore from exception frame */
     mrs x4, spsr_el1
+
+    /* arch_ucontext_save(user_sp, psiginfo, exp_frame, elr, spsr, save_sig_mask); */
     b arch_ucontext_save
 
     dc cvau, x0
