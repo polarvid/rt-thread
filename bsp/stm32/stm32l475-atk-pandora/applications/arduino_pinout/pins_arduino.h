@@ -59,12 +59,16 @@
 #define A3        (43)
 #define DAC0      (44)
 
+#define RTDUINO_PIN_MAX_LIMIT DAC0 /* pin number max limit check */
+
 #define F_CPU          80000000L  /* CPU:80MHz */
 
 #define LED_BUILTIN     D22  /* Default Built-in LED */
 
 /* Serial2 - PA2-TX  PA3-RX */
 #define RTDUINO_SERIAL2_DEVICE_NAME     "uart2"
+
+#define RTDUINO_TONE_HWTIMER_DEVICE_NAME "timer7"
 
 /* I2C */
 #if defined(BSP_USING_ARDUINO_AHT10)
