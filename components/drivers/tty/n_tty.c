@@ -683,12 +683,15 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 static void __isig(int sig, struct tty_struct *tty)
 {
     struct rt_lwp *lwp = tty->foreground;
+    #if 0
     struct tty_ldisc *ld = RT_NULL;
     struct termios old_termios;
     struct termios *new_termios = get_old_termios();
+    #endif
 
     if (lwp)
     {
+        #if 0
         if (sig == SIGTSTP)
         {
             struct rt_lwp *old_lwp;
@@ -708,8 +711,9 @@ static void __isig(int sig, struct tty_struct *tty)
             tty->foreground = old_lwp;
         }
         else
+        #endif
         {
-            lwp_kill(lwp_to_pid(lwp), sig);
+            lwp_signal_kill(lwp, sig, SI_USER, 0);
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2020, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -234,7 +234,7 @@ rt_inline int sigqueue_ismember(lwp_sigqueue_t sigqueue, int signo)
 
 rt_inline int sigqueue_peek(lwp_sigqueue_t sigqueue, lwp_sigset_t *mask)
 {
-    _next_signal(&sigqueue->sigset_pending, mask);
+    return _next_signal(&sigqueue->sigset_pending, mask);
 }
 
 static void sigqueue_enqueue(lwp_sigqueue_t sigqueue, lwp_siginfo_t siginfo)
@@ -260,10 +260,50 @@ static lwp_siginfo_t sigqueue_dequeue(lwp_sigqueue_t sigqueue, int signo)
     rt_list_for_each_entry(candidate, &sigqueue->siginfo_list, node)
     {
         if (candidate->ksiginfo.signo == signo)
+        {
             found = candidate;
+            rt_list_remove(&found->node);
+            break;
+        }
         else if (candidate->ksiginfo.signo > signo)
             break;
     }
+
+    return found;
+}
+
+/* if found, the pempty can indicate whether there are pending signal of same sig exist */
+static lwp_siginfo_t sigqueue_dequeue_examine(lwp_sigqueue_t sigqueue, int signo, rt_bool_t *pempty)
+{
+    lwp_siginfo_t found;
+    lwp_siginfo_t candidate;
+    rt_bool_t is_empty;
+
+    found = RT_NULL;
+    is_empty = RT_TRUE;
+    rt_list_for_each_entry(candidate, &sigqueue->siginfo_list, node)
+    {
+        if (candidate->ksiginfo.signo == signo)
+        {
+            if (found)
+            {
+                /* already found */
+                is_empty = RT_FALSE;
+                break;
+            }
+            else
+            {
+                /* found first */
+                found = candidate;
+                rt_list_remove(&found->node);
+            }
+        }
+        else if (candidate->ksiginfo.signo > signo)
+            break;
+    }
+
+    if (pempty)
+        *pempty = is_empty;
 
     return found;
 }
@@ -388,7 +428,7 @@ void lwp_thread_signal_catch(void *exp_frame)
             NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
 
             /* arch signal entry */
-            if (lwp->signal.sig_action_flags[signo] & SA_SIGINFO)
+            if (lwp->signal.sig_action_flag[signo] & SA_SIGINFO)
             {
                 siginfo_copy_to_user(siginfo, &usiginfo);
                 p_usi = &usiginfo;
@@ -527,7 +567,7 @@ rt_inline rt_bool_t _sighandler_is_ignored(struct rt_lwp *lwp, int signo)
     return is_ignored;
 }
 
-rt_err_t lwp_signal_kill(struct rt_lwp *lwp, int signo, int code, int value)
+rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
 {
     rt_err_t ret;
     rt_base_t level;
@@ -604,7 +644,7 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
     return ret;
 }
 
-rt_err_t lwp_thread_signal_kill(rt_thread_t thread, int signo, int code, int value)
+rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long value)
 {
     rt_err_t ret;
     rt_base_t level;
@@ -617,6 +657,8 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, int signo, int code, int val
     }
     else
     {
+        lwp = thread->lwp;
+        RT_ASSERT(lwp);
         NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
 
         /* FIXME: acquire READ lock to lwp */
@@ -901,62 +943,45 @@ out:
 }
 #endif
 
-static rt_bool_t _dequeue_info(rt_thread_t thread, siginfo_t *info, int sig)
-{
-    rt_bool_t isempty; 
-    ksiginfo_t iter;
-    ksiginfo_t candidate = RT_NULL;
-
-    /* TODO: COMPLETE siginfo list */
-    return RT_TRUE; // TODO
-    rt_list_for_each_entry(iter, &_KSI(thread->siginfo_list)->node, node)
-    {
-        if (iter->si.si_signo == sig)
-        {
-            candidate = iter;
-        }
-    }
-    /* real-time signals should check if same signal is still queuing */
-    isempty = RT_TRUE;
-
-    if (candidate)
-    {
-        memcpy(info, &candidate->si, sizeof(*info));
-    }
-    return isempty;
-}
-
 static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *info)
 {
+    int signo;
+    rt_bool_t is_empty;
     lwp_sigset_t *pending;
-    int sig;
-    pending = &thread->signal;
-    sig = _next_signal(pending, mask);
-    if (!sig)
+    lwp_siginfo_t si;
+    struct rt_lwp *lwp;
+
+    pending = &_SIGQ(thread)->sigset_pending;
+    signo = _next_signal(pending, mask);
+    if (!signo)
     {
-        pending = &((struct rt_lwp *)thread->lwp)->signal;
-        sig = _next_signal(pending, mask);
+        lwp = thread->lwp;
+        RT_ASSERT(lwp);
+        pending = &_SIGQ(lwp)->sigset_pending;
+        signo = _next_signal(pending, mask);
     }
 
-    if (!sig)
-        return sig;
+    if (!signo)
+        return signo;
 
-    if (_dequeue_info(thread, info, sig))
+    si = sigqueue_dequeue_examine(_SIGQ(thread), signo, &is_empty);
+    RT_ASSERT(!!si);
+    if (is_empty)
     {
         /* No more signal */
-        _sigdelset(pending, sig);
+        _sigdelset(pending, signo);
     }
 
     info->si_code = SI_TIMER;
-    _sigdelset(pending, sig);
-    return sig;
+    _sigdelset(pending, signo);
+    return signo;
 }
 
-int lwp_sigtimedwait(lwp_sigset_t *sigset, siginfo_t *info, struct timespec *timeout)
+int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
+                                siginfo_t *info, struct timespec *timeout)
 {
     rt_err_t ret;
     int sig;
-    rt_thread_t thread = rt_thread_self();
 
     /**
      * @brief POSIX
@@ -983,7 +1008,7 @@ int lwp_sigtimedwait(lwp_sigset_t *sigset, siginfo_t *info, struct timespec *tim
      */
     if (timeout)
     {
-        /* TODO verify timeout valid ? not overflow 32bits, nanosec valid, ... */
+        /* TODO: verify timeout valid ? not overflow 32bits, nanosec valid, ... */
         rt_uint32_t time;
         time = rt_timespec_to_tick(timeout);
 

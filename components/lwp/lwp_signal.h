@@ -60,53 +60,6 @@ void lwp_sighandler_set(int sig, lwp_sighandler_t func);
 void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func);
 #endif
 
-/**
- * @brief check for signal to handle of current thread
- *
- * @return int 0 if no signals to handle, otherwise the signo will be returned
- */
-int lwp_signal_check(void);
-
-/**
- * @brief send a signal to the process
- *
- * @param lwp the process to be killed
- * @param signo the signal number
- * @param code as in siginfo
- * @param value as in siginfo
- * @return rt_err_t RT_EINVAL if the parameter is invalid, RT_EOK as successful
- *
- * @note the *signal_kill have the same definition of a successful return as
- *       kill() in IEEE Std 1003.1-2017
- */
-rt_err_t lwp_signal_kill(struct rt_lwp *lwp, int signo, int code, int value);
-
-/**
- * @brief set or examine the signal action of signo
- *
- * @param signo signal number
- * @param act the signal action
- * @param oact 
- * @return rt_err_t 
- */
-rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
-                           const struct lwp_sigaction *restrict act,
-                           struct lwp_sigaction *restrict oact);
-
-rt_err_t lwp_thread_signal_kill(rt_thread_t thread, int signo, int code, int value);
-
-/**
- * @brief set signal mask of target thread
- * 
- * @param thread the target thread
- * @param how command
- * @param sigset operand
- * @param oset the address to old set
- * @return rt_err_t
- */
-rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
-                                const lwp_sigset_t *sigset, lwp_sigset_t *oset);
-
 rt_inline void lwp_sigqueue_init(lwp_sigqueue_t sigq)
 {
     memset(&sigq->sigset_pending, 0, sizeof(lwp_sigset_t));
@@ -128,10 +81,67 @@ rt_inline rt_err_t lwp_signal_init(struct lwp_signal *sig)
     return rc;
 }
 
+rt_err_t lwp_signal_detach(struct lwp_signal *signal);
+
+/**
+ * @brief check for signal to handle of current thread
+ *
+ * @return int 0 if no signals to handle, otherwise the signo will be returned
+ */
+int lwp_signal_check(void);
+
+/**
+ * @brief send a signal to the process
+ *
+ * @param lwp the process to be killed
+ * @param signo the signal number
+ * @param code as in siginfo
+ * @param value as in siginfo
+ * @return rt_err_t RT_EINVAL if the parameter is invalid, RT_EOK as successful
+ *
+ * @note the *signal_kill have the same definition of a successful return as
+ *       kill() in IEEE Std 1003.1-2017
+ */
+rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value);
+
+/**
+ * @brief set or examine the signal action of signo
+ *
+ * @param signo signal number
+ * @param act the signal action
+ * @param oact 
+ * @return rt_err_t 
+ */
+rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
+                           const struct lwp_sigaction *restrict act,
+                           struct lwp_sigaction *restrict oact);
+
+rt_inline void lwp_thread_signal_detach(struct lwp_thread_signal *tsig)
+{
+    lwp_sigqueue_clear(&tsig->sig_queue);
+}
+
+rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long value);
+
+/**
+ * @brief set signal mask of target thread
+ * 
+ * @param thread the target thread
+ * @param how command
+ * @param sigset operand
+ * @param oset the address to old set
+ * @return rt_err_t
+ */
+rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
+                                const lwp_sigset_t *sigset, lwp_sigset_t *oset);
+
 /**
  * @brief Catch signal if exists and no return, otherwise return with no side effect
  */
 void lwp_thread_signal_catch(void *exp_frame);
+
+int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
+                                siginfo_t *info, struct timespec *timeout);
 
 rt_noreturn void arch_thread_signal_enter(int signo, siginfo_t *psiginfo,
                                           void *exp_frame, void *entry_uaddr);

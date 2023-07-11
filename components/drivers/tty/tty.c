@@ -126,6 +126,7 @@ struct rt_lwp *tty_pop(struct tty_node **head, struct rt_lwp *target_lwp)
     return lwp;
 }
 
+#if 0
 rt_inline int tty_sigismember(lwp_sigset_t *set, int _sig)
 {
     unsigned long sig = _sig - 1;
@@ -145,7 +146,7 @@ static int is_ignored(int sig)
     return (tty_sigismember(&current->signal_mask, sig) ||
         current->signal_handler[sig-1] == SIG_IGN);
 }
-
+#endif
 /**
  *  tty_check_change    -   check for POSIX terminal changes
  *  @tty: tty to check
@@ -182,6 +183,7 @@ int __tty_check_change(struct tty_struct *tty, int sig)
 
     if (tty_pgrp && (pgrp != tty->pgrp))
     {
+        #if 0
         if (is_ignored(sig))
         {
             if (sig == SIGTTIN)
@@ -190,10 +192,11 @@ int __tty_check_change(struct tty_struct *tty, int sig)
             }
         }
         else
+        #endif
         {
             if (lwp)
             {
-                lwp_kill(lwp_to_pid(lwp), sig);
+                lwp_signal_kill(lwp, sig, SI_USER, 0);
             }
         }
     }

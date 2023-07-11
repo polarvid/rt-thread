@@ -935,12 +935,12 @@ static void rtthread_timer_wrapper(void *timerobj)
     int tid = *(int *)&timer->sigev_notify_function;
     if (!tid)
     {
-        ret = lwp_kill(timer->pid, timer->sigev_signo);
+        ret = lwp_signal_kill(lwp_from_pid(timer->pid), timer->sigev_signo, SI_TIMER, 0);
     }
     else
     {
         rt_thread_t thread = lwp_tid_get_thread(tid);
-        ret = lwp_thread_kill(thread, timer->sigev_signo);
+        ret = lwp_thread_signal_kill(thread, timer->sigev_signo, SI_TIMER, 0);
     }
 
     if (ret != RT_EOK)

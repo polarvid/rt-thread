@@ -13,6 +13,10 @@
  * 2023-02-20     wangxiaoyao  fix bug on foreground app switch
  */
 
+#define DBG_TAG "LWP"
+#define DBG_LVL DBG_WARNING
+#include <rtdbg.h>
+
 #include <rthw.h>
 #include <rtthread.h>
 
@@ -33,11 +37,8 @@
 #include "lwp_arch.h"
 #include "lwp_arch_comm.h"
 #include "lwp_signal.h"
+#include "lwp_dbg.h"
 #include "console.h"
-
-#define DBG_TAG "LWP"
-#define DBG_LVL DBG_WARNING
-#include <rtdbg.h>
 
 #ifdef ARCH_MM_MMU
 #include <lwp_user_mm.h>
@@ -1046,7 +1047,7 @@ void lwp_cleanup(struct rt_thread *tid)
     lwp_tid_put(tid->tid);
     rt_list_remove(&tid->sibling);
 
-    lwp_sigqueue_clear(&tid->signal.sig_queue);
+    lwp_thread_signal_detach(&tid->signal);
     rt_hw_interrupt_enable(level);
 
     lwp_ref_dec(lwp);

@@ -1722,9 +1722,7 @@ static void lwp_struct_copy(struct rt_lwp *dst, struct rt_lwp *src)
     dst->tty = src->tty;
     rt_memcpy(dst->cmd, src->cmd, RT_NAME_MAX);
 
-    dst->sa_flags = src->sa_flags;
-    dst->signal_mask = src->signal_mask;
-    rt_memcpy(dst->signal_handler, src->signal_handler, sizeof dst->signal_handler);
+    rt_memcpy(&dst->signal, &src->signal, sizeof(dst->signal));
     rt_strcpy(dst->working_directory, src->working_directory);
 }
 
@@ -1832,7 +1830,7 @@ sysret_t _sys_fork(void)
     thread->user_entry = self_thread->user_entry;
     thread->user_stack = self_thread->user_stack;
     thread->user_stack_size = self_thread->user_stack_size;
-    thread->signal_mask = self_thread->signal_mask;
+    thread->signal.sigset_mask = self_thread->signal.sigset_mask;
     thread->thread_idr = self_thread->thread_idr;
     thread->lwp = (void *)lwp;
     thread->tid = tid;
@@ -2487,12 +2485,10 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
 
         _swap_lwp_data(lwp, new_lwp, void *, args);
 
-        rt_memset(&thread->signal_mask, 0, sizeof(thread->signal_mask));
-        rt_memset(&thread->signal_mask_bak, 0, sizeof(thread->signal_mask_bak));
-        lwp->sa_flags = 0;
-        rt_memset(&lwp->signal_mask, 0, sizeof(lwp->signal_mask));
-        rt_memset(&lwp->signal_mask_bak, 0, sizeof(lwp->signal_mask_bak));
-        rt_memset(lwp->signal_handler, 0, sizeof(lwp->signal_handler));
+        lwp_thread_signal_detach(&thread->signal);
+        rt_memset(&thread->signal.sigset_mask, 0, sizeof(thread->signal.sigset_mask));
+        lwp_signal_detach(&lwp->signal);
+        lwp_signal_init(&lwp->signal);
 
         /* to do: clsoe files with flag CLOEXEC */
 
@@ -3300,6 +3296,7 @@ sysret_t sys_sigaction(int sig, const struct k_sigaction *act,
                        struct k_sigaction *oact, size_t sigsetsize)
 {
     int ret = -RT_EINVAL;
+    struct rt_lwp *lwp;
     struct lwp_sigaction kact, *pkact = RT_NULL;
     struct lwp_sigaction koact, *pkoact = RT_NULL;
 
@@ -3340,7 +3337,9 @@ sysret_t sys_sigaction(int sig, const struct k_sigaction *act,
         pkact = &kact;
     }
 
-    ret = lwp_sigaction(sig, pkact, pkoact, sigsetsize);
+    lwp = lwp_self();
+    RT_ASSERT(lwp);
+    ret = lwp_signal_action(lwp, sig, pkact, pkoact);
 #ifdef ARCH_MM_MMU
     if (ret == 0 && oact)
     {
@@ -3407,7 +3406,7 @@ sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t
         pnewset = (lwp_sigset_t *)sigset;
 #endif /* ARCH_MM_MMU */
     }
-    ret = lwp_sigprocmask(how, pnewset, poldset);
+    ret = lwp_thread_signal_mask(rt_thread_self(), how, pnewset, poldset);
 #ifdef ARCH_MM_MMU
     if (ret < 0)
     {
@@ -3468,7 +3467,7 @@ sysret_t sys_rt_sigtimedwait(const sigset_t *sigset, siginfo_t *info, const stru
         ptimeout = RT_NULL;
     }
 
-    sig = lwp_sigtimedwait(&lwpset, &kinfo, ptimeout);
+    sig = lwp_thread_signal_timedwait(rt_thread_self(), &lwpset, &kinfo, ptimeout);
 
     if (info)
     {
@@ -3493,7 +3492,7 @@ sysret_t sys_tkill(int tid, int sig)
 
     level = rt_hw_interrupt_disable();
     thread = lwp_tid_get_thread(tid);
-    ret =  lwp_thread_kill(thread, sig);
+    ret =  lwp_thread_signal_kill(thread, sig, SI_USER, 0);
     rt_hw_interrupt_enable(level);
     return ret;
 #else
@@ -3554,7 +3553,7 @@ sysret_t sys_thread_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_
         pnewset = (lwp_sigset_t *)sigset;
 #endif
     }
-    ret = lwp_thread_sigprocmask(how, pnewset, poldset);
+    ret = lwp_thread_signal_mask(rt_thread_self(), how, pnewset, poldset);
     if (ret < 0)
     {
         return ret;

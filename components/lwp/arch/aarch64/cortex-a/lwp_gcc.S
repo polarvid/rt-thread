@@ -555,7 +555,7 @@ arch_thread_signal_enter:
     mrs x3, elr_el1
     /** FIXME: spsr must restore from exception frame */
     mrs x4, spsr_el1
-    b arch_copy_exp_frame
+    b arch_ucontext_save
 
     dc cvau, x0
     dsb sy
@@ -570,7 +570,7 @@ arch_thread_signal_enter:
     add sp, x21, #RT_HW_EXCEPTION_FRAME_SIZE
 
     /** reset user sp */
-    mrs sp_el0, x0
+    msr sp_el0, x0
 
     /** set the entry address of signal handler */
     msr elr_el1, x3
@@ -593,6 +593,7 @@ lwp_debugreturn:
     mov x8, 0xf000
     svc #0
 
+.global lwp_sigreturn
 lwp_sigreturn:
     mov x8, #0xe000
     svc #0

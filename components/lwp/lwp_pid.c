@@ -847,7 +847,7 @@ static void cmd_kill(int argc, char** argv)
             sig = atoi(argv[3]);
         }
     }
-    lwp_kill(pid, sig);
+    lwp_signal_kill(lwp_from_pid(pid), sig, SI_USER, 0);
 }
 MSH_CMD_EXPORT_ALIAS(cmd_kill, kill, send a signal to a process);
 
@@ -862,7 +862,7 @@ static void cmd_killall(int argc, char** argv)
 
     while((pid = lwp_name2pid(argv[1])) > 0)
     {
-        lwp_kill(pid, SIGKILL);
+        lwp_signal_kill(lwp_from_pid(pid), SIGKILL, SI_USER, 0);
         rt_thread_mdelay(100);
     }
 }
