@@ -6,27 +6,26 @@
  * Change Logs:
  * Date           Author       Notes
  * 2020-02-23     Jesven       first version.
- * 2023-07-06     Shell        Rewrite implementation of POSIX signal
+ * 2023-07-06     Shell        Improve supported feature of lwp signal
  */
 
-#ifndef LWP_SIGNAL_H__
-#define LWP_SIGNAL_H__
+#ifndef __LWP_SIGNAL_H__
+#define __LWP_SIGNAL_H__
 
 #include "syscall_generic.h"
 
 #include <rtthread.h>
 #include <sys/signal.h>
 
-#define _USIGNAL_SIGMASK(signo) (1u << ((signo)-1))
-#define LWP_SIG_IGNORE_SET      (_USIGNAL_SIGMASK(SIGCHLD) | _USIGNAL_SIGMASK(SIGURG))
-#define LWP_SIG_ACT_DFL         ((lwp_sighandler_t)0)
-#define LWP_SIG_ACT_IGN         ((lwp_sighandler_t)1)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define USER_SA_FLAGS                                                       \
+#define _USIGNAL_SIGMASK(signo) (1u << ((signo)-1))
+#define LWP_SIG_IGNORE_SET      (_USIGNAL_SIGMASK(SIGCHLD) | _USIGNAL_SIGMASK(SIGURG))
+#define LWP_SIG_ACT_DFL         ((lwp_sighandler_t)0)
+#define LWP_SIG_ACT_IGN         ((lwp_sighandler_t)1)
+#define LWP_SIG_USER_SA_FLAGS                                               \
     (SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART |   \
      SA_NODEFER | SA_RESETHAND | SA_EXPOSE_TAGBITS)
 
@@ -57,8 +56,8 @@ struct lwp_signal {
 
 struct rt_lwp;
 
-void lwp_sighandler_set(int sig, lwp_sighandler_t func);
 #ifndef ARCH_MM_MMU
+void lwp_sighandler_set(int sig, lwp_sighandler_t func);
 void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func);
 #endif
 
@@ -68,34 +67,21 @@ rt_inline void lwp_sigqueue_init(lwp_sigqueue_t sigq)
     rt_list_init(&sigq->siginfo_list);
 }
 
+/**
+ * @brief release the signal queue
+ *
+ * @param sigq target signal queue
+ */
 void lwp_sigqueue_clear(lwp_sigqueue_t sigq);
 
-rt_inline rt_err_t lwp_signal_init(struct lwp_signal *sig)
-{
-    rt_err_t rc;
-    rc = rt_mutex_init(&sig->sig_lock, "lwpsig", RT_IPC_FLAG_FIFO);
-    if (rc == RT_EOK)
-    {
-        memset(&sig->sig_dispatch_thr, 0, sizeof(sig->sig_dispatch_thr));
-
-        memset(&sig->sig_action, 0, sizeof(sig->sig_action));
-        memset(&sig->sig_action_nodefer, 0, sizeof(sig->sig_action_nodefer));
-        memset(&sig->sig_action_onstack, 0, sizeof(sig->sig_action_onstack));
-        memset(&sig->sig_action_restart, 0, sizeof(sig->sig_action_restart));
-        memset(&sig->sig_action_siginfo, 0, sizeof(sig->sig_action_siginfo));
-        lwp_sigqueue_init(&sig->sig_queue);
-    }
-    return rc;
-}
+rt_err_t lwp_signal_init(struct lwp_signal *sig);
 
 rt_err_t lwp_signal_detach(struct lwp_signal *signal);
 
-/**
- * @brief check for signal to handle of current thread
- *
- * @return int 0 if no signals to handle, otherwise the signo will be returned
- */
-int lwp_signal_check(void);
+rt_inline void lwp_thread_signal_detach(struct lwp_thread_signal *tsig)
+{
+    lwp_sigqueue_clear(&tsig->sig_queue);
+}
 
 /**
  * @brief send a signal to the process
@@ -116,18 +102,22 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value);
  *
  * @param signo signal number
  * @param act the signal action
- * @param oact 
+ * @param oact the old signal action
  * @return rt_err_t 
  */
 rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
                            const struct lwp_sigaction *restrict act,
                            struct lwp_sigaction *restrict oact);
 
-rt_inline void lwp_thread_signal_detach(struct lwp_thread_signal *tsig)
-{
-    lwp_sigqueue_clear(&tsig->sig_queue);
-}
-
+/**
+ * @brief send a signal to the thread
+ *
+ * @param thread target thread
+ * @param signo the signal number
+ * @param code as in siginfo
+ * @param value as in siginfo
+ * @return rt_err_t RT_EINVAL if the parameter is invalid, RT_EOK as successful
+ */
 rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long value);
 
 /**
@@ -144,18 +134,25 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
 
 /**
  * @brief Catch signal if exists and no return, otherwise return with no side effect
+ *
+ * @param exp_frame the exception frame on kernel stack
  */
 void lwp_thread_signal_catch(void *exp_frame);
 
-int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
-                                siginfo_t *info, struct timespec *timeout);
-
-rt_noreturn void arch_thread_signal_enter(int signo, siginfo_t *psiginfo,
-                                          void *exp_frame, void *entry_uaddr,
-                                          lwp_sigset_t *save_sig_mask);
+/**
+ * @brief Asynchronously wait for signal
+ *
+ * @param thread target thread
+ * @param sigset 
+ * @param info 
+ * @param timeout 
+ * @return rt_err_t
+ */
+rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
+                                     siginfo_t *usi, struct timespec *timeout);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* __LWP_SIGNAL_H__ */

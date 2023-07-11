@@ -6,11 +6,11 @@
  * Change Logs:
  * Date           Author       Notes
  * 2019-11-12     Jesven       first version
- * 2023-02-23     shell        Support sigtimedwait
- * 2023-07-04     shell        Support siginfo, sigqueue
+ * 2023-02-23     Shell        Support sigtimedwait
+ * 2023-07-04     Shell        Support siginfo, sigqueue
  *                             remove mask from lwp
  *                             remove lwp_signal_backup/restore()
- *                             rewrite lwp implementation of signal
+ *                             Improve supported feature of lwp signal
  */
 
 #define DBG_TAG    "LWP_SIGNAL"
@@ -255,28 +255,6 @@ static lwp_siginfo_t sigqueue_dequeue(lwp_sigqueue_t sigqueue, int signo)
 {
     lwp_siginfo_t found;
     lwp_siginfo_t candidate;
-
-    found = RT_NULL;
-    rt_list_for_each_entry(candidate, &sigqueue->siginfo_list, node)
-    {
-        if (candidate->ksiginfo.signo == signo)
-        {
-            found = candidate;
-            rt_list_remove(&found->node);
-            break;
-        }
-        else if (candidate->ksiginfo.signo > signo)
-            break;
-    }
-
-    return found;
-}
-
-/* if found, the pempty can indicate whether there are still pending signal of same sig */
-static lwp_siginfo_t sigqueue_dequeue_examine(lwp_sigqueue_t sigqueue, int signo, rt_bool_t *pempty)
-{
-    lwp_siginfo_t found;
-    lwp_siginfo_t candidate;
     rt_bool_t is_empty;
 
     found = RT_NULL;
@@ -302,8 +280,8 @@ static lwp_siginfo_t sigqueue_dequeue_examine(lwp_sigqueue_t sigqueue, int signo
             break;
     }
 
-    if (pempty)
-        *pempty = is_empty;
+    if (is_empty)
+        _sigdelset(&sigqueue->sigset_pending, signo);
 
     return found;
 }
@@ -372,16 +350,6 @@ static void _thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
     }
 }
 
-rt_err_t lwp_signal_detach(struct lwp_signal *signal)
-{
-    rt_err_t ret;
-
-    lwp_sigqueue_clear(&signal->sig_queue);
-    ret = rt_mutex_detach(&signal->sig_lock);
-
-    return ret;
-}
-
 void lwp_sigqueue_clear(lwp_sigqueue_t sigq)
 {
     lwp_siginfo_t this, next;
@@ -392,6 +360,34 @@ void lwp_sigqueue_clear(lwp_sigqueue_t sigq)
             rt_free(this);
         }
     }
+}
+
+rt_err_t lwp_signal_init(struct lwp_signal *sig)
+{
+    rt_err_t rc;
+    rc = rt_mutex_init(&sig->sig_lock, "lwpsig", RT_IPC_FLAG_FIFO);
+    if (rc == RT_EOK)
+    {
+        memset(&sig->sig_dispatch_thr, 0, sizeof(sig->sig_dispatch_thr));
+
+        memset(&sig->sig_action, 0, sizeof(sig->sig_action));
+        memset(&sig->sig_action_nodefer, 0, sizeof(sig->sig_action_nodefer));
+        memset(&sig->sig_action_onstack, 0, sizeof(sig->sig_action_onstack));
+        memset(&sig->sig_action_restart, 0, sizeof(sig->sig_action_restart));
+        memset(&sig->sig_action_siginfo, 0, sizeof(sig->sig_action_siginfo));
+        lwp_sigqueue_init(&sig->sig_queue);
+    }
+    return rc;
+}
+
+rt_err_t lwp_signal_detach(struct lwp_signal *signal)
+{
+    rt_err_t ret;
+
+    lwp_sigqueue_clear(&signal->sig_queue);
+    ret = rt_mutex_detach(&signal->sig_lock);
+
+    return ret;
 }
 
 int lwp_suspend_sigcheck(rt_thread_t thread, int suspend_flag)
@@ -792,7 +788,7 @@ void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func)
 }
 #endif
 
-void lwp_sighandler_set(int sig, lwp_sighandler_t func)
+void lwp_signal_handler_set(struct rt_lwp *lwp, int sig, lwp_sighandler_t func)
 {
     rt_base_t level;
 
@@ -802,7 +798,7 @@ void lwp_sighandler_set(int sig, lwp_sighandler_t func)
         return;
 
     level = rt_hw_interrupt_disable();
-    ((struct rt_lwp*)rt_thread_self()->lwp)->signal.sig_action[sig - 1] = func;
+    lwp->signal.sig_action[sig - 1] = func;
     rt_hw_interrupt_enable(level);
 }
 
@@ -840,13 +836,12 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
     return ret;
 }
 
-static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *info)
+static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *usi)
 {
     int signo;
-    rt_bool_t is_empty;
-    lwp_sigset_t *pending;
     lwp_siginfo_t si;
     struct rt_lwp *lwp;
+    lwp_sigset_t *pending;
 
     pending = &_SIGQ(thread)->sigset_pending;
     signo = _next_signal(pending, mask);
@@ -861,21 +856,17 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *in
     if (!signo)
         return signo;
 
-    si = sigqueue_dequeue_examine(_SIGQ(thread), signo, &is_empty);
+    si = sigqueue_dequeue(_SIGQ(thread), signo);
     RT_ASSERT(!!si);
-    if (is_empty)
-    {
-        /* No more signal */
-        _sigdelset(pending, signo);
-    }
 
-    info->si_code = SI_TIMER;
-    _sigdelset(pending, signo);
+    siginfo_k2u(si, usi);
+    rt_free(si);
+
     return signo;
 }
 
-int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
-                                siginfo_t *info, struct timespec *timeout)
+rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
+                                     siginfo_t *usi, struct timespec *timeout)
 {
     rt_err_t ret;
     int sig;
@@ -891,7 +882,7 @@ int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     _sigdelset(sigset, SIGSTOP);
     _signotsets(sigset, sigset);
 
-    sig = _dequeue_signal(thread, sigset, info);
+    sig = _dequeue_signal(thread, sigset, usi);
     if (sig)
         return sig;
 
@@ -939,7 +930,7 @@ int lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     }
     /* else ret == -EINTR */
 
-    sig = _dequeue_signal(thread, sigset, info);
+    sig = _dequeue_signal(thread, sigset, usi);
 
     return sig ? sig : ret;
 }
