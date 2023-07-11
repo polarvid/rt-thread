@@ -3297,7 +3297,7 @@ struct k_sigaction {
 };
 
 sysret_t sys_sigaction(int sig, const struct k_sigaction *act,
-                     struct k_sigaction *oact, size_t sigsetsize)
+                       struct k_sigaction *oact, size_t sigsetsize)
 {
     int ret = -RT_EINVAL;
     struct lwp_sigaction kact, *pkact = RT_NULL;

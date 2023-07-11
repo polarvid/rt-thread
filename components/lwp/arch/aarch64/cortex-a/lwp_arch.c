@@ -94,12 +94,25 @@ int arch_expand_user_stack(void *addr)
 }
 
 #endif
+#define ALGIN_BYTES (16)
 
-void *arch_copy_exp_frame(rt_base_t user_sp, struct rt_hw_exp_stack *exp_frame, rt_base_t elr, rt_base_t spsr)
+void *arch_ucontext_save(rt_base_t user_sp, siginfo_t *psiginfo,
+                         struct rt_hw_exp_stack *exp_frame, rt_base_t elr,
+                         rt_base_t spsr)
 {
+    rt_base_t *new_sp;
     size_t item_copied = sizeof(*exp_frame) / sizeof(rt_base_t);
-    rt_base_t *new_sp = (rt_base_t *)user_sp - item_copied;
 
+    /* push psiginfo */
+    if (psiginfo)
+    {
+        new_sp = (void *)RT_ALIGN_DOWN(user_sp - sizeof(*psiginfo), ALGIN_BYTES);
+        memcpy(new_sp, psiginfo, sizeof(*psiginfo));
+        user_sp = (rt_base_t)new_sp;
+    }
+
+    /* exp frame is already aligned as AAPCS64 required */
+    new_sp = (rt_base_t *)user_sp - item_copied;;
     if (lwp_user_accessable(new_sp, sizeof(*exp_frame)))
         memcpy(new_sp, exp_frame, sizeof(*exp_frame));
     else
@@ -108,10 +121,16 @@ void *arch_copy_exp_frame(rt_base_t user_sp, struct rt_hw_exp_stack *exp_frame, 
         sys_exit(EXIT_FAILURE);
     }
 
-    /* TODO: fix the 3 fields in exception frame, so that memcpy will be fine */
+    /* fix the 3 fields in exception frame, so that memcpy will be fine */
     ((struct rt_hw_exp_stack *)new_sp)->pc = elr;
     ((struct rt_hw_exp_stack *)new_sp)->cpsr = spsr;
     ((struct rt_hw_exp_stack *)new_sp)->sp_el0 = user_sp;
+
+    /* copy lwp_sigreturn */
+    extern void lwp_sigreturn(void);
+    void *fn_sigreturn = &lwp_sigreturn;
+    new_sp -= ALGIN_BYTES / sizeof(new_sp);
+    memcpy(new_sp, fn_sigreturn, 8);
 
     return new_sp;
 }

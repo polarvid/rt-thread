@@ -531,70 +531,62 @@ arch_signal_quit:
 
     b arch_ret_to_user
 
+/**
+ * rt_noreturn
+ * void arch_thread_signal_enter(
+ *      int signo,
+ *      siginfo_t *info,
+ *      void *exp_frame,
+ *      void *entry_uaddr)
+ */
+.global arch_thread_signal_enter
+arch_thread_signal_enter:
+    mov x19, x0
+    mov x20, x3
+    mov x21, x2 /* exp_frame */
 
-/* void arch_thread_signal_prepare(void *exp_frame, bool_t need_siginfo) */
-.global arch_thread_signal_prepare
-arch_thread_signal_prepare:
-
-    /* move exception frame to user stack */
-    mov x1, x0
+    /**
+     * move exception frame to user stack
+     * arch_ucontext_save(user_sp, exp_frame, psiginfo, elr, spsr);
+     */
     mrs x0, sp_el0
-    mrs x2, elr_el1
-    mrs x3, spsr_el1
-    bl arch_copy_exp_frame
-
-    /* drop exp frame on kernel stack, reset user sp */
-    add sp, sp, #RT_HW_EXCEPTION_FRAME_SIZE
-    msr sp_el0, x0
-
-    /* copy lwp_sigreturn */
-    msr spsel, #0
-
-    sub sp, sp, #0x10
-    adr x0, lwp_sigreturn   /* TODO: fix sys_sigreturn */
-    ldr w1, [x0]
-    str w1, [sp]
-    ldr w1, [x0, #4]
-    str w1, [sp, #4]
-
-    mov x20, sp /* lwp_sigreturn */
-    mov x0, sp
+    /* x1 is the psiginfo */
+    /* x2 is the exp_frame */
+    mrs x3, elr_el1
+    /** FIXME: spsr must restore from exception frame */
+    mrs x4, spsr_el1
+    b arch_copy_exp_frame
 
     dc cvau, x0
     dsb sy
     ic ialluis
     dsb sy
 
-    msr spsel, #1
-    ret
-
-/**
- * __attribute__ ((noreturn))
- * void arch_thread_signal_enter(
- *      int signo,
- *      siginfo_t *info,
- *      void *context,
- *      void *entry_uaddr)
- */
-.global arch_thread_signal_enter
-arch_thread_signal_enter:
-    mov x0, x19
-    bl lwp_sighandler_get
-    adds x1, x0, xzr
-    mov x0, x19
-
     /**
-     * x0 -> signal number
-     * x1 -> signal handler
+     * @brief Prepare the environment for signal handler
      */
-    bne 1f
-    mov x1, x20
-1:
-    msr elr_el1, x1
+
+    /** drop exp frame on kernel stack, reset kernel sp */
+    add sp, x21, #RT_HW_EXCEPTION_FRAME_SIZE
+
+    /** reset user sp */
+    mrs sp_el0, x0
+
+    /** set the entry address of signal handler */
+    msr elr_el1, x3
 
     /** set the return address to the sigreturn */
     /** TODO: fix this with a __kernel_sigreturn */
-    mrs x30, sp_el0
+    mov x30, x0
+
+    /** x0 is the new user sp returned by arch_copy_exp_frame */
+    add x2, x0, 16
+    add x1, x2, #RT_HW_EXCEPTION_FRAME_SIZE
+    mov x0, x19
+
+    /**
+     * handler(signo, psi, ucontext);
+     */
     eret
 
 lwp_debugreturn:

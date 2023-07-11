@@ -12,15 +12,10 @@
 #ifndef LWP_SIGNAL_H__
 #define LWP_SIGNAL_H__
 
-#include "rtdef.h"
 #include "syscall_generic.h"
 
 #include <rtthread.h>
 #include <sys/signal.h>
-
-#ifndef sigmask
-#define sigmask(sig) ((int)(1u << ((sig)-1)))
-#endif
 
 #define LWP_SIG_IGNORE_SET      (sigmask(SIGCHLD) | sigmask(SIGURG))
 #define LWP_SIG_ACT_DFL         ((lwp_sighandler_t)0)
@@ -34,6 +29,13 @@ extern "C" {
     (SA_NOCLDSTOP | SA_NOCLDWAIT | SA_SIGINFO | SA_ONSTACK | SA_RESTART |   \
      SA_NODEFER | SA_RESETHAND | SA_EXPOSE_TAGBITS)
 
+typedef enum {
+    LWP_SIG_MASK_CMD_BLOCK,
+    LWP_SIG_MASK_CMD_UNBLOCK,
+    LWP_SIG_MASK_CMD_SET_MASK,
+    __LWP_SIG_MASK_CMD_WATERMARK
+} lwp_sig_mask_cmd_t;
+
 /**
  * LwP implementation of POSIX signal
  */
@@ -42,23 +44,21 @@ struct lwp_signal {
 
     struct lwp_sigqueue sig_queue;
 
-    int sig_action_flags[_LWP_NSIG];
+    lwp_sigset_t sig_mask[_LWP_NSIG];
     rt_thread_t sig_action_thr[_LWP_NSIG];
     lwp_sighandler_t sig_action[_LWP_NSIG];
+    int sig_action_flag[_LWP_NSIG];
+    lwp_sigset_t sig_action_siginfo;
+    lwp_sigset_t sig_action_altstack;
+    lwp_sigset_t sig_action_restart;
 };
 
 struct rt_lwp;
 
-lwp_sighandler_t lwp_sighandler_get(int sig);
 void lwp_sighandler_set(int sig, lwp_sighandler_t func);
 #ifndef ARCH_MM_MMU
 void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func);
 #endif
-
-int lwp_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset);
-int lwp_thread_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset);
-int lwp_sigtimedwait(lwp_sigset_t *sigset, siginfo_t *info, struct timespec *timeout);
-int lwp_sigaction(pid_t sig, const struct lwp_sigaction *act, struct lwp_sigaction * oact, size_t sigsetsize);
 
 /**
  * @brief check for signal to handle of current thread
@@ -81,7 +81,31 @@ int lwp_signal_check(void);
  */
 rt_err_t lwp_signal_kill(struct rt_lwp *lwp, int signo, int code, int value);
 
+/**
+ * @brief set or examine the signal action of signo
+ *
+ * @param signo signal number
+ * @param act the signal action
+ * @param oact 
+ * @return rt_err_t 
+ */
+rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
+                           const struct lwp_sigaction *restrict act,
+                           struct lwp_sigaction *restrict oact);
+
 rt_err_t lwp_thread_signal_kill(rt_thread_t thread, int signo, int code, int value);
+
+/**
+ * @brief set signal mask of target thread
+ * 
+ * @param thread the target thread
+ * @param how command
+ * @param sigset operand
+ * @param oset the address to old set
+ * @return rt_err_t
+ */
+rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
+                                const lwp_sigset_t *sigset, lwp_sigset_t *oset);
 
 rt_inline void lwp_sigqueue_init(lwp_sigqueue_t sigq)
 {
@@ -98,7 +122,7 @@ rt_inline rt_err_t lwp_signal_init(struct lwp_signal *sig)
     if (rc == RT_EOK)
     {
         memset(&sig->sig_action, 0, sizeof(sig->sig_action));
-        memset(&sig->sig_action_flags, 0, sizeof(sig->sig_action_flags));
+        memset(&sig->sig_action_flag, 0, sizeof(sig->sig_action_flag));
         lwp_sigqueue_init(&sig->sig_queue);
     }
     return rc;
@@ -106,12 +130,11 @@ rt_inline rt_err_t lwp_signal_init(struct lwp_signal *sig)
 
 /**
  * @brief Catch signal if exists and no return, otherwise return with no side effect
- *
  */
 void lwp_thread_signal_catch(void *exp_frame);
 
-void arch_thread_signal_prepare(void *exp_frame, rt_bool_t need_siginfo);
-rt_noreturn void arch_thread_signal_enter(int signo, siginfo_t *psiginfo, void *exp_frame, void *entry_uaddr);
+rt_noreturn void arch_thread_signal_enter(int signo, siginfo_t *psiginfo,
+                                          void *exp_frame, void *entry_uaddr);
 
 #ifdef __cplusplus
 }

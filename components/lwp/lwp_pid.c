@@ -984,7 +984,7 @@ void lwp_terminate(struct rt_lwp *lwp)
     /* stop the receiving of signals */
     lwp->terminated = RT_TRUE;
 
-    /* broad cast exit request for sibling threads */
+    /* broadcast exit request for sibling threads */
     for (list = lwp->t_grp.next; list != &lwp->t_grp; list = list->next)
     {
         rt_thread_t thread;

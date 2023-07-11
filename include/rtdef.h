@@ -384,6 +384,7 @@ typedef int (*init_fn_t)(void);
 #define RT_ETRAP                        11              /**< Trap event */
 #define RT_ENOENT                       12              /**< No entry */
 #define RT_ENOSPC                       13              /**< No space left */
+#define RT_EPERM                        14              /**< Operation not permitted */
 
 /**@}*/
 
@@ -746,6 +747,11 @@ typedef void (*lwp_sigaction_t)(int signo, siginfo_t *info, void *context);
 typedef struct {
     unsigned long sig[_LWP_NSIG_WORDS];
 } lwp_sigset_t;
+
+#if _LWP_NSIG <= 64
+#define lwp_sigmask(signo)      ((lwp_sigset_t){.sig = {[0] = ((long)(1u << ((signo)-1)))}})
+#define lwp_sigset_init(mask)   ((lwp_sigset_t){.sig = {[0] = (long)(mask)}})
+#endif
 
 struct lwp_sigaction {
     union {
