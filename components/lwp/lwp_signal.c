@@ -29,11 +29,11 @@
 
 /**
  * ASSERT the operation should never failed
- * if the RT_ASSERT is disable, there tend to be
+ * if the RT_ASSERT is disable, there should be
  * no effect on the running code
  */
 #define NEVER_FAIL(stat)    \
-    if (stat != RT_EOK)     \
+    if ((stat) != RT_EOK)     \
         RT_ASSERT(0);
 
 static lwp_siginfo_t siginfo_create(int signo, int code, int value)
@@ -272,7 +272,7 @@ static lwp_siginfo_t sigqueue_dequeue(lwp_sigqueue_t sigqueue, int signo)
     return found;
 }
 
-/* if found, the pempty can indicate whether there are pending signal of same sig exist */
+/* if found, the pempty can indicate whether there are still pending signal of same sig */
 static lwp_siginfo_t sigqueue_dequeue_examine(lwp_sigqueue_t sigqueue, int signo, rt_bool_t *pempty)
 {
     lwp_siginfo_t found;
@@ -308,14 +308,15 @@ static lwp_siginfo_t sigqueue_dequeue_examine(lwp_sigqueue_t sigqueue, int signo
     return found;
 }
 
-static void siginfo_copy_to_user(lwp_siginfo_t ksigi, siginfo_t *usigi)
+/** translate lwp siginfo to user siginfo_t  */
+rt_inline void siginfo_k2u(lwp_siginfo_t ksigi, siginfo_t *usigi)
 {
     usigi->si_code = ksigi->ksiginfo.code;
     usigi->si_signo = ksigi->ksiginfo.signo;
     usigi->si_errno = 0;
 }
 
-rt_inline lwp_sighandler_t _sighandler_get_locked(struct rt_lwp *lwp, int signo)
+rt_inline lwp_sighandler_t _get_sighandler_locked(struct rt_lwp *lwp, int signo)
 {
     return lwp->signal.sig_action[signo - 1];
 }
@@ -371,6 +372,16 @@ static void _thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
     }
 }
 
+rt_err_t lwp_signal_detach(struct lwp_signal *signal)
+{
+    rt_err_t ret;
+
+    lwp_sigqueue_clear(&signal->sig_queue);
+    ret = rt_mutex_detach(&signal->sig_lock);
+
+    return ret;
+}
+
 void lwp_sigqueue_clear(lwp_sigqueue_t sigq)
 {
     lwp_siginfo_t this, next;
@@ -422,16 +433,6 @@ int lwp_suspend_sigcheck(rt_thread_t thread, int suspend_flag)
     return ret;
 }
 
-rt_err_t lwp_signal_detach(struct lwp_signal *signal)
-{
-    rt_err_t ret;
-
-    lwp_sigqueue_clear(&signal->sig_queue);
-    ret = rt_mutex_detach(&signal->sig_lock);
-
-    return ret;
-}
-
 void lwp_thread_signal_catch(void *exp_frame)
 {
     int signo;
@@ -475,10 +476,10 @@ void lwp_thread_signal_catch(void *exp_frame)
         {
             siginfo = sigqueue_dequeue(pending, signo);
             RT_ASSERT(siginfo != RT_NULL);
-            handler = _sighandler_get_locked(lwp, signo);
+            handler = _get_sighandler_locked(lwp, signo);
             RT_ASSERT(handler != LWP_SIG_ACT_IGN);
 
-            /*  */
+            /* copy the block signal mask from the register signal action */
             memcpy(&new_sig_mask, &lwp->signal.sig_action_mask[signo - 1], sizeof(new_sig_mask));
 
             if (!_sigismember(&lwp->signal.sig_action_nodefer, signo))
@@ -491,7 +492,7 @@ void lwp_thread_signal_catch(void *exp_frame)
             /* arch signal entry */
             if (_sigismember(&lwp->signal.sig_action_siginfo, signo))
             {
-                siginfo_copy_to_user(siginfo, &usiginfo);
+                siginfo_k2u(siginfo, &usiginfo);
                 p_usi = &usiginfo;
             }
             else
@@ -616,7 +617,7 @@ rt_inline rt_bool_t _sighandler_is_ignored(struct rt_lwp *lwp, int signo)
     lwp_sighandler_t action;
     lwp_sigset_t ign_set = lwp_sigset_init(LWP_SIG_IGNORE_SET);
 
-    action = _sighandler_get_locked(lwp, signo);
+    action = _get_sighandler_locked(lwp, signo);
 
     if (action == LWP_SIG_ACT_IGN)
         is_ignored = RT_TRUE;
@@ -778,62 +779,6 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
     return ret;
 }
 
-#if 0
-rt_inline int _lwp_check_ignore(int sig)
-{
-    if (sig == SIGCHLD || sig == SIGCONT)
-    {
-        return 1;
-    }
-    return 0;
-}
-
-lwp_sighandler_t lwp_sighandler_get(int sig)
-{
-    lwp_sighandler_t func = RT_NULL;
-    struct rt_lwp *lwp;
-    rt_thread_t thread;
-    rt_base_t level;
-
-    if (sig == 0 || sig > _LWP_NSIG)
-    {
-        return func;
-    }
-    level = rt_hw_interrupt_disable();
-    thread = rt_thread_self();
-#ifndef ARCH_MM_MMU
-    if (thread->signal_in_process)
-    {
-        func = thread->signal_handler[sig - 1];
-        goto out;
-    }
-#endif
-    lwp = (struct rt_lwp*)thread->lwp;
-
-    func = lwp->signal_handler[sig - 1];
-    if (!func)
-    {
-        if (_lwp_check_ignore(sig))
-        {
-            goto out;
-        }
-        if (lwp->signal_in_process)
-        {
-            lwp_terminate(lwp);
-        }
-        sys_exit(0);
-    }
-out:
-    rt_hw_interrupt_enable(level);
-
-    if (func == (lwp_sighandler_t)SIG_IGN)
-    {
-        func = RT_NULL;
-    }
-    return func;
-}
-#endif
-
 #ifndef ARCH_MM_MMU
 void lwp_thread_sighandler_set(int sig, lwp_sighandler_t func)
 {
@@ -894,99 +839,6 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
 
     return ret;
 }
-
-#if 0
-int lwp_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset)
-{
-    int ret = -1;
-    rt_base_t level;
-    struct rt_lwp *lwp;
-    struct rt_thread *thread;
-    lwp_sigset_t newset;
-
-    level = rt_hw_interrupt_disable();
-
-    thread = rt_thread_self();
-    lwp = (struct rt_lwp*)thread->lwp;
-    if (!lwp)
-    {
-        goto out;
-    }
-    if (oset)
-    {
-        rt_memcpy(oset, &lwp->signal_mask, sizeof(lwp_sigset_t));
-    }
-
-    if (sigset)
-    {
-        switch (how)
-        {
-            case SIG_BLOCK:
-                _sigorsets(&newset, &lwp->signal_mask, sigset);
-                break;
-            case SIG_UNBLOCK:
-                _sigandsets(&newset, &lwp->signal_mask, sigset);
-                break;
-            case SIG_SETMASK:
-                newset = *sigset;
-                break;
-            default:
-                ret = -RT_EINVAL;
-                goto out;
-        }
-
-        _sigdelset(&newset, SIGKILL);
-        _sigdelset(&newset, SIGSTOP);
-
-        lwp->signal_mask = newset;
-    }
-    ret = 0;
-out:
-    rt_hw_interrupt_enable(level);
-    return ret;
-}
-
-int lwp_thread_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_t *oset)
-{
-    rt_base_t level;
-    struct rt_thread *thread;
-    lwp_sigset_t newset;
-
-    level = rt_hw_interrupt_disable();
-    thread = rt_thread_self();
-
-    if (oset)
-    {
-        rt_memcpy(oset, &thread->signal_mask, sizeof(lwp_sigset_t));
-    }
-
-    if (sigset)
-    {
-        switch (how)
-        {
-            case SIG_BLOCK:
-                _sigorsets(&newset, &thread->signal_mask, sigset);
-                break;
-            case SIG_UNBLOCK:
-                _sigandsets(&newset, &thread->signal_mask, sigset);
-                break;
-            case SIG_SETMASK:
-                newset = *sigset;
-                break;
-            default:
-                goto out;
-        }
-
-        _sigdelset(&newset, SIGKILL);
-        _sigdelset(&newset, SIGSTOP);
-
-        thread->signal_mask = newset;
-    }
-out:
-    rt_hw_interrupt_enable(level);
-    return 0;
-}
-#endif
 
 static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *info)
 {

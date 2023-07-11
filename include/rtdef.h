@@ -731,7 +731,7 @@ struct rt_wakeup
     void *user_data;
 };
 
-#define _LWP_NSIG       64
+#define _LWP_NSIG       32
 
 #ifdef ARCH_CPU_64BIT
 #define _LWP_NSIG_BPW   64
@@ -739,7 +739,7 @@ struct rt_wakeup
 #define _LWP_NSIG_BPW   32
 #endif
 
-#define _LWP_NSIG_WORDS (_LWP_NSIG / _LWP_NSIG_BPW)
+#define _LWP_NSIG_WORDS (RT_ALIGN(_LWP_NSIG, _LWP_NSIG_BPW) / _LWP_NSIG_BPW)
 
 typedef void (*lwp_sighandler_t)(int);
 typedef void (*lwp_sigaction_t)(int signo, siginfo_t *info, void *context);

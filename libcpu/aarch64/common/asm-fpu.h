@@ -7,7 +7,9 @@
  * Date           Author       Notes
  * 2021-05-18     Jesven       the first version
  */
+#include <rtconfig.h>
 
+#ifdef BSP_SUPPORT_FPU
 .macro SAVE_FPU, reg
     STR Q0, [\reg, #-0x10]!
     STR Q1, [\reg, #-0x10]!
@@ -44,3 +46,12 @@
     LDR Q1, [\reg], #0x10
     LDR Q0, [\reg], #0x10
 .endm
+#else
+
+.macro SAVE_FPU, reg
+.endm
+
+.macro RESTORE_FPU, reg
+.endm
+
+#endif /* BSP_SUPPORT_FPU */

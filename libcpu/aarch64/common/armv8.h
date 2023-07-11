@@ -11,7 +11,7 @@
 #ifndef __ARMV8_H__
 #define __ARMV8_H__
 
-#define RT_HW_EXCEPTION_FRAME_SIZE 544
+#define RT_HW_EXCEPTION_FRAME_SIZE 800
 
 #define SP_ELx     ((unsigned long)0x01)
 #define SP_EL0     ((unsigned long)0x00)
@@ -62,7 +62,9 @@ struct rt_hw_exp_stack
     unsigned long x0;
     unsigned long x1;
 
-    unsigned long fpu[32];
+#ifdef BSP_SUPPORT_FPU
+    unsigned long fpu[64];
+#endif
 };
 
 RT_CTASSERT(frame_size_identical, sizeof(struct rt_hw_exp_stack) == RT_HW_EXCEPTION_FRAME_SIZE);
