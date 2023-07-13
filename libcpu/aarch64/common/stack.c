@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2006-2021, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Change Logs:
  * Date           Author       Notes
  * 2021-05-12     RT-Thread    init
- * 2023-07-13     Shell        ARMv8 NEON support
+ * 2023-07-13     GuEe-GUI     append fpu: Q16 ~ Q31
  */
 #include <board.h>
 #include <rtthread.h>
@@ -36,8 +36,12 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
 
     stk = (rt_ubase_t *)stack_addr;
 
-    stk -= 64;
-    memset(stk, 0, 64 * sizeof(rt_base_t));
+    for (int i = 0; i < 32; ++i)
+    {
+        stk -= sizeof(rt_uint128_t) / sizeof(rt_ubase_t);
+
+        *(rt_uint128_t *)stk = (rt_uint128_t) { 0 };
+    }
 
     *(--stk) = (rt_ubase_t)0;           /* X1 */
     *(--stk) = (rt_ubase_t)parameter;   /* X0 */

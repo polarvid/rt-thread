@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 2006-2021, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Change Logs:
  * Date           Author       Notes
  * 2021-05-18     Jesven       the first version
- * 2023-07-13     RT-Thread    armv8 FPU
+ * 2023-07-13     GuEe-GUI     append Q16 ~ Q31
  */
 #include <rtconfig.h>
 
