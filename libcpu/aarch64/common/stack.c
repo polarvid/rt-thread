@@ -6,6 +6,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2021-05-12     RT-Thread    init
+ * 2023-07-13     Shell        ARMv8 NEON support
  */
 #include <board.h>
 #include <rtthread.h>
@@ -35,38 +36,8 @@ rt_uint8_t *rt_hw_stack_init(void *tentry, void *parameter,
 
     stk = (rt_ubase_t *)stack_addr;
 
-    *(--stk) = (rt_ubase_t)0; /* Q0 */
-    *(--stk) = (rt_ubase_t)0; /* Q0 */
-    *(--stk) = (rt_ubase_t)0; /* Q1 */
-    *(--stk) = (rt_ubase_t)0; /* Q1 */
-    *(--stk) = (rt_ubase_t)0; /* Q2 */
-    *(--stk) = (rt_ubase_t)0; /* Q2 */
-    *(--stk) = (rt_ubase_t)0; /* Q3 */
-    *(--stk) = (rt_ubase_t)0; /* Q3 */
-    *(--stk) = (rt_ubase_t)0; /* Q4 */
-    *(--stk) = (rt_ubase_t)0; /* Q4 */
-    *(--stk) = (rt_ubase_t)0; /* Q5 */
-    *(--stk) = (rt_ubase_t)0; /* Q5 */
-    *(--stk) = (rt_ubase_t)0; /* Q6 */
-    *(--stk) = (rt_ubase_t)0; /* Q6 */
-    *(--stk) = (rt_ubase_t)0; /* Q7 */
-    *(--stk) = (rt_ubase_t)0; /* Q7 */
-    *(--stk) = (rt_ubase_t)0; /* Q8 */
-    *(--stk) = (rt_ubase_t)0; /* Q8 */
-    *(--stk) = (rt_ubase_t)0; /* Q9 */
-    *(--stk) = (rt_ubase_t)0; /* Q9 */
-    *(--stk) = (rt_ubase_t)0; /* Q10 */
-    *(--stk) = (rt_ubase_t)0; /* Q10 */
-    *(--stk) = (rt_ubase_t)0; /* Q11 */
-    *(--stk) = (rt_ubase_t)0; /* Q11 */
-    *(--stk) = (rt_ubase_t)0; /* Q12 */
-    *(--stk) = (rt_ubase_t)0; /* Q12 */
-    *(--stk) = (rt_ubase_t)0; /* Q13 */
-    *(--stk) = (rt_ubase_t)0; /* Q13 */
-    *(--stk) = (rt_ubase_t)0; /* Q14 */
-    *(--stk) = (rt_ubase_t)0; /* Q14 */
-    *(--stk) = (rt_ubase_t)0; /* Q15 */
-    *(--stk) = (rt_ubase_t)0; /* Q15 */
+    stk -= 64;
+    memset(stk, 0, 64 * sizeof(rt_base_t));
 
     *(--stk) = (rt_ubase_t)0;           /* X1 */
     *(--stk) = (rt_ubase_t)parameter;   /* X0 */

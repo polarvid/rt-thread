@@ -11,7 +11,17 @@
 #ifndef __ARMV8_H__
 #define __ARMV8_H__
 
-#define RT_HW_EXCEPTION_FRAME_SIZE 800
+#include <rtconfig.h>
+
+#define _BASE_CTX_SIZE              ((32 + 4) * 8)
+
+#ifdef BSP_SUPPORT_FPU
+#define RT_HW_FPU_CTX_SIZE          (32 * (128 / 8))
+#define RT_HW_EXCEPTION_FRAME_SIZE  (_BASE_CTX_SIZE + RT_HW_FPU_CTX_SIZE)
+#else
+#define RT_HW_EXCEPTION_FRAME_SIZE  _BASE_CTX_SIZE
+
+#endif
 
 #define SP_ELx     ((unsigned long)0x01)
 #define SP_EL0     ((unsigned long)0x00)

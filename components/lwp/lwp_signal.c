@@ -560,7 +560,7 @@ static void _do_signal_wakeup(rt_thread_t thread, int sig)
 /** find a candidate to be notified of the arrival */
 static rt_thread_t _signal_find_catcher(struct rt_lwp *lwp, int signo)
 {
-    rt_thread_t catcher;
+    rt_thread_t catcher = RT_NULL;
     rt_thread_t candidate;
 
     candidate = lwp->signal.sig_dispatch_thr[signo - 1];

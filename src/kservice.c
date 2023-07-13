@@ -2044,6 +2044,7 @@ void rt_assert_handler(const char *ex_string, const char *func, rt_size_t line)
 #endif /*RT_USING_MODULE*/
         {
             rt_kprintf("(%s) assertion failed at function:%s, line number:%d \n", ex_string, func, line);
+            rt_backtrace();
             rt_hw_cpu_shutdown();
             while (dummy == 0);
         }

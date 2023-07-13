@@ -22,3 +22,8 @@ config RT_USING_ADT_REF
     bool "Reference API"
     depends on RT_USING_ADT
     default y
+
+config RT_USING_ADT_UTHASH
+    bool "UT HASH"
+    depends on RT_USING_ADT
+    default y

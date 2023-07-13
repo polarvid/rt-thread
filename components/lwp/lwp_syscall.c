@@ -3304,7 +3304,7 @@ struct k_sigaction {
     unsigned mask[2];
 };
 
-SYSCALL_DEFINE(sys_sigaction, int, sig, const struct k_sigaction *, act,
+SYSCALL_DEFINE(sigaction, int, sig, const struct k_sigaction *, act,
                      struct k_sigaction *, oact, size_t, sigsetsize)
 {
     int ret = -RT_EINVAL;

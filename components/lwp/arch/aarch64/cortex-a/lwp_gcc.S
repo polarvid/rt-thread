@@ -93,7 +93,7 @@
 #define CONTEXT_OFFSET_Q1         0x200
 #define CONTEXT_OFFSET_Q0         0x210
 
-#define CONTEXT_FPU_SIZE          0x100
+#define CONTEXT_FPU_SIZE          0x200
 #define CONTEXT_SIZE              0x220
 
 /**************************************************/
@@ -375,10 +375,8 @@ arch_ret_to_user:
     stp x0, x1, [sp, #-0x10]!
     stp x29, x30, [sp, #-0x10]!
 
-
     mrs x0, elr_el1
     bl dbg_attach_req
-
 
     /* restore */
     ldp x29, x30, [sp], #0x10
@@ -508,6 +506,8 @@ arch_signal_quit:
 
     /* drop current exception frame */
     add sp, sp, #CONTEXT_SIZE
+    mrs x0, sp_el0
+    bl  arch_sigmask_restore
 
     /* restore previous exception frame */
     msr spsel, #0
