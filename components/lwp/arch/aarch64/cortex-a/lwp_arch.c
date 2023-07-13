@@ -109,10 +109,10 @@ struct signal_ucontext
     struct rt_hw_exp_stack frame;
 };
 
-void arch_sigmask_restore(rt_base_t user_sp)
+void *arch_sigmask_restore(rt_base_t user_sp)
 {
     struct signal_ucontext *new_sp;
-    new_sp = (void *)(user_sp - sizeof(struct signal_ucontext));
+    new_sp = (void *)user_sp;
 
     if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
     {
@@ -123,7 +123,7 @@ void arch_sigmask_restore(rt_base_t user_sp)
         RT_ASSERT(0);
     }
 
-    return ;
+    return (char *)&new_sp->frame + sizeof(struct rt_hw_exp_stack);
 }
 
 /* TODO: fix this with a structure to describe the layout */

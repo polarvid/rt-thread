@@ -735,7 +735,7 @@ struct rt_wakeup
     void *user_data;
 };
 
-#define _LWP_NSIG       32
+#define _LWP_NSIG       64
 
 #ifdef ARCH_CPU_64BIT
 #define _LWP_NSIG_BPW   64
