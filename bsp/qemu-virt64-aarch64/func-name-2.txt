@@ -1,5 +1,0 @@
-0xffff0000001dbc70 tidle2
-0xffff0000001d72c8 fgc_th2
-0xffff0000001d79e8 fgc_fc2
-
-0xffff0000001d79e8 fgc_fc2

@@ -64,6 +64,8 @@
 #define RT_USING_STDC_ATOMIC
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
+#define RT_USING_HW_ATOMIC
+#define RT_USING_CPU_FFS
 #define ARCH_MM_MMU
 #define ARCH_ARM
 #define ARCH_ARM_MMU
@@ -185,11 +187,6 @@
 
 /* Socket is in the 'Network' category */
 
-#define RT_USING_TRACING
-#define TRACING_KSYMTBL
-#define TRACING_FTRACE
-#define TRACING_SYSCALL
-#define TRACING_SYSCALL_EXT
 
 /* Network */
 
@@ -254,12 +251,16 @@
 
 /* Utilities */
 
+#define RT_USING_UTEST
+#define UTEST_THR_STACK_SIZE 8192
+#define UTEST_THR_PRIORITY 20
 #define RT_USING_RESOURCE_ID
 #define RT_USING_ADT
 #define RT_USING_ADT_AVL
 #define RT_USING_ADT_BITMAP
 #define RT_USING_ADT_HASHMAP
 #define RT_USING_ADT_REF
+#define RT_USING_ADT_UTHASH
 
 /* RT-Thread Utestcases */
 
@@ -270,6 +271,7 @@
 
 /* Kernel Testcase */
 
+#define UTEST_SMALL_MEM_TC
 
 /* CPP11 Testcase */
 
@@ -282,7 +284,6 @@
 
 /* Memory Management Subsytem Testcase */
 
-#define UTEST_TRACING_TC
 
 /* RT-Thread online packages */
 
