@@ -307,6 +307,7 @@ arch_ret_to_user:
     add sp, sp, #-0x10
     mov x0, sp
     bl lwp_thread_signal_catch
+    add sp, sp, #0x10
 
     /* check debug */
     /* restore exception frame */
@@ -537,27 +538,27 @@ arch_signal_quit:
  *      int signo,                      -> x0
  *      siginfo_t *psiginfo,            -> x1
  *      void *exp_frame,                -> x2
- *      lwp_sigset_t save_mask,         -> x3
- *      void *entry_uaddr,              -> x4
- *      lwp_sigset_t *save_sig_mask,    -> x5
+ *      void *entry_uaddr,              -> x3
+ *      lwp_sigset_t *save_sig_mask,    -> x4
  *      )
  */
 .global arch_thread_signal_enter
 arch_thread_signal_enter:
     mov x19, x0
-    mov x20, x3
-    mov x21, x2 /* exp_frame */
+    mov x20, x2 /* exp_frame */
+    mov x21, x3
 
     /**
      * move exception frame to user stack
      */
     mrs x0, sp_el0
     mrs x3, elr_el1
+    mov x5, x4
     /** FIXME: spsr must restore from exception frame */
     mrs x4, spsr_el1
 
     /* arch_ucontext_save(user_sp, psiginfo, exp_frame, elr, spsr, save_sig_mask); */
-    b arch_ucontext_save
+    bl arch_ucontext_save
 
     dc cvau, x0
     dsb sy
@@ -569,20 +570,19 @@ arch_thread_signal_enter:
      */
 
     /** drop exp frame on kernel stack, reset kernel sp */
-    add sp, x21, #RT_HW_EXCEPTION_FRAME_SIZE
+    add sp, x20, #RT_HW_EXCEPTION_FRAME_SIZE
 
     /** reset user sp */
     msr sp_el0, x0
-
-    /** set the entry address of signal handler */
-    msr elr_el1, x3
-
     /** set the return address to the sigreturn */
     /** TODO: fix this with a __kernel_sigreturn */
     mov x30, x0
 
-    /** x0 is the new user sp returned by arch_copy_exp_frame */
-    add x2, x0, 16
+    /** set the entry address of signal handler */
+    msr elr_el1, x21
+
+    /* siginfo is above the return address */
+    add x2, x30, 16
     add x1, x2, #RT_HW_EXCEPTION_FRAME_SIZE
     mov x0, x19
 

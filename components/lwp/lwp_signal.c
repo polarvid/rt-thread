@@ -32,8 +32,8 @@
  * if the RT_ASSERT is disable, there should be
  * no effect on the running code
  */
-#define NEVER_FAIL(stat)    \
-    if ((stat) != RT_EOK)     \
+#define NEVER_FAIL(stat)        \
+    if ((stat) != RT_EOK)       \
         RT_ASSERT(0);
 
 static lwp_siginfo_t siginfo_create(int signo, int code, int value)
@@ -68,7 +68,7 @@ static lwp_siginfo_t siginfo_create(int signo, int code, int value)
 
 rt_inline void siginfo_delete(lwp_siginfo_t siginfo)
 {
-    rt_free(siginfo);
+    // rt_free(siginfo);
 }
 
 rt_inline void _sigorsets(lwp_sigset_t *dset, const lwp_sigset_t *set0, const lwp_sigset_t *set1)
@@ -240,12 +240,19 @@ rt_inline int sigqueue_peek(lwp_sigqueue_t sigqueue, lwp_sigset_t *mask)
 static void sigqueue_enqueue(lwp_sigqueue_t sigqueue, lwp_siginfo_t siginfo)
 {
     lwp_siginfo_t idx;
+    rt_bool_t inserted = RT_FALSE;
     rt_list_for_each_entry(idx, &sigqueue->siginfo_list, node)
     {
-        if (idx->ksiginfo.signo < siginfo->ksiginfo.signo)
-            continue;
-        rt_list_insert_after(&idx->node, &siginfo->node);
+        if (idx->ksiginfo.signo >= siginfo->ksiginfo.signo)
+        {
+            rt_list_insert_after(&idx->node, &siginfo->node);
+            inserted = RT_TRUE;
+            break;
+        }
     }
+
+    if (!inserted)
+        rt_list_insert_after(&idx->node, &siginfo->node);
 
     _sigaddset(&sigqueue->sigset_pending, siginfo->ksiginfo.signo);
     return ;
@@ -255,11 +262,12 @@ static lwp_siginfo_t sigqueue_dequeue(lwp_sigqueue_t sigqueue, int signo)
 {
     lwp_siginfo_t found;
     lwp_siginfo_t candidate;
+    lwp_siginfo_t next;
     rt_bool_t is_empty;
 
     found = RT_NULL;
     is_empty = RT_TRUE;
-    rt_list_for_each_entry(candidate, &sigqueue->siginfo_list, node)
+    rt_list_for_each_entry_safe(candidate, next, &sigqueue->siginfo_list, node)
     {
         if (candidate->ksiginfo.signo == signo)
         {
@@ -357,7 +365,7 @@ void lwp_sigqueue_clear(lwp_sigqueue_t sigq)
     {
         rt_list_for_each_entry_safe(this, next, &sigq->siginfo_list, node)
         {
-            rt_free(this);
+            siginfo_delete(this);
         }
     }
 }
@@ -473,9 +481,11 @@ void lwp_thread_signal_catch(void *exp_frame)
             siginfo = sigqueue_dequeue(pending, signo);
             RT_ASSERT(siginfo != RT_NULL);
             handler = _get_sighandler_locked(lwp, signo);
+
+            /* IGN signal will never be queued */
             RT_ASSERT(handler != LWP_SIG_ACT_IGN);
 
-            /* copy the block signal mask from the register signal action */
+            /* copy the blocked signal mask from the registered signal action */
             memcpy(&new_sig_mask, &lwp->signal.sig_action_mask[signo - 1], sizeof(new_sig_mask));
 
             if (!_sigismember(&lwp->signal.sig_action_nodefer, signo))
@@ -483,9 +493,7 @@ void lwp_thread_signal_catch(void *exp_frame)
 
             _thread_signal_mask(thread, LWP_SIG_MASK_CMD_BLOCK, &new_sig_mask, &save_sig_mask);
 
-            NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
-
-            /* arch signal entry */
+            /* siginfo is need for signal action */
             if (_sigismember(&lwp->signal.sig_action_siginfo, signo))
             {
                 siginfo_k2u(siginfo, &usiginfo);
@@ -494,12 +502,16 @@ void lwp_thread_signal_catch(void *exp_frame)
             else
                 p_usi = RT_NULL;
 
+            NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+
             /* FIXME: rt_free() of sigqueue should be done in internal API */
-            rt_free(siginfo);
+            siginfo_delete(siginfo);
 
             /* signal default handler */
             if (handler == LWP_SIG_ACT_DFL)
             {
+                /* FIXME: is the way good enough? */
+                LOG_I("%s: default handler; and exit", __func__);
                 sys_exit(0);
             }
 
@@ -723,6 +735,7 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
 
         rt_hw_interrupt_enable(level);
         NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+        ret = RT_EOK;
     }
     else
         ret = -RT_EINVAL;
@@ -860,7 +873,7 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *us
     RT_ASSERT(!!si);
 
     siginfo_k2u(si, usi);
-    rt_free(si);
+    siginfo_delete(si);
 
     return signo;
 }

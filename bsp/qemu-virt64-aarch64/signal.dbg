@@ -1,0 +1,9 @@
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_thread_signal_kill
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_thread_signal_mask
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_thread_signal_timedwait
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.h:lwp_thread_signal_detach
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_signal_action
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_signal_detach
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_signal_handler_set
+break /home/rtthread-smart/rtthread/components/lwp/lwp_signal.c:lwp_signal_init
+break *0xffff0000000c1084

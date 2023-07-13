@@ -14,6 +14,7 @@
  * 2023-07-06     Shell        adapt the sys_kill to new implementation of POSIX signal
  */
 
+#include "lwp_signal.h"
 #define _GNU_SOURCE
 
 /* RT-Thread System call */
@@ -3358,6 +3359,12 @@ out:
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
+static int mask_command_u2k[] = {
+    [SIG_BLOCK] = LWP_SIG_MASK_CMD_BLOCK,
+    [SIG_UNBLOCK] = LWP_SIG_MASK_CMD_UNBLOCK,
+    [SIG_SETMASK] = LWP_SIG_MASK_CMD_SET_MASK,
+};
+
 sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t size)
 {
     int ret = -1;
@@ -3411,7 +3418,7 @@ sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t
         pnewset = (lwp_sigset_t *)sigset;
 #endif /* ARCH_MM_MMU */
     }
-    ret = lwp_thread_signal_mask(rt_thread_self(), how, pnewset, poldset);
+    ret = lwp_thread_signal_mask(rt_thread_self(), mask_command_u2k[how], pnewset, poldset);
 #ifdef ARCH_MM_MMU
     if (ret < 0)
     {
@@ -3558,7 +3565,7 @@ sysret_t sys_thread_sigprocmask(int how, const lwp_sigset_t *sigset, lwp_sigset_
         pnewset = (lwp_sigset_t *)sigset;
 #endif
     }
-    ret = lwp_thread_signal_mask(rt_thread_self(), how, pnewset, poldset);
+    ret = lwp_thread_signal_mask(rt_thread_self(), mask_command_u2k[how], pnewset, poldset);
     if (ret < 0)
     {
         return ret;

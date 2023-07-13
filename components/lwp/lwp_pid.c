@@ -29,7 +29,7 @@
 #endif
 
 #define DBG_TAG    "LWP_PID"
-#define DBG_LVL    DBG_LOG
+#define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
 
 #define PID_MAX 10000

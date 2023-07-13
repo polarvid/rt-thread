@@ -118,6 +118,7 @@
 #define RT_DFS_ELM_MUTEX_TIMEOUT 3000
 #define RT_USING_DFS_DEVFS
 #define RT_USING_DFS_ROMFS
+#define RT_USING_DFS_MQUEUE
 #define RT_USING_LWP
 #define RT_LWP_MAX_NR 30
 #define LWP_TASK_STACK_SIZE 16384
@@ -248,8 +249,12 @@
 
 /* Utilities */
 
-#define RT_USING_ADT
 #define RT_USING_RESOURCE_ID
+#define RT_USING_ADT
+#define RT_USING_ADT_AVL
+#define RT_USING_ADT_BITMAP
+#define RT_USING_ADT_HASHMAP
+#define RT_USING_ADT_REF
 
 /* RT-Thread Utestcases */
 

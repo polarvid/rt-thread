@@ -263,7 +263,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     thread->lwp = RT_NULL;
     rt_list_init(&(thread->sibling));
 
-    /* signal init */
+    /* lwp thread-signal init */
     rt_memset(&thread->signal.sigset_mask, 0, sizeof(lwp_sigset_t));
     rt_memset(&thread->signal.sig_queue.sigset_pending, 0, sizeof(lwp_sigset_t));
     rt_list_init(&thread->signal.sig_queue.siginfo_list);
