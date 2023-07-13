@@ -33,6 +33,8 @@ void rt_hw_backtrace(rt_uint32_t *ffp, rt_ubase_t sepc)
     {
         asm volatile("mv %0, s0"
                      : "=r"(fp));
+        if (!fp)
+            return ;
     }
 
     if (sepc)

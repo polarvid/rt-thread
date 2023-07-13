@@ -156,6 +156,7 @@ rt_thread_t rt_thread_create(const char *name,
 rt_err_t rt_thread_delete(rt_thread_t thread);
 #endif
 rt_thread_t rt_thread_self(void);
+rt_thread_t rt_thread_self_sync(void);
 rt_thread_t rt_thread_find(char *name);
 rt_err_t rt_thread_startup(rt_thread_t thread);
 rt_err_t rt_thread_yield(void);
@@ -688,7 +689,11 @@ const char *rt_strerror(rt_err_t error);
 #endif
 #endif
 
+#ifndef RT_USING_CPU_FFS
 int __rt_ffs(int value);
+#else
+#include <cpuport.h>
+#endif
 
 #ifndef RT_KSERVICE_USING_STDLIB_MEMORY
 void *rt_memset(void *src, int c, rt_ubase_t n);
@@ -825,6 +830,45 @@ while (0)
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
+#endif
+
+#ifdef RT_USING_SMP
+/*
+ * disable scheduler
+ */
+#include <stdatomic.h>
+rt_inline void rt_preempt_disable(void)
+{
+    struct rt_thread *current_thread;
+
+    current_thread = rt_thread_self();
+    if (current_thread)
+    {
+        /* lock scheduler for local cpu */
+        atomic_fetch_add_explicit(&current_thread->scheduler_lock_nest, 1, memory_order_relaxed);
+    }
+}
+
+/*
+ * enable scheduler
+ */
+rt_inline void rt_preempt_enable(void)
+{
+    struct rt_thread *current_thread;
+
+    current_thread = rt_thread_self();
+    if (current_thread)
+    {
+        /* unlock scheduler for local cpu */
+        int nest =
+            atomic_fetch_add_explicit(&current_thread->scheduler_lock_nest, -1, memory_order_relaxed);
+        if (nest <= 1)
+        {
+            RT_ASSERT(nest == 1);
+            rt_schedule();
+        }
+    }
+}
 #endif
 
 /**@}*/

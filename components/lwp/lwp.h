@@ -166,7 +166,10 @@ void lwp_user_setting_save(rt_thread_t thread);
 void lwp_user_setting_restore(rt_thread_t thread);
 int lwp_setaffinity(pid_t pid, int cpu);
 
+pid_t exec(char *filename, int debug, int argc, char **argv);
+
 #ifdef ARCH_MM_MMU
+
 struct __pthread {
     /* Part 1 -- these fields may be external or
      * internal (accessed via asm) ABI. Do not change. */

@@ -11,6 +11,7 @@
 #define __TEST_SYNCHRONIZATION_H__
 
 #include "common.h"
+#include "rtdef.h"
 #include "semaphore.h"
 
 #ifdef RT_USING_SMP
@@ -55,7 +56,7 @@ static void group1_entry(void *param)
     size_t test_times = TEST_TIMES;
     size_t alive = test_times / 10;
     void *buf;
-
+    rt_kprintf("%s: %ld\n", __func__, id);
     while (test_times--)
     {
         if (test_times % alive == 0)
@@ -85,6 +86,7 @@ static void group2_entry(void *param)
     size_t test_times = TEST_TIMES;
     size_t alive = test_times / 10;
     void *buf;
+    rt_kprintf("%s: %ld\n", __func__, id);
 
     while (test_times--)
     {
@@ -126,11 +128,13 @@ static void synchronization_tc(void)
         char name[RT_NAME_MAX];
         rt_sprintf(name, "grp1_%d", i);
         group1[i] =
-            rt_thread_create(name, group1_entry, (void *)i, ARCH_PAGE_SIZE, PRIO, 10);
+            rt_thread_create(name, group1_entry, (void *)i, ARCH_PAGE_SIZE * 2, PRIO, 10);
         uassert_true(!!group1[i]);
         semaphore_init(&sem1[i], 0);
+        rt_thread_control(group1[i], RT_THREAD_CTRL_BIND_CPU, (void *)i);
 
         uassert_true(!rt_thread_startup(group1[i]));
+        LOG_I("%s: group 1: %d startup bind %d", __func__, i, i);
     }
 
     for (size_t i = 0; i < THREAD_CNT / 2; i++)
@@ -141,8 +145,10 @@ static void synchronization_tc(void)
             rt_thread_create(name, group2_entry, (void *)i, ARCH_PAGE_SIZE, PRIO, 10);
         uassert_true(!!group2[i]);
         semaphore_init(&sem2[i], 0);
+        rt_thread_control(group2[i], RT_THREAD_CTRL_BIND_CPU, (void *)(THREAD_CNT / 2 + i));
 
         uassert_true(!rt_thread_startup(group2[i]));
+        LOG_I("%s: group 2: %d startup bind %d", __func__, i, (void *)(THREAD_CNT / 2 + i));
     }
 
     /* wait all thread exit */

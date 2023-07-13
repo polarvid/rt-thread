@@ -28,6 +28,7 @@ rt_inline rt_uint32_t rt_cpu_dcache_line_size(void)
     return 0;
 }
 
+rt_notrace
 void rt_hw_cpu_icache_invalidate(void *addr, rt_size_t size)
 {
     __asm_invalidate_icache_range((rt_size_t)addr, (rt_size_t)addr + size);
@@ -48,6 +49,7 @@ void rt_hw_cpu_dcache_clean_and_invalidate(void *addr, rt_size_t size)
     __asm_flush_dcache_range((rt_size_t)addr, (rt_size_t)addr + size);
 }
 
+rt_notrace
 void rt_hw_cpu_icache_ops(int ops, void *addr, int size)
 {
     if (ops == RT_HW_CACHE_INVALIDATE)

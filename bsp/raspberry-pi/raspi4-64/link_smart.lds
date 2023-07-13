@@ -13,6 +13,10 @@ SECTIONS
         *(.text)
         *(.text.*)
 
+        . = ALIGN(8);
+        __patchable_function_entries = .;
+        KEEP(*(__patchable_function_entries))
+
         /* section information for utest */
         . = ALIGN(4);
         __rt_utest_tc_tab_start = .;
@@ -53,6 +57,13 @@ SECTIONS
 
     __rodata_start = .;
     .rodata   : { *(.rodata) *(.rodata.*) }
+
+    . = ALIGN(32);
+    __ksymtbl_blob = .;
+    .ksymtbl     :
+    {
+        KEEP(*(.ksymtbl))
+    }
     __rodata_end = .;
 
     . = ALIGN(4);

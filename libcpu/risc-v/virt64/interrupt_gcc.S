@@ -17,9 +17,9 @@
 #include "encoding.h"
 #include "stackframe.h"
 
-    .align 2
     .global trap_entry
     .global debug_check_sp
+    .align 2
 trap_entry:
     // distingush exception from kernel or user
     csrrw   sp, sscratch, sp
@@ -83,12 +83,20 @@ _resume_kernel:
     csrw    sscratch, zero
     sret
 
+.global rt_hw_local_irq_enable
+rt_hw_local_irq_enable:
+#ifndef RT_USING_SMP
 .global rt_hw_interrupt_enable
 rt_hw_interrupt_enable:
+#endif
     csrs sstatus, a0    /* restore to old csr */
     jr ra
 
+.global rt_hw_local_irq_disable
+rt_hw_local_irq_disable:
+#ifndef RT_USING_SMP
 .global rt_hw_interrupt_disable
 rt_hw_interrupt_disable:
+#endif
     csrrci a0, sstatus, 2   /* clear SIE */
     jr ra

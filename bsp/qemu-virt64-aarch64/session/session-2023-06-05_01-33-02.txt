@@ -1,0 +1,124 @@
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x0 as cpu 0[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x1 as cpu 1[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x2 as cpu 2[0m
+[32m[I/libcpu.aarch64.cpu] Using MPID 0x3 as cpu 3[0m
+
+ \ | /
+- RT -     Thread Smart Operating System
+ / | \     5.0.1 build Jun  4 2023 10:29:22
+ 2006 - 2022 Copyright by RT-Thread team
+lwIP-2.1.2 initialized!
+[32m[I/sal.skt] Socket Abstraction Layer initialize success.[0m
+[32m[I/utest] utest is initialize success.[0m
+[32m[I/utest] total utest testcase num: (3)[0m
+file system initialization done!
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 1 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 2 booted[0m
+[32m[I/libcpu.aarch64.cpu] Secondary CPU 3 booted[0m
+msh />hello rt-thread
+
+msh />
+msh />ut
+utest_list
+utest_run
+msh />utest_r
+utest_run
+msh />utest_run
+[32m[I/utest] [==========] [ utest    ] loop 1/1[0m
+[32m[I/utest] [==========] [ utest    ] started[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ftrace.graph) started[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_api:250) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:63) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:66) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:67) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:68) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:71) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:72) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:73) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:74) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:75) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:79) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:80) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:85) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_get_custom_session:87) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_api:262) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_api:263) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:172) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:175) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:184) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:185) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:187) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:190) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:199) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:200) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:202) is passed[0m
+[32m[I/testcase] processing: 0/1048576[0m
+[32m[I/testcase] processing: 104857/1048576[0m
+[32m[I/testcase] processing: 209714/1048576[0m
+[32m[I/testcase] processing: 314571/1048576[0m
+[32m[I/testcase] processing: 419428/1048576[0m
+[32m[I/testcase] processing: 524285/1048576[0m
+[32m[I/testcase] processing: 629142/1048576[0m
+[32m[I/testcase] processing: 733999/1048576[0m
+[32m[I/testcase] processing: 838856/1048576[0m
+[32m[I/testcase] processing: 943713/1048576[0m
+[32m[I/testcase] processing: 1048570/1048576[0m
+[32m[I/testcase] 100000 event consumed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (func_consumer:152) is passed[0m
+[32m[I/testcase] Dumping part of events: (0xffff0000001134f4, 0xffff0000003612f8, 0x1f8f31880, 0x1f8f32390)[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:217) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (thread_consumer:126) is passed[0m
+[32m[I/testcase] consumed 1: thread tshell, tid 0xffff0000003612f8[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:219) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_tester:222) is passed[0m
+[32m[I/testcase] Event Summary: [0m
+[0m[D/utest] [    OK    ] [ unit     ] (_summary_test:236) is passed[0m
+[32m[I/testcase]   Function: drops 0x0 in-buffer 0x0 total 0x0[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_summary_test:242) is passed[0m
+[32m[I/testcase]   Thread: drops 0x0 in-buffer 0x1 total 0x1[0m
+[32m[I/utest] [  PASSED  ] [ result   ] testcase (testcases.tracing.ftrace.graph)[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ftrace.graph) finished[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ftrace) started[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:89) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:91) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:94) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:98) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:100) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_handler:58) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (_test_tracee:45) is passed[0m
+return value 0xffff0000003691a8
+return value 0x0000000000000003
+return value 0x3a5edfea021fe119
+return value 0x0000000000000005
+return value 0xffff0000000a7114
+return value 0x0000000000000000
+return value 0x00000000ffffffff
+return value 0x0000000000000002
+[32m[I/testcase] Return value verification[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:116) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:116) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:116) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_set_trace_api:116) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_vice_stack:151) is passed[0m
+[32m[I/utest] [  PASSED  ] [ result   ] testcase (testcases.tracing.ftrace)[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ftrace) finished[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ksymtbl) started[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_ksymtbl_find_by_address:31) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_ksymtbl_find_by_address:32) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_ksymtbl_find_by_address:33) is passed[0m
+[0m[D/utest] [    OK    ] [ unit     ] (test_ksymtbl_find_by_address:34) is passed[0m
+[32m[I/utest] [  PASSED  ] [ result   ] testcase (testcases.tracing.ksymtbl)[0m
+[32m[I/utest] [----------] [ testcase ] (testcases.tracing.ksymtbl) finished[0m
+[32m[I/utest] [==========] [ utest    ] finished[0m
+[32m[I/utest] [==========] [ utest    ] 3 tests from 3 testcase ran.[0m
+[32m[I/utest] [  PASSED  ] [ result   ] 3 tests.[0m
+msh />
+msh />QEMU: Terminated
+

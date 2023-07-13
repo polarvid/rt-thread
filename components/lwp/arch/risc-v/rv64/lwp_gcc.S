@@ -302,7 +302,7 @@ copy_context_loop:
     addi t1, t1, 8
     addi t2, t2, 8
     bnez s0, copy_context_loop
-#endif /* ARCH_USING_NEW_CTX_SWITCH */
+#endif /* !defined ARCH_USING_NEW_CTX_SWITCH */
 
     /* fetch SYSCALL ID */
     LOAD a7, 17 * REGBYTES(sp)

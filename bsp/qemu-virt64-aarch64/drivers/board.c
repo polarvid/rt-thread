@@ -33,7 +33,7 @@
 
 #ifdef RT_USING_SMART
 struct mem_desc platform_mem_desc[] = {
-    {KERNEL_VADDR_START, KERNEL_VADDR_START + 0x0fffffff, (rt_size_t)ARCH_MAP_FAILED, NORMAL_MEM}
+    {KERNEL_VADDR_START, KERNEL_VADDR_START + 0x0fffffff, (rt_size_t)ARCH_MAP_FAILED, NORMAL_MEM},
 };
 #else
 
@@ -87,13 +87,22 @@ void rt_hw_board_init(void)
 #ifdef RT_USING_SMART
     rt_hw_mmu_map_init(&rt_kernel_space, (void*)0xfffffffff0000000, 0x10000000, MMUTable, PV_OFFSET);
 #else
-    rt_hw_mmu_map_init(&rt_kernel_space, (void*)0x80000000, 0x10000000, MMUTable, 0);
+    #define USER_VADDR_TOP      0x0001000000000000UL
+    #define IOREMAP_MAX_SIZE    0x10000000
+    rt_hw_mmu_map_init(&rt_kernel_space, (void*)USER_VADDR_TOP - IOREMAP_MAX_SIZE, IOREMAP_MAX_SIZE, MMUTable, 0);
 #endif
     rt_page_init(init_page_region);
     rt_hw_mmu_setup(&rt_kernel_space, platform_mem_desc, platform_mem_desc_size);
 
     /* initialize system heap */
     rt_system_heap_init((void *)HEAP_BEGIN, (void *)HEAP_END);
+
+#ifdef DEBUG_MEM
+    const rt_size_t mm_size = 256ul << 10;
+    void *mm_buf = rt_pages_alloc(rt_page_bits(mm_size));
+    extern rt_slab_t mm_slab;
+    mm_slab = rt_slab_init("mm_slab", mm_buf, mm_size);
+#endif
 
     /* initialize hardware interrupt */
     rt_hw_interrupt_init();
@@ -116,7 +125,7 @@ void rt_hw_board_init(void)
 
     rt_components_board_init();
 
-    rt_thread_idle_sethook(idle_wfi);
+    // rt_thread_idle_sethook(idle_wfi);
 
 #ifdef RT_USING_SMP
     /* install IPI handle */

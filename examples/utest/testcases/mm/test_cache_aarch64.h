@@ -26,17 +26,20 @@ const char *platform_cache_not_guarantee = "Cannot guarantee cache operation wor
  * ==============================================================
  */
 
-static int _get1_const(void)
+rt_notrace static rt_optimize(0)
+int _get1_const(void)
 {
     return 1;
 }
 
-static int _get1(void)
+rt_notrace static rt_optimize(0)
+int _get1(void)
 {
     return 1;
 }
 
-static int _get2(void)
+rt_notrace static rt_optimize(0)
+int _get2(void)
 {
     return 2;
 }

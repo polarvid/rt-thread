@@ -42,8 +42,6 @@ SECTIONS
     {
         *(.text)                        /* remaining code */
         *(.text.*)                      /* remaining code */
-        *(.rodata)                      /* read-only data (constants) */
-        *(.rodata*)
         *(.glue_7)
         *(.glue_7t)
         *(.gnu.linkonce.t*)
@@ -69,9 +67,6 @@ SECTIONS
         __rt_utest_tc_tab_start = .;
         KEEP(*(UtestTcTab))
         __rt_utest_tc_tab_end = .;
-
-        . = ALIGN(8);
-        _etext = .;
     } > SRAM
 
     .eh_frame_hdr :
@@ -84,6 +79,14 @@ SECTIONS
     . = ALIGN(8);
     __text_end = .;
     __text_size = __text_end - __text_start;
+
+    __rodata_start = .;
+    .rodata :
+    {
+        *(.rodata)
+        *(.rodata.*)
+    } > SRAM
+    __rodata_end = .;
 
     .data :
     {
@@ -98,6 +101,21 @@ SECTIONS
 
         *(.sdata)
         *(.sdata.*)
+    } > SRAM
+
+    . = ALIGN(8);
+    __patchable_function_entries :
+    {
+        __patchable_function_entries_start = .;
+        KEEP(*(SORT(__patchable_function_entries)))
+        __patchable_function_entries_end = .;
+    } > SRAM
+
+    . = ALIGN(8);
+    .ksymtbl :
+    {
+        __ksymtbl_blob = .;
+        KEEP(*(.ksymtbl))
     } > SRAM
 
     . = ALIGN(8);
@@ -125,9 +143,6 @@ SECTIONS
 
         . += __STACKSIZE__;
         __stack_cpu0 = .;
-
-        . += __STACKSIZE__;
-        __stack_cpu1 = .;
     } > SRAM
 
     . = ALIGN(8);

@@ -22,6 +22,37 @@
 #define MM_PA_TO_OFF(pa) ((uintptr_t)(pa) >> MM_PAGE_SHIFT)
 #define PV_OFFSET        (rt_kmem_pvoff())
 
+// #define DEBUG_MEM
+
+#ifdef DEBUG_MEM
+#include <kasan.h>
+
+extern void *mm_buf;
+extern const size_t mm_size;
+extern rt_slab_t mm_slab;
+
+static inline void *mm_malloc(rt_size_t size)
+{
+    void *_buf;
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    _buf = rt_slab_alloc(mm_slab, size);
+    rt_hw_interrupt_enable(level);
+    return _buf;
+}
+
+static inline void mm_free(void *buf)
+{
+    rt_ubase_t level = rt_hw_interrupt_disable();
+    rt_slab_free(mm_slab, buf);
+    /* TODO: complete this to detect use after free */
+    // kasan_poisoned(buf, length);
+    rt_hw_interrupt_enable(level);
+}
+#else
+#define mm_malloc rt_malloc
+#define mm_free rt_free
+#endif
+
 #ifndef RT_USING_SMP
 typedef rt_spinlock_t mm_spinlock;
 

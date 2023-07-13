@@ -1,0 +1,7 @@
+
+config UTEST_TRACING_TC
+    bool "Tracing Framework Testcase"
+    default n
+    depends on RT_USING_TRACING
+    help
+        All tests will be setup regarding to the configuration of the tracing framework

@@ -31,13 +31,13 @@ uint32_t hal_interrupt_get_nest(void)
 void hal_interrupt_enable(void)
 {
     void local_irq_enable(void);
-    local_irq_enable();
+    // local_irq_enable();
 }
 
 void hal_interrupt_disable(void)
 {
     void local_irq_disable(void);
-    local_irq_disable();
+    // local_irq_disable();
 }
 
 uint32_t hal_interrupt_save(void)

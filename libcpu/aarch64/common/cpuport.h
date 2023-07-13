@@ -49,4 +49,10 @@ rt_inline void rt_hw_dsb(void)
 }
 
 void _thread_start(void);
+
+rt_inline int __rt_ffs(int value)
+{
+    return __builtin_ffs(value);
+}
+
 #endif  /*CPUPORT_H__*/

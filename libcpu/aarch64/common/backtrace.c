@@ -17,6 +17,10 @@ static int unwind_frame(struct bt_frame *frame)
 {
     unsigned long fp = frame->fp;
 
+#ifdef TRACING_SOFT_KASAN
+    fp |= 0xff00000000000000;
+#endif
+
     if ((fp & 0x7)
 #ifdef RT_USING_LWP
          || fp < KERNEL_VADDR_START
@@ -39,7 +43,7 @@ static void walk_unwind(unsigned long pc, unsigned long fp)
     frame.fp = fp;
     while (nesting < BT_NESTING_MAX)
     {
-        rt_kprintf(" %p", (void *)lr);
+        rt_kprintf(" %p", (void *)lr - 4);
         if (unwind_frame(&frame))
         {
             break;
@@ -51,18 +55,41 @@ static void walk_unwind(unsigned long pc, unsigned long fp)
 
 void backtrace(unsigned long pc, unsigned long lr, unsigned long fp)
 {
-    rt_kprintf("please use: addr2line -e rtthread.elf -a -f %p", (void *)pc);
+    rt_kprintf("please use: addr2line -e rtthread.elf -a -f ");
+    if (pc)
+        rt_kprintf("%p", (void *)pc);
+
     walk_unwind(lr, fp);
     rt_kprintf("\n");
 }
 
+int rt_backtrace_skipn(int level)
+{
+    unsigned long lr;
+    unsigned long fp = (unsigned long)__builtin_frame_address(0U);
+
+    /* skip current frames */
+    struct bt_frame frame;
+    frame.fp = fp;
+
+    /* skip n frames */
+    do
+    {
+        if (unwind_frame(&frame))
+            return -RT_ERROR;
+        lr = frame.pc;
+
+        /* INFO: level is signed integer */
+    } while (level-- > 0);
+
+    backtrace(0, lr, frame.fp);
+    return 0;
+}
+
 int rt_backtrace(void)
 {
-    unsigned long pc = (unsigned long)backtrace;
-    unsigned long ra = (unsigned long)__builtin_return_address(0U);
-    unsigned long fr = (unsigned long)__builtin_frame_address(0U);
-
-    backtrace(pc, ra, fr);
+    /* skip rt_backtrace itself */
+    rt_backtrace_skipn(1);
     return 0;
 }
 MSH_CMD_EXPORT_ALIAS(rt_backtrace, bt_test, backtrace test);

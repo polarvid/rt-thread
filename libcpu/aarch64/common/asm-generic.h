@@ -10,6 +10,13 @@
 #ifndef __ASM_GENERIC_H__
 #define __ASM_GENERIC_H__
 
+#ifdef TRACING_FTRACE
+#include <ftrace.h>
+#else
+#define TRACE_SYMBOL(funcname)  \
+    funcname:
+#endif /* TRACING_FTRACE */
+
 /* use to mark a start point where every task start from */
 #define START_POINT(funcname)               \
     .global funcname;                       \

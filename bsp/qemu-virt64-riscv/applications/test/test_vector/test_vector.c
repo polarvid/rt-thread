@@ -31,8 +31,8 @@ static char array[ARR_SIZE];
 
 static void test_feature(void)
 {
-    memcpy(array, constant, sizeof array);
-    char *src = constant;
+    rvv_memcpy(array, &test_feature, sizeof array);
+    char *src = test_feature;
     char *dst = array;
     int error = 0;
 

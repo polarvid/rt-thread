@@ -14,16 +14,15 @@
 #define RT_THREAD_PRIORITY_32
 #define RT_THREAD_PRIORITY_MAX 32
 #define RT_TICK_PER_SECOND 100
-#define RT_USING_OVERFLOW_CHECK
 #define RT_USING_HOOK
 #define RT_HOOK_USING_FUNC_PTR
 #define RT_USING_IDLE_HOOK
 #define RT_IDLE_HOOK_LIST_SIZE 4
-#define IDLE_THREAD_STACK_SIZE 8192
-#define SYSTEM_THREAD_STACK_SIZE 8192
+#define IDLE_THREAD_STACK_SIZE 32768
+#define SYSTEM_THREAD_STACK_SIZE 32768
 #define RT_USING_TIMER_SOFT
 #define RT_TIMER_THREAD_PRIO 4
-#define RT_TIMER_THREAD_STACK_SIZE 8192
+#define RT_TIMER_THREAD_STACK_SIZE 32768
 
 /* kservice optimization */
 
@@ -51,7 +50,6 @@
 #define RT_MEMHEAP_FAST_MODE
 #define RT_USING_MEMHEAP_AS_HEAP
 #define RT_USING_MEMHEAP_AUTO_BINDING
-#define RT_USING_MEMTRACE
 #define RT_USING_HEAP
 
 /* Kernel Device Object */
@@ -83,7 +81,7 @@
 #define FINSH_USING_MSH
 #define FINSH_THREAD_NAME "tshell"
 #define FINSH_THREAD_PRIORITY 20
-#define FINSH_THREAD_STACK_SIZE 4096
+#define FINSH_THREAD_STACK_SIZE 32768
 #define FINSH_USING_HISTORY
 #define FINSH_HISTORY_LINES 10
 #define FINSH_USING_SYMTAB
@@ -132,7 +130,7 @@
 #define RT_USING_DEVICE_IPC
 #define RT_UNAMED_PIPE_NUMBER 64
 #define RT_USING_SYSTEM_WORKQUEUE
-#define RT_SYSTEM_WORKQUEUE_STACKSIZE 8192
+#define RT_SYSTEM_WORKQUEUE_STACKSIZE 32768
 #define RT_SYSTEM_WORKQUEUE_PRIORITY 23
 #define RT_USING_SERIAL
 #define RT_USING_SERIAL_V1
@@ -171,7 +169,9 @@
 #define RT_USING_POSIX_STDIO
 #define RT_USING_POSIX_POLL
 #define RT_USING_POSIX_SELECT
+#define RT_USING_POSIX_SOCKET
 #define RT_USING_POSIX_TERMIOS
+#define RT_USING_POSIX_MMAN
 #define RT_USING_POSIX_DELAY
 #define RT_USING_POSIX_CLOCK
 #define RT_USING_POSIX_TIMER
@@ -185,6 +185,11 @@
 
 /* Socket is in the 'Network' category */
 
+#define RT_USING_TRACING
+#define TRACING_KSYMTBL
+#define TRACING_FTRACE
+#define TRACING_SYSCALL
+#define TRACING_SYSCALL_EXT
 
 /* Network */
 
@@ -258,6 +263,26 @@
 
 /* RT-Thread Utestcases */
 
+#define RT_USING_UTESTCASES
+
+/* Utest Self Testcase */
+
+
+/* Kernel Testcase */
+
+
+/* CPP11 Testcase */
+
+
+/* Utest Serial Testcase */
+
+
+/* RTT Posix Testcase */
+
+
+/* Memory Management Subsytem Testcase */
+
+#define UTEST_TRACING_TC
 
 /* RT-Thread online packages */
 

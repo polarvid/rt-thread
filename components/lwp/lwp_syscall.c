@@ -13,8 +13,8 @@
  * 2023-03-13     WangXiaoyao  Format & fix syscall return value
  * 2023-07-06     Shell        adapt the sys_kill to new implementation of POSIX signal
  */
+#include <stddef.h>
 
-#include "lwp_signal.h"
 #define _GNU_SOURCE
 
 /* RT-Thread System call */
@@ -35,6 +35,7 @@
 #ifdef ARCH_MM_MMU
 #include <lwp_user_mm.h>
 #include <lwp_arch.h>
+#include "lwp_signal.h"
 #endif
 
 #include <fcntl.h>
@@ -323,16 +324,21 @@ static void _crt_thread_entry(void *parameter)
 }
 
 /* thread/process */
-void sys_exit(int value)
+SYSCALL_DEFINE(exit, int, value)
 {
     rt_base_t level;
     rt_thread_t tid, main_thread;
     struct rt_lwp *lwp;
 
-    LOG_D("thread/process exit.");
-
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
+
+#ifdef TRACING_FTRACE
+    void _fgraph_stop(void);
+    extern pid_t trace_pid;
+    if (lwp->pid == trace_pid)
+        _fgraph_stop();
+#endif /* RT_USING_TRACING */
 
     level = rt_hw_interrupt_disable();
 #ifdef ARCH_MM_MMU
@@ -376,17 +382,17 @@ void sys_exit(int value)
     rt_schedule();
     rt_hw_interrupt_enable(level);
 
-    return;
+    return 0;
 }
 
 /* exit group */
-void sys_exit_group(int status)
+SYSCALL_DEFINE(exit_group, int, status)
 {
-    return;
+    return 0;
 }
 
 /* syscall: "read" ret: "ssize_t" args: "int" "void *" "size_t" */
-ssize_t sys_read(int fd, void *buf, size_t nbyte)
+SYSCALL_DEFINE(read, int, fd, void *, buf, size_t, nbyte)
 {
 #ifdef ARCH_MM_MMU
     void *kmem = RT_NULL;
@@ -433,7 +439,7 @@ ssize_t sys_read(int fd, void *buf, size_t nbyte)
 }
 
 /* syscall: "write" ret: "ssize_t" args: "int" "const void *" "size_t" */
-ssize_t sys_write(int fd, const void *buf, size_t nbyte)
+SYSCALL_DEFINE(write, int, fd, const void *, buf, size_t, nbyte)
 {
 #ifdef ARCH_MM_MMU
     void *kmem = RT_NULL;
@@ -476,14 +482,14 @@ ssize_t sys_write(int fd, const void *buf, size_t nbyte)
 }
 
 /* syscall: "lseek" ret: "off_t" args: "int" "off_t" "int" */
-off_t sys_lseek(int fd, off_t offset, int whence)
+SYSCALL_DEFINE(lseek, int, fd, off_t, offset, int, whence)
 {
     off_t ret = lseek(fd, offset, whence);
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
 /* syscall: "open" ret: "int" args: "const char *" "int" "..." */
-sysret_t sys_open(const char *name, int flag, ...)
+SYSCALL_DEFINE_VARG(open, const char *, name, int, flag)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -590,20 +596,20 @@ sysret_t sys_openat(int dirfd, const char *name, int flag, mode_t mode)
 }
 
 /* syscall: "close" ret: "int" args: "int" */
-sysret_t sys_close(int fd)
+SYSCALL_DEFINE(close, int, fd)
 {
     int ret = close(fd);
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
 /* syscall: "ioctl" ret: "int" args: "int" "u_long" "..." */
-sysret_t sys_ioctl(int fd, unsigned long cmd, void* data)
+SYSCALL_DEFINE(ioctl, int, fd, unsigned long, cmd, void *, data)
 {
     int ret = ioctl(fd, cmd, data);
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
-sysret_t sys_fstat(int file, struct stat *buf)
+SYSCALL_DEFINE(fstat, int, file, struct stat *, buf)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -730,7 +736,7 @@ static void dfs2musl_events(short *events)
     *events = result_e;
 }
 
-sysret_t sys_poll(struct pollfd *fds, nfds_t nfds, int timeout)
+SYSCALL_DEFINE(poll, struct pollfd *, fds, nfds_t, nfds, int, timeout)
 {
     int ret = -1;
     int i = 0;
@@ -895,7 +901,7 @@ quit:
 #endif
 }
 
-sysret_t sys_unlink(const char *pathname)
+SYSCALL_DEFINE(unlink, const char *, pathname)
 {
 #ifdef ARCH_MM_MMU
     int ret = -1;
@@ -1081,7 +1087,7 @@ sysret_t sys_kill(int pid, int signo)
     return sysret;
 }
 
-sysret_t sys_getpid(void)
+SYSCALL_DEFINE(getpid)
 {
     return lwp_getpid();
 }
@@ -1177,7 +1183,7 @@ sysret_t sys_mutex_release(rt_mutex_t mutex)
 
 #ifdef ARCH_MM_MMU
 /* memory allocation */
-rt_base_t sys_brk(void *addr)
+SYSCALL_DEFINE(brk, void *, addr)
 {
     return lwp_brk(addr);
 }
@@ -2627,7 +2633,7 @@ static int sys_log_enable(int argc, char** argv)
 }
 MSH_CMD_EXPORT_ALIAS(sys_log_enable, sys_log, sys_log 1(enable)/0(disable));
 
-sysret_t sys_log(const char* log, int size)
+SYSCALL_DEFINE(log, const char *, log, int, size)
 {
     rt_device_t console = rt_console_get_device();
 
@@ -2639,7 +2645,7 @@ sysret_t sys_log(const char* log, int size)
     return 0;
 }
 
-sysret_t sys_stat(const char *file, struct stat *buf)
+SYSCALL_DEFINE(stat, const char *, file, struct stat *, buf)
 {
     int ret = 0;
     int err;
@@ -2748,7 +2754,7 @@ void sys_hw_interrupt_enable(uint32_t level)
 }
 
 #ifdef ARCH_MM_MMU
-sysret_t sys_shmget(size_t key, size_t size, int create)
+SYSCALL_DEFINE(shmget, size_t, key, size_t, size, int, create)
 {
     return lwp_shmget(key, size, create);
 }
@@ -3298,8 +3304,8 @@ struct k_sigaction {
     unsigned mask[2];
 };
 
-sysret_t sys_sigaction(int sig, const struct k_sigaction *act,
-                       struct k_sigaction *oact, size_t sigsetsize)
+SYSCALL_DEFINE(sys_sigaction, int, sig, const struct k_sigaction *, act,
+                     struct k_sigaction *, oact, size_t, sigsetsize)
 {
     int ret = -RT_EINVAL;
     struct rt_lwp *lwp;
@@ -3365,7 +3371,7 @@ static int mask_command_u2k[] = {
     [SIG_SETMASK] = LWP_SIG_MASK_CMD_SET_MASK,
 };
 
-sysret_t sys_sigprocmask(int how, const sigset_t *sigset, sigset_t *oset, size_t size)
+SYSCALL_DEFINE(sigprocmask, int, how, const sigset_t *, sigset, sigset_t *, oset, size_t, size)
 {
     int ret = -1;
     lwp_sigset_t *pnewset = RT_NULL, *poldset = RT_NULL;
@@ -3495,7 +3501,7 @@ sysret_t sys_rt_sigtimedwait(const sigset_t *sigset, siginfo_t *info, const stru
     return sig;
 }
 
-sysret_t sys_tkill(int tid, int sig)
+SYSCALL_DEFINE(tkill, int, tid, int, sig)
 {
 #ifdef ARCH_MM_MMU
     rt_base_t level;
@@ -3879,7 +3885,7 @@ __exit:
 }
 #endif
 
-char *sys_getcwd(char *buf, size_t size)
+SYSCALL_DEFINE(getcwd, char *, buf, size_t, size)
 {
     if (!lwp_user_accessable((void *)buf, size))
     {
@@ -3887,7 +3893,7 @@ char *sys_getcwd(char *buf, size_t size)
     }
     getcwd(buf, size);
 
-    return (char *)strlen(buf);
+    return strlen(buf);
 }
 
 sysret_t sys_chdir(const char *path)
@@ -4025,7 +4031,7 @@ sysret_t sys_set_thread_area(void *p)
     return 0;
 }
 
-sysret_t sys_set_tid_address(int *tidptr)
+SYSCALL_DEFINE(set_tid_address, int *, tidptr)
 {
     rt_thread_t thread;
 
@@ -4970,7 +4976,7 @@ rt_weak sysret_t sys_cacheflush(void *addr, int size, int cache)
     return -EFAULT;
 }
 
-sysret_t sys_uname(struct utsname *uts)
+SYSCALL_DEFINE(uname, struct utsname *, uts)
 {
     struct utsname utsbuff = {0};
     int ret = 0;
@@ -5273,23 +5279,30 @@ sysret_t sys_symlink(const char *existing, const char *new)
     return (ret < 0 ? GET_ERRNO() : ret);
 }
 
+#include "lwp_pmutex.h"
+
+SYSCALL_DEFINE(pmutex, void *, umutex, int, op, void *, arg)
+{
+    return lwp_pmutex(umutex, op, arg);
+}
+
 const static struct rt_syscall_def func_table[] =
 {
-    SYSCALL_SIGN(sys_exit),            /* 01 */
-    SYSCALL_SIGN(sys_read),
-    SYSCALL_SIGN(sys_write),
-    SYSCALL_SIGN(sys_lseek),
-    SYSCALL_SIGN(sys_open),            /* 05 */
-    SYSCALL_SIGN(sys_close),
-    SYSCALL_SIGN(sys_ioctl),
-    SYSCALL_SIGN(sys_fstat),
-    SYSCALL_SIGN(sys_poll),
+    SYSCALL_SIGN_EXT(sys_exit),            /* 01 */
+    SYSCALL_SIGN_EXT(sys_read),
+    SYSCALL_SIGN_EXT(sys_write),
+    SYSCALL_SIGN_EXT(sys_lseek),
+    SYSCALL_SIGN_EXT(sys_open),            /* 05 */
+    SYSCALL_SIGN_EXT(sys_close),
+    SYSCALL_SIGN_EXT(sys_ioctl),
+    SYSCALL_SIGN_EXT(sys_fstat),
+    SYSCALL_SIGN_EXT(sys_poll),
     SYSCALL_SIGN(sys_nanosleep),       /* 10 */
     SYSCALL_SIGN(sys_gettimeofday),
     SYSCALL_SIGN(sys_settimeofday),
     SYSCALL_SIGN(sys_exec),
     SYSCALL_SIGN(sys_kill),
-    SYSCALL_SIGN(sys_getpid),          /* 15 */
+    SYSCALL_SIGN_EXT(sys_getpid),          /* 15 */
     SYSCALL_SIGN(sys_getpriority),
     SYSCALL_SIGN(sys_setpriority),
     SYSCALL_SIGN(sys_sem_create),
@@ -5327,11 +5340,11 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_enter_critical),  /* 50 */
     SYSCALL_SIGN(sys_exit_critical),
 
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_brk)),
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_brk)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_mmap2)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_munmap)),
 #ifdef ARCH_MM_MMU
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_shmget)), /* 55 */
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_shmget)), /* 55 */
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmrm)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmat)),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_shmdt)),
@@ -5357,7 +5370,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_device_read),    /* 65 */
     SYSCALL_SIGN(sys_device_write),
 
-    SYSCALL_SIGN(sys_stat),
+    SYSCALL_SIGN_EXT(sys_stat),
     SYSCALL_SIGN(sys_thread_find),
 
     SYSCALL_NET(SYSCALL_SIGN(sys_accept)),
@@ -5398,15 +5411,15 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_notimpl),    //SYSCALL_SIGN(sys_hw_interrupt_enable),
 
     SYSCALL_SIGN(sys_tick_get),
-    SYSCALL_SIGN(sys_exit_group),
+    SYSCALL_SIGN_EXT(sys_exit_group),
 
     SYSCALL_SIGN(sys_notimpl),    //rt_delayed_work_init,
     SYSCALL_SIGN(sys_notimpl),    //rt_work_submit,           /* 100 */
     SYSCALL_SIGN(sys_notimpl),    //rt_wqueue_wakeup,
     SYSCALL_SIGN(sys_thread_mdelay),
-    SYSCALL_SIGN(sys_sigaction),
-    SYSCALL_SIGN(sys_sigprocmask),
-    SYSCALL_SIGN(sys_tkill),             /* 105 */
+    SYSCALL_SIGN_EXT(sys_sigaction),
+    SYSCALL_SIGN_EXT(sys_sigprocmask),
+    SYSCALL_SIGN_EXT(sys_tkill),             /* 105 */
     SYSCALL_SIGN(sys_thread_sigprocmask),
 #ifdef ARCH_MM_MMU
     SYSCALL_SIGN(sys_cacheflush),
@@ -5424,16 +5437,16 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_rt_timer_start),
     SYSCALL_SIGN(sys_rt_timer_stop),
     SYSCALL_SIGN(sys_rt_timer_control),  /* 115 */
-    SYSCALL_SIGN(sys_getcwd),
+    SYSCALL_SIGN_EXT(sys_getcwd),
     SYSCALL_SIGN(sys_chdir),
-    SYSCALL_SIGN(sys_unlink),
+    SYSCALL_SIGN_EXT(sys_unlink),
     SYSCALL_SIGN(sys_mkdir),
     SYSCALL_SIGN(sys_rmdir),          /* 120 */
     SYSCALL_SIGN(sys_getdents),
     SYSCALL_SIGN(sys_get_errno),
 #ifdef ARCH_MM_MMU
     SYSCALL_SIGN(sys_set_thread_area),
-    SYSCALL_SIGN(sys_set_tid_address),
+    SYSCALL_SIGN_EXT(sys_set_tid_address),
 #else
     SYSCALL_SIGN(sys_notimpl),
     SYSCALL_SIGN(sys_notimpl),
@@ -5445,7 +5458,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_clock_getres),
     SYSCALL_USPACE(SYSCALL_SIGN(sys_clone)),           /* 130 */
     SYSCALL_USPACE(SYSCALL_SIGN(sys_futex)),
-    SYSCALL_USPACE(SYSCALL_SIGN(sys_pmutex)),
+    SYSCALL_USPACE(SYSCALL_SIGN_EXT(sys_pmutex)),
     SYSCALL_SIGN(sys_dup),
     SYSCALL_SIGN(sys_dup2),
     SYSCALL_SIGN(sys_rename),         /* 135 */
@@ -5483,7 +5496,7 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_mq_getsetattr),
     SYSCALL_SIGN(sys_mq_close),
     SYSCALL_SIGN(sys_lstat),
-    SYSCALL_SIGN(sys_uname),                            /* 170 */
+    SYSCALL_SIGN_EXT(sys_uname),                            /* 170 */
     SYSCALL_SIGN(sys_statfs),
     SYSCALL_SIGN(sys_statfs64),
     SYSCALL_SIGN(sys_fstatfs),
@@ -5498,9 +5511,10 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_SIGN(sys_rt_sigtimedwait),
 };
 
+rt_notrace
 const void *lwp_get_sys_api(rt_uint32_t number)
 {
-    const void *func = (const void *)sys_notimpl;
+    const void *func = (const void *)NULL;
 
     if (number == 0xff)
     {
@@ -5518,6 +5532,7 @@ const void *lwp_get_sys_api(rt_uint32_t number)
     return func;
 }
 
+#ifdef TRACING_SYSCALL
 const char *lwp_get_syscall_name(rt_uint32_t number)
 {
     const char *name = "sys_notimpl";
@@ -5538,3 +5553,45 @@ const char *lwp_get_syscall_name(rt_uint32_t number)
     // skip sys_
     return name;
 }
+
+#ifdef TRACING_SYSCALL_EXT
+
+static struct rt_syscall_def sys_log_def = SYSCALL_SIGN_EXT(sys_log);
+
+const int lwp_get_syscall_param_list(rt_uint32_t number, const char ***ptypes, const char ***pargs)
+{
+    int retval = -1;
+
+    if (number == 0xff)
+    {
+        *ptypes = sys_log_def.param_list_types;
+        *pargs = sys_log_def.param_list_name;
+        retval = sys_log_def.param_cnt;
+    }
+    else
+    {
+        const char **types, **args;
+        number -= 1;
+        if (number < sizeof(func_table) / sizeof(func_table[0]))
+        {
+            types = func_table[number].param_list_types;
+            if (types)
+            {
+                args = func_table[number].param_list_name;
+
+                if (ptypes)
+                    *ptypes = types;
+                if (pargs)
+                    *pargs = args;
+
+                retval = func_table[number].param_cnt;
+            }
+        }
+    }
+
+    // skip sys_
+    return retval;
+}
+#endif /* TRACING_SYSCALL_EXT */
+
+#endif /* TRACING_SYSCALL */

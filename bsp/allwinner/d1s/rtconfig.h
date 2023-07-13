@@ -26,6 +26,7 @@
 #define RT_KSERVICE_USING_STDLIB
 #define RT_KPRINTF_USING_LONGLONG
 #define RT_DEBUG
+#define RT_DEBUG_COLOR
 
 /* Inter-Thread communication */
 
@@ -39,8 +40,10 @@
 
 #define RT_PAGE_MAX_ORDER 11
 #define RT_USING_MEMPOOL
-#define RT_USING_SMALL_MEM
-#define RT_USING_SMALL_MEM_AS_HEAP
+#define RT_USING_MEMHEAP
+#define RT_MEMHEAP_FAST_MODE
+#define RT_USING_MEMHEAP_AS_HEAP
+#define RT_USING_MEMHEAP_AUTO_BINDING
 #define RT_USING_MEMTRACE
 #define RT_USING_HEAP
 
@@ -50,7 +53,7 @@
 #define RT_USING_CONSOLE
 #define RT_CONSOLEBUF_SIZE 256
 #define RT_CONSOLE_DEVICE_NAME "uart0"
-#define RT_VER_NUM 0x50000
+#define RT_VER_NUM 0x50001
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
 #define ARCH_MM_MMU
@@ -68,7 +71,7 @@
 #define RT_USING_FINSH
 #define FINSH_USING_MSH
 #define FINSH_THREAD_NAME "tshell"
-#define FINSH_THREAD_PRIORITY 20
+#define FINSH_THREAD_PRIORITY 25
 #define FINSH_THREAD_STACK_SIZE 8192
 #define FINSH_USING_HISTORY
 #define FINSH_HISTORY_LINES 5
@@ -77,12 +80,16 @@
 #define MSH_USING_BUILT_IN_COMMANDS
 #define FINSH_USING_DESCRIPTION
 #define FINSH_ARG_MAX 10
+
+/* DFS: device virtual file system */
+
 #define RT_USING_DFS
 #define DFS_USING_POSIX
 #define DFS_USING_WORKDIR
+#define DFS_FD_MAX 64
+#define RT_USING_DFS_V1
 #define DFS_FILESYSTEMS_MAX 8
-#define DFS_FILESYSTEM_TYPES_MAX 4
-#define DFS_FD_MAX 32
+#define DFS_FILESYSTEM_TYPES_MAX 8
 #define RT_USING_DFS_ELMFAT
 
 /* elm-chan's FatFs, Generic FAT Filesystem Module */
@@ -99,6 +106,7 @@
 #define RT_DFS_ELM_REENTRANT
 #define RT_DFS_ELM_MUTEX_TIMEOUT 3000
 #define RT_USING_DFS_DEVFS
+#define RT_USING_DFS_TMPFS
 #define RT_USING_FAL
 #define FAL_DEBUG_CONFIG
 #define FAL_DEBUG 1
@@ -121,6 +129,9 @@
 #define RT_USING_SERIAL
 #define RT_USING_SERIAL_V2
 #define RT_USING_TTY
+#define RT_USING_CPUTIME
+#define RT_USING_CPUTIME_RISCV
+#define CPUTIME_TIMER_FREQ 24000000
 #define RT_USING_PIN
 #define RT_USING_NULL
 #define RT_USING_ZERO
@@ -155,17 +166,46 @@
 
 /* Socket is in the 'Network' category */
 
+#define RT_USING_TRACING
+#define TRACING_KSYMTBL
+#define TRACING_FTRACE
+#define TRACING_SYSCALL
+#define TRACING_SYSCALL_EXT
 
 /* Network */
 
 
 /* Utilities */
 
+#define RT_USING_UTEST
+#define UTEST_THR_STACK_SIZE 4096
+#define UTEST_THR_PRIORITY 20
 #define RT_USING_ADT
 #define RT_USING_ADT_AVL
 
 /* RT-Thread Utestcases */
 
+#define RT_USING_UTESTCASES
+
+/* Utest Self Testcase */
+
+
+/* Kernel Testcase */
+
+#define UTEST_MEMHEAP_TC
+
+/* CPP11 Testcase */
+
+
+/* Utest Serial Testcase */
+
+
+/* RTT Posix Testcase */
+
+
+/* Memory Management Subsytem Testcase */
+
+#define UTEST_TRACING_TC
 
 /* RT-Thread online packages */
 
@@ -202,6 +242,9 @@
 /* u8g2: a monochrome graphic library */
 
 
+/* PainterEngine: A cross-platform graphics application framework written in C language */
+
+
 /* tools packages */
 
 
@@ -221,19 +264,11 @@
 
 /* peripheral libraries and drivers */
 
-/* sensors drivers */
-
-
-/* touch drivers */
-
 
 /* Kendryte SDK */
 
 
 /* AI packages */
-
-
-/* Signal Processing and Control Algorithm Packages */
 
 
 /* miscellaneous packages */
@@ -273,7 +308,6 @@
 
 
 /* Other */
-
 
 /* Signal IO */
 

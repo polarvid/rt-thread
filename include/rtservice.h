@@ -104,6 +104,7 @@ rt_inline int rt_list_isempty(const rt_list_t *l)
  * @brief get the list length
  * @param l the list to get.
  */
+rt_notrace
 rt_inline unsigned int rt_list_len(const rt_list_t *l)
 {
     unsigned int len = 0;

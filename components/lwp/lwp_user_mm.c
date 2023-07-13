@@ -478,7 +478,6 @@ rt_base_t lwp_brk(void *addr)
     rt_base_t ret = -1;
     struct rt_lwp *lwp = RT_NULL;
 
-    rt_mm_lock();
     lwp = rt_thread_self()->lwp;
 
     if ((size_t)addr <= lwp->end_heap)
@@ -502,7 +501,7 @@ rt_base_t lwp_brk(void *addr)
             ret = lwp->end_heap;
         }
     }
-    rt_mm_unlock();
+
     return ret;
 }
 
@@ -560,9 +559,7 @@ int lwp_munmap(void *addr)
 {
     int ret = 0;
 
-    rt_mm_lock();
     ret = lwp_unmap_user(lwp_self(), addr);
-    rt_mm_unlock();
 
     return ret;
 }

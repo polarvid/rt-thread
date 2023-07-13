@@ -36,6 +36,7 @@
 
 #include <rthw.h>
 #include <rtthread.h>
+#include <stdatomic.h>
 #include <stddef.h>
 
 #define DBG_TAG           "kernel.thread"
@@ -230,7 +231,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     thread->oncpu = RT_CPU_DETACHED;
 
     /* lock init */
-    thread->scheduler_lock_nest = 0;
+    atomic_store(&thread->scheduler_lock_nest, 0);
     thread->cpus_lock_nest = 0;
     thread->critical_lock_nest = 0;
 #endif /* RT_USING_SMP */
@@ -269,6 +270,12 @@ static rt_err_t _thread_init(struct rt_thread *thread,
     rt_list_init(&thread->signal.sig_queue.siginfo_list);
 
     rt_memset(&thread->user_ctx, 0, sizeof thread->user_ctx);
+
+#ifdef TRACING_FTRACE
+    thread->ftrace_host_session = NULL;
+    extern int ftrace_trace_host_setup(rt_thread_t t);
+    ftrace_trace_host_setup(thread);
+#endif
 #endif
 
 #ifdef RT_USING_CPU_USAGE
@@ -349,6 +356,7 @@ RTM_EXPORT(rt_thread_init);
  *
  * @return  The self thread object.
  */
+rt_notrace
 rt_thread_t rt_thread_self(void)
 {
 #ifdef RT_USING_SMP
@@ -366,6 +374,46 @@ rt_thread_t rt_thread_self(void)
 #endif /* RT_USING_SMP */
 }
 RTM_EXPORT(rt_thread_self);
+
+/**
+ * @brief   This function will return self thread object sync with sp.
+ *
+ * @return  The self thread object.
+ */
+rt_notrace
+rt_thread_t rt_thread_self_sync(void)
+{
+    rt_thread_t self;
+#ifdef RT_USING_SMP
+    self = rt_thread_self();
+#else
+    extern rt_thread_t rt_current_thread_sync;
+
+    self = rt_current_thread_sync;
+#endif /* RT_USING_SMP */
+
+    /* compare sp */
+    rt_ubase_t self_sp = (rt_ubase_t)__builtin_frame_address(0);
+    if (self_sp < (rt_ubase_t)self->stack_addr || self_sp > (rt_ubase_t)self->stack_addr + self->stack_size)
+    {
+        /* If scheduler not working proper, or sp overflow */
+        while (1) ;
+    }
+    return self;
+}
+RTM_EXPORT(rt_thread_self_sync);
+
+/**
+ * @brief Must be called in interrupt disable context
+ * 
+ * @param thread 
+ */
+void rt_thread_self_sync_set(rt_thread_t thread)
+{
+#ifndef RT_USING_SMP
+    rt_current_thread_sync = thread;
+#endif /* RT_USING_SMP */
+}
 
 /**
  * @brief   This function will start a thread and put it to system ready queue.

@@ -83,6 +83,7 @@ static void _kenrel_unmap_4K(unsigned long *lv0_tbl, void *v_addr)
         level_info[level].pos = cur_lv_tbl + off;
         cur_lv_tbl = (unsigned long *)(page & MMU_ADDRESS_MASK);
         cur_lv_tbl = (unsigned long *)((unsigned long)cur_lv_tbl - PV_OFFSET);
+        // next table entry at
         level_info[level].page = cur_lv_tbl;
         level_shift -= MMU_LEVEL_SHIFT;
     }
@@ -338,7 +339,7 @@ void rt_hw_aspace_switch(rt_aspace_t aspace)
     if (aspace != &rt_kernel_space)
     {
         void *pgtbl = aspace->page_table;
-        pgtbl = rt_kmem_v2p(pgtbl);
+        pgtbl = rt_hw_mmu_kernel_v2p(pgtbl);
         rt_ubase_t tcr;
 
         __asm__ volatile("msr ttbr0_el1, %0" ::"r"(pgtbl) : "memory");
@@ -422,12 +423,32 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
     rt_page_cleanup();
 }
 
+#ifdef TRACING_SOFT_KASAN
+#include "kasan.h"
+#endif /* TRACING_SOFT_KASAN */
+
 #ifdef RT_USING_SMART
 static void _init_region(void *vaddr, size_t size)
 {
     rt_ioremap_start = vaddr;
     rt_ioremap_size = size;
     rt_mpr_start = (char *)rt_ioremap_start - rt_mpr_size;
+
+#ifdef TRACING_SOFT_KASAN
+    kasan_area_start = rt_mpr_start - KASAN_AREA_SIZE;
+    int ret;
+    ret = rt_aspace_map_static(&rt_kernel_space, &kasan_area, (void **)&kasan_area_start,
+                               KASAN_AREA_SIZE, MMU_MAP_K_RWCB, 0, &kasan_mapper, 0);
+
+    if (ret)
+    {
+        LOG_W("kasan area map failed");
+    }
+    else
+    {
+        kasan_init();
+    }
+#endif /* TRACING_SOFT_KASAN */
 }
 #else
 
@@ -497,7 +518,7 @@ void mmu_tcr_init(void)
 {
     unsigned long val64;
 
-    val64 = 0x00447fUL;
+    val64 = 0x0044ffUL;
     __asm__ volatile("msr MAIR_EL1, %0\n dsb sy\n" ::"r"(val64));
 
     /* TCR_EL1 */
@@ -519,7 +540,7 @@ void mmu_tcr_init(void)
             | (0x0UL << 35)  /* reserved */
             | (0x1UL << 36)  /* as: 0:8bit 1:16bit */
             | (0x0UL << 37)  /* tbi0 */
-            | (0x0UL << 38); /* tbi1 */
+            | (0x1UL << 38); /* tbi1 */
     __asm__ volatile("msr TCR_EL1, %0\n" ::"r"(val64));
 }
 

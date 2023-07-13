@@ -9,6 +9,7 @@
  */
 #include <rthw.h>
 #include <rtthread.h>
+#include <stdatomic.h>
 
 #ifdef RT_USING_SMART
 #include <lwp.h>
@@ -37,7 +38,7 @@ static void _cpu_preempt_disable(void)
     }
 
     /* lock scheduler for local cpu */
-    current_thread->scheduler_lock_nest ++;
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, 1);
 
     /* enable interrupt */
     rt_hw_local_irq_enable(level);
@@ -62,7 +63,7 @@ static void _cpu_preempt_enable(void)
     }
 
     /* unlock scheduler for local cpu */
-    current_thread->scheduler_lock_nest --;
+    atomic_fetch_add(&current_thread->scheduler_lock_nest, -1);
 
     rt_schedule();
     /* enable interrupt */
@@ -170,6 +171,7 @@ RTM_EXPORT(rt_spin_unlock_irqrestore)
  *
  * @return  Return a pointer to the current cpu object.
  */
+rt_notrace
 struct rt_cpu *rt_cpu_self(void)
 {
     return &_cpus[rt_hw_cpu_id()];
@@ -207,7 +209,7 @@ rt_base_t rt_cpus_lock(void)
         pcpu->current_thread->cpus_lock_nest++;
         if (lock_nest == 0)
         {
-            pcpu->current_thread->scheduler_lock_nest++;
+            atomic_fetch_add(&pcpu->current_thread->scheduler_lock_nest, 1);
             rt_hw_spin_lock(&_cpus_lock);
         }
     }
@@ -232,7 +234,7 @@ void rt_cpus_unlock(rt_base_t level)
 
         if (pcpu->current_thread->cpus_lock_nest == 0)
         {
-            pcpu->current_thread->scheduler_lock_nest--;
+            atomic_fetch_add(&pcpu->current_thread->scheduler_lock_nest, -1);
             rt_hw_spin_unlock(&_cpus_lock);
         }
     }
@@ -245,16 +247,19 @@ RTM_EXPORT(rt_cpus_unlock);
  * It will restore the lock state to whatever the thread's counter expects.
  * If target thread not locked the cpus then unlock the cpus lock.
  *
+ * @note This API will reset current thread, hence it's notrace
+ *
  * @param   thread is a pointer to the target thread.
  */
+rt_notrace
 void rt_cpus_lock_status_restore(struct rt_thread *thread)
 {
     struct rt_cpu* pcpu = rt_cpu_self();
+    pcpu->current_thread = thread;
 
 #if defined(ARCH_MM_MMU) && defined(RT_USING_SMART)
     lwp_aspace_switch(thread);
 #endif
-    pcpu->current_thread = thread;
     if (!thread->cpus_lock_nest)
     {
         rt_hw_spin_unlock(&_cpus_lock);

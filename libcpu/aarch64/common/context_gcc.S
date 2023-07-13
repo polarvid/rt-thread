@@ -276,8 +276,10 @@ START_POINT_END(_thread_start)
 /*
  * rt_base_t rt_hw_interrupt_disable();
  */
-.globl rt_hw_interrupt_disable
+.global rt_hw_interrupt_disable
 rt_hw_interrupt_disable:
+.global rt_hw_local_irq_disable
+rt_hw_local_irq_disable:
     MRS     X0, DAIF
     MSR     DAIFSet, #3
     DSB     SY
@@ -286,8 +288,10 @@ rt_hw_interrupt_disable:
 /*
  * void rt_hw_interrupt_enable(rt_base_t level);
  */
-.globl rt_hw_interrupt_enable
+.global rt_hw_interrupt_enable
 rt_hw_interrupt_enable:
+.global rt_hw_local_irq_enable
+rt_hw_local_irq_enable:
     DSB     SY
     AND     X0, X0, #0xc0
     MRS     X1, DAIF
@@ -330,12 +334,17 @@ rt_hw_context_switch:
     SAVE_CONTEXT_FROM_EL1
     MOV    X3, SP
     STR    X3, [X0]            // store sp in preempted tasks TCB
-    LDR    X0, [X1]            // get new task stack pointer
+
+    /* reset the sp */
+    LDR    X0, [X1]
     MOV    SP, X0
-    MOV    X0, X2
+
+    /* set current thread sync */
+    MOV    X19, X2
+    MOV    X0, X19
     BL     rt_cpus_lock_status_restore
 #ifdef RT_USING_LWP
-    BL     rt_thread_self
+    MOV    X0, X19
     BL     lwp_user_setting_restore
 #endif
     B      rt_hw_context_switch_exit
@@ -375,8 +384,7 @@ rt_hw_context_switch_interrupt:
 vector_fiq:
     B       .
 
-.globl vector_irq
-vector_irq:
+START_POINT(vector_irq)
     CLREX
     SAVE_CONTEXT
     STP     X0, X1, [SP, #-0x10]!   /* X0 is thread sp */
@@ -388,6 +396,7 @@ vector_irq:
     LDP     X0, X1, [SP], #0x10
     BL      rt_scheduler_do_irq_switch
     B       rt_hw_context_switch_exit
+START_POINT_END(vector_irq)
 
 .global rt_hw_context_switch_exit
 rt_hw_context_switch_exit:

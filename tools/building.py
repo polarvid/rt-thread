@@ -380,6 +380,23 @@ def PrepareBuilding(env, root_directory, has_libcpu=False, remove_components = [
         if env['LINK'].find('gcc') != -1:
             env['LINK'] = env['LINK'].replace('gcc', 'g++')
 
+    # add tracing option for gcc(& clang in the future)
+    if GetDepend('TRACING_FTRACE') and rtconfig.PLATFORM in ['gcc']:
+        if rtconfig.ARCH == 'risc-v':
+            # entry % 8 in (0, 2, 4, 6)
+            prefix_insn = 5
+            # entry % 4 in (0, 2)
+            total_insn = 5 + prefix_insn
+        else:
+            prefix_insn = 3
+            total_insn = 2 + prefix_insn
+
+        TRACE_CONFIG = f" -fpatchable-function-entry={total_insn},{prefix_insn}"
+        env.Append(CFLAGS=TRACE_CONFIG, CXXFLAGS=TRACE_CONFIG)
+    if GetDepend('TRACING_SOFT_KASAN'):
+        SANITIZER = ' -fsanitize=kernel-address'
+        env.Append(CFLAGS=SANITIZER, CXXFLAGS=SANITIZER)
+
     # we need to seperate the variant_dir for BSPs and the kernels. BSPs could
     # have their own components etc. If they point to the same folder, SCons
     # would find the wrong source code to compile.
@@ -932,6 +949,16 @@ def EndBuilding(target, program = None):
 
     if hasattr(rtconfig, 'dist_handle'):
         Env['dist_handle'] = rtconfig.dist_handle
+
+    # for ftrace
+    if GetDepend('TRACING_KSYMTBL') and rtconfig.PLATFORM in ['gcc']:
+        extract = rtconfig.PREFIX + 'nm -f sysv -n rtthread.elf > rtthread.nm\n'
+        extract += 'python ' + Rtt_Root + '/tools/extract_sym.py rtthread.nm > ./ksymtbl.c\n'
+        extract += 'rm rtthread.nm'
+        cc_command = rtconfig.CC + ' -c -o ./ksymtbl.o' + rtconfig.CFLAGS + ' ./ksymtbl.c && rm ./ksymtbl.c'
+        ld_command = Env['LINKCOM']
+        ld_command = ld_command.replace('$SOURCES', '$SOURCES ./ksymtbl.o')
+        rtconfig.POST_ACTION = '{0}\n{1}\n{2}\n'.format(extract, cc_command, ld_command) + rtconfig.POST_ACTION
 
     Env.AddPostAction(target, rtconfig.POST_ACTION)
     # Add addition clean files

@@ -441,7 +441,7 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
             err = _mm_aspace_map(aspace, varea, attr, flags, mem_obj, offset);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                mm_free(varea);
             }
             else
             {
@@ -570,7 +570,7 @@ int rt_aspace_map_phy(rt_aspace_t aspace, rt_mm_va_hint_t hint, rt_size_t attr,
             err = _mm_aspace_map_phy(aspace, varea, hint, attr, pa_off, ret_va);
             if (err != RT_EOK)
             {
-                rt_free(varea);
+                mm_free(varea);
             }
         }
         else

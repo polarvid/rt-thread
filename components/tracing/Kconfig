@@ -1,0 +1,42 @@
+menuconfig RT_USING_TRACING
+    bool "Kernel Tracing Support"
+    default n
+
+if RT_USING_TRACING
+    config TRACING_KSYMTBL
+        bool "Enable run-time kernel symbol table"
+        default y
+
+    if TRACING_KSYMTBL
+        config TRACING_FTRACE
+            bool "function tracing"
+            default y
+        
+        if TRACING_FTRACE
+            config TRACING_FTRACE_DEBUG
+                bool "Debugging mode"
+                default y
+                help
+                    This will enable extra logging for debug information
+        endif
+
+        config TRACING_SYSCALL
+            bool "Kernel space syscall tracing"
+            default y
+
+        if TRACING_SYSCALL
+            config TRACING_SYSCALL_EXT
+                bool "Parameter list analyzing"
+                default y
+                help
+                    This will take up more footprint in system memory, while enabling
+                    more detailed dumping for parameter list of each syscall.
+        endif
+    endif
+
+    if ARCH_ARMV8
+        config TRACING_SOFT_KASAN
+            bool "Enable software-tagged KASAN (memory usage tracer)"
+            default n
+    endif
+endif

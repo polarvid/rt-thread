@@ -116,11 +116,6 @@ void rt_hw_cpu_shutdown()
     while (1);
 }
 
-int rt_hw_cpu_id(void)
-{
-    return 0;   /* d1 has one core */
-}
-
 void rt_hw_set_process_id(int pid)
 {
     //TODO

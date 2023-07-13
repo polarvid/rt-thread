@@ -66,6 +66,22 @@
     csrw    sepc, ra
 .endm
 
+.global rvv_memcpy
+rvv_memcpy:
+  mv          a4, a0
+
+1:
+  vsetvli     a3, a2, e8, m8, ta, ma
+  vle8.v      v8, (a1)
+  vse8.v      v8, (a0)
+  add         a0, a0, a3
+  add         a1, a1, a3
+  sub         a2, a2, a3
+  bnez        a2, 1b
+
+  mv          a0, a4
+  ret
+
 /*
  * void rt_hw_context_switch_to(rt_ubase_t to);
  *
@@ -99,12 +115,19 @@ rt_hw_context_switch:
     RESERVE_CONTEXT
     STORE sp, (a0)
 
-    // restore to thread SP
+    /* restore to thread SP */
     LOAD sp, (a1)
 
     // restore Address Space
     la s0, rt_current_thread
     LOAD s1, (s0)
+
+    /**
+     * switch thread. It is atomic-op since interrupt is disable;
+     * we need a percpu variable by the way
+     */
+    la      s0, rt_current_thread_sync
+    STORE   s1, (s0)
 
     #ifdef RT_USING_SMART
         mv a0, s1

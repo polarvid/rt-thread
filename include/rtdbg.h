@@ -148,6 +148,22 @@ extern "C" {
     }                                                       \
     while (0)
 
+#define dbg_log_prologue(level)                             \
+    if ((level) <= DBG_LEVEL)                               \
+    {                                                       \
+        switch(level)                                       \
+        {                                                   \
+            case DBG_ERROR:   _DBG_LOG_HDR("E", 31); break; \
+            case DBG_WARNING: _DBG_LOG_HDR("W", 33); break; \
+            case DBG_INFO:    _DBG_LOG_HDR("I", 32); break; \
+            case DBG_LOG:     _DBG_LOG_HDR("D", 0); break;  \
+            default: break;                                 \
+        }
+
+#define dbg_log_epilogue(level)                             \
+        _DBG_COLOR(0);                                      \
+    }
+
 #define dbg_raw(...)         rt_kprintf(__VA_ARGS__);
 
 #else

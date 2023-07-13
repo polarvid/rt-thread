@@ -27,6 +27,8 @@
 #include "sys/signal.h"
 #include "syscall_generic.h"
 
+#define rt_kprintf(...)
+
 /**
  * ASSERT the operation should never failed
  * if the RT_ASSERT is disable, there should be
