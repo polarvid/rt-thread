@@ -138,7 +138,6 @@ struct rt_hw_exp_stack
 
     rt_uint128_t fpu[32];
 };
-#define RT_HW_EXCEPTION_FRAME_SIZE 800
 
 #define SP_ELx     ((unsigned long)0x01)
 #define SP_EL0     ((unsigned long)0x00)
@@ -150,8 +149,6 @@ rt_ubase_t rt_hw_get_current_el(void);
 void rt_hw_set_elx_env(void);
 void rt_hw_set_current_vbar(rt_ubase_t addr);
 
-
 #endif /* __ASSEMBLY__ */
-
 
 #endif
