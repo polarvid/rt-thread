@@ -8,6 +8,8 @@
  * 2021-05-18     Jesven       first version
  */
 
+#include "lwp_signal.h"
+#include "rtdef.h"
 #include <armv8.h>
 #include <rthw.h>
 #include <rtthread.h>
@@ -96,47 +98,72 @@ int arch_expand_user_stack(void *addr)
 #endif
 #define ALGIN_BYTES (16)
 
+struct signal_ucontext
+{
+    rt_int64_t sigreturn;
+    lwp_sigset_t save_sigmask;
+
+    siginfo_t si;
+    char __padding[RT_ALIGN(sizeof(siginfo_t), ALGIN_BYTES) - sizeof(siginfo_t)];
+
+    struct rt_hw_exp_stack frame;
+};
+
+void arch_sigmask_restore(rt_base_t user_sp)
+{
+    struct signal_ucontext *new_sp;
+    new_sp = (void *)(user_sp - sizeof(struct signal_ucontext));
+
+    if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
+    {
+        lwp_thread_signal_mask(rt_thread_self(), LWP_SIG_MASK_CMD_SET_MASK, &new_sp->save_sigmask, RT_NULL);
+    }
+    else
+    {
+        RT_ASSERT(0);
+    }
+
+    return ;
+}
+
 /* TODO: fix this with a structure to describe the layout */
 void *arch_ucontext_save(rt_base_t user_sp, siginfo_t *psiginfo,
                          struct rt_hw_exp_stack *exp_frame, rt_base_t elr,
                          rt_base_t spsr, lwp_sigset_t *save_sig_mask)
 {
-    rt_base_t *new_sp;
-    size_t item_copied = sizeof(*exp_frame) / sizeof(rt_base_t);
+    struct signal_ucontext *new_sp;
+    new_sp = (void *)(user_sp - sizeof(struct signal_ucontext));
 
-    /* push psiginfo */
-    if (psiginfo)
+    if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
     {
-        new_sp = (void *)RT_ALIGN_DOWN(user_sp - sizeof(*psiginfo), ALGIN_BYTES);
-        memcpy(new_sp, psiginfo, sizeof(*psiginfo));
-        user_sp = (rt_base_t)new_sp;
-    }
+        /* push psiginfo */
+        if (psiginfo)
+        {
+            memcpy(&new_sp->si, psiginfo, sizeof(*psiginfo));
+        }
 
-    /* exp frame is already aligned as AAPCS64 required */
-    new_sp = (rt_base_t *)user_sp - item_copied;;
-    if (lwp_user_accessable(new_sp, sizeof(*exp_frame)))
-        memcpy(new_sp, exp_frame, sizeof(*exp_frame));
+        /* exp frame is already aligned as AAPCS64 required */
+        memcpy(&new_sp->frame, exp_frame, sizeof(*exp_frame));
+
+        /* fix the 3 fields in exception frame, so that memcpy will be fine */
+        new_sp->frame.pc = elr;
+        new_sp->frame.cpsr = spsr;
+        new_sp->frame.sp_el0 = user_sp;
+
+        /* copy the save_sig_mask */
+        memcpy(&new_sp->save_sigmask, save_sig_mask, sizeof(lwp_sigset_t));
+
+        /* copy lwp_sigreturn */
+        const size_t lwp_sigreturn_bytes = 8;
+        extern void lwp_sigreturn(void);
+        /* -> ensure that the sigreturn start at the outer most boundary */
+        memcpy(&new_sp->sigreturn,  &lwp_sigreturn, lwp_sigreturn_bytes);
+    }
     else
     {
         LOG_I("%s: User stack overflow", __func__);
         sys_exit(EXIT_FAILURE);
     }
-
-    /* fix the 3 fields in exception frame, so that memcpy will be fine */
-    ((struct rt_hw_exp_stack *)new_sp)->pc = elr;
-    ((struct rt_hw_exp_stack *)new_sp)->cpsr = spsr;
-    ((struct rt_hw_exp_stack *)new_sp)->sp_el0 = user_sp;
-
-    /* copy the save_sig_mask */
-    new_sp -= RT_ALIGN(sizeof(lwp_sigset_t), sizeof(*new_sp));
-    memcpy(new_sp, save_sig_mask, sizeof(lwp_sigset_t));
-
-    /* copy lwp_sigreturn */
-    const size_t lwp_sigreturn_bytes = 8;
-    extern void lwp_sigreturn(void);
-    /* -> ensure that the sigreturn start at the outer most boundary */
-    new_sp = (rt_base_t *)(RT_ALIGN((rt_ubase_t)new_sp - lwp_sigreturn_bytes, ALGIN_BYTES));
-    memcpy(new_sp,  &lwp_sigreturn, lwp_sigreturn_bytes);
 
     return new_sp;
 }
