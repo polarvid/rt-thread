@@ -394,11 +394,12 @@ arch_signal_quit:
     add sp, sp, #CONTEXT_SIZE
     mrs x0, sp_el0
     bl  arch_sigmask_restore
+    add x0, x0, #-CONTEXT_SIZE
+    msr sp_el0, x0
 
     /* restore previous exception frame */
     msr spsel, #0
 
-    add sp, sp, #0x10
     ldp x2, x3, [sp], #0x10
     msr elr_el1, x2
     msr spsr_el1, x3
@@ -469,7 +470,7 @@ arch_thread_signal_enter:
      */
 
     /** drop exp frame on kernel stack, reset kernel sp */
-    add sp, x20, #RT_HW_EXCEPTION_FRAME_SIZE
+    add sp, x20, #CONTEXT_SIZE
 
     /** reset user sp */
     msr sp_el0, x0
@@ -482,7 +483,7 @@ arch_thread_signal_enter:
 
     /* siginfo is above the return address */
     add x2, x30, 16
-    add x1, x2, #RT_HW_EXCEPTION_FRAME_SIZE
+    add x1, x2, #CONTEXT_SIZE
     mov x0, x19
 
     /**

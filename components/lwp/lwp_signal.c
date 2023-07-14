@@ -763,7 +763,6 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
         /* FIXME: acquire READ lock to lwp */
         level = rt_hw_interrupt_disable();
 
-        lwp = thread->lwp;
         if (!lwp)
             ret = -RT_EPERM;
         else if (lwp->terminated || _sighandler_is_ignored(lwp, signo))
