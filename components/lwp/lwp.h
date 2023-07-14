@@ -169,7 +169,7 @@ int lwp_setaffinity(pid_t pid, int cpu);
 #ifdef ARCH_MM_MMU
 struct __pthread {
     /* Part 1 -- these fields may be external or
-     * internal (accessed via asm) ABI. Do not change. */
+     *      * internal (accessed via asm) ABI. Do not change. */
     struct pthread *self;
     uintptr_t *dtv;
     struct pthread *prev, *next; /* non-ABI */
@@ -295,7 +295,7 @@ void dbg_register(struct dbg_ops_t *dbg_ops);
 
 uint32_t dbg_get_ins(void);
 void dbg_activate_step(void);
-void dbg_deactivaate_step(void);
+void dbg_deactivate_step(void);
 int dbg_check_event(struct rt_hw_exp_stack *regs, unsigned long arg);
 rt_channel_t gdb_server_channel(void);
 int dbg_step_type(void);
