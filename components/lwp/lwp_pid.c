@@ -319,7 +319,7 @@ struct rt_lwp* lwp_new(void)
     {
         return lwp;
     }
-    rt_memset(lwp, 0, sizeof(*lwp));
+    memset(lwp, 0, sizeof(*lwp));
     //lwp->tgroup_leader = RT_NULL;
     rt_list_init(&lwp->wait_list);
     lwp->leader = 0;

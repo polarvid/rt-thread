@@ -65,14 +65,16 @@ static void console_rx_work(void *parameter)
 static int rx_thread_init(void)
 {
     void *rb_buffer;
+    rt_thread_t thread;
     rb_buffer = rt_malloc(rb_bufsz);
     rt_ringbuffer_init(&console_rx_ringbuffer, rb_buffer, rb_bufsz);
     rt_wqueue_init(&console_rx_wqueue);
 
-    console_rx_thread = rt_thread_create("console_rx", console_rx_work, &console_dev, rb_bufsz, 10, 10);
-    if (console_rx_thread != RT_NULL)
+    thread = rt_thread_create("console_rx", console_rx_work, &console_dev, rb_bufsz, 10, 10);
+    if (thread != RT_NULL)
     {
-        rt_thread_startup(console_rx_thread);
+        rt_thread_startup(thread);
+        console_rx_thread = thread;
     }
 
     return 0;
@@ -103,7 +105,8 @@ static void console_rx_notify(struct rt_device *dev)
             break;
         }
     }
-    rt_wqueue_wakeup(&console_rx_wqueue, 0);
+    if (console_rx_thread)
+        rt_wqueue_wakeup(&console_rx_wqueue, 0);
 }
 
 struct tty_struct *console_tty_get(void)

@@ -8,7 +8,6 @@
  * 2021-05-18     Jesven       first version
  * 2023-06-30     shell        Reduce save/restore of exception context
  */
-#define __ASSEMBLY__
 
 #ifndef __ASSEMBLY__
 #define __ASSEMBLY__
@@ -194,8 +193,7 @@ arch_syscall_exit:
     add sp, sp, #0x40
     RESTORE_FPU sp
 
-.global arch_ret_to_user
-arch_ret_to_user:
+START_POINT(arch_ret_to_user)
     /* save exception frame */
     SAVE_FPU sp
     stp x0, x1, [sp, #-0x10]!
@@ -331,6 +329,7 @@ arch_ret_to_user:
     RESTORE_FPU sp
 1:
     eret
+START_POINT_END(arch_ret_to_user)
 
 .global lwp_check_debug
 lwp_check_debug:

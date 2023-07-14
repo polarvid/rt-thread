@@ -454,6 +454,7 @@ void lwp_thread_signal_catch(void *exp_frame)
     thread = rt_thread_self();
     lwp = (struct rt_lwp*)thread->lwp;
 
+    RT_ASSERT(!!lwp);
     NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
 
     /* check if signal exist */
@@ -502,57 +503,59 @@ void lwp_thread_signal_catch(void *exp_frame)
             else
                 p_usi = RT_NULL;
 
-            NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
-
-            /* FIXME: rt_free() of sigqueue should be done in internal API */
-            siginfo_delete(siginfo);
-
-            /* signal default handler */
-            if (handler == LWP_SIG_ACT_DFL)
-            {
-                /* FIXME: is the way good enough? */
-                LOG_I("%s: default handler; and exit", __func__);
-                sys_exit(0);
-            }
-
-            /**
-             * enter signal action of user
-             * @note that the p_usi is release before entering signal action by
-             * reseting the kernel sp.
-             */
-            arch_thread_signal_enter(signo, p_usi, exp_frame, handler, &save_sig_mask);
-            /* the arch_thread_signal_enter() never return */
-            RT_ASSERT(0);
         }
     }
     NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+
+    if (pending && signo)
+    {
+        /* FIXME: rt_free() of sigqueue should be done in internal API */
+        siginfo_delete(siginfo);
+
+        /* signal default handler */
+        if (handler == LWP_SIG_ACT_DFL)
+        {
+            /* FIXME: is the way good enough? */
+            LOG_I("%s: default handler; and exit", __func__);
+            sys_exit(0);
+        }
+
+        /**
+         * enter signal action of user
+         * @note that the p_usi is release before entering signal action by
+         * reseting the kernel sp.
+         */
+        arch_thread_signal_enter(signo, p_usi, exp_frame, handler, &save_sig_mask);
+        /* the arch_thread_signal_enter() never return */
+        RT_ASSERT(0);
+    }
 }
 
-static void _do_signal_wakeup(rt_thread_t thread, int sig)
+static int _do_signal_wakeup(rt_thread_t thread, int sig)
 {
+    int need_schedule;
     if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
     {
-        int need_schedule = 1;
 
         if ((thread->stat & RT_SIGNAL_COMMON_WAKEUP_MASK) != RT_SIGNAL_COMMON_WAKEUP_MASK)
         {
             rt_thread_wakeup(thread);
+            need_schedule = 1;
         }
         else if ((sig == SIGKILL) && ((thread->stat & RT_SIGNAL_KILL_WAKEUP_MASK) != RT_SIGNAL_KILL_WAKEUP_MASK))
         {
             rt_thread_wakeup(thread);
+            need_schedule = 1;
         }
         else
         {
             need_schedule = 0;
         }
-
-        /* do schedule */
-        if (need_schedule)
-        {
-            rt_schedule();
-        }
     }
+    else
+        need_schedule = 0;
+
+    return need_schedule;
 }
 
 /** find a candidate to be notified of the arrival */
@@ -606,17 +609,13 @@ static int _siginfo_deliver_to_lwp(struct rt_lwp *lwp, lwp_siginfo_t siginfo)
     catcher = _signal_find_catcher(lwp, siginfo->ksiginfo.signo);
 
     sigqueue_enqueue(&lwp->signal.sig_queue, siginfo);
-    _do_signal_wakeup(catcher, siginfo->ksiginfo.signo);
-
-    return 0;
+    return _do_signal_wakeup(catcher, siginfo->ksiginfo.signo);
 }
 
 static int _siginfo_deliver_to_thread(struct rt_lwp *lwp, rt_thread_t thread, lwp_siginfo_t siginfo)
 {
     sigqueue_enqueue(_SIGQ(thread), siginfo);
-    _do_signal_wakeup(thread, siginfo->ksiginfo.signo);
-
-    return 0;
+    return _do_signal_wakeup(thread, siginfo->ksiginfo.signo);
 }
 
 rt_inline rt_bool_t _sighandler_is_ignored(struct rt_lwp *lwp, int signo)
@@ -643,6 +642,7 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
     rt_base_t level;
     lwp_siginfo_t siginfo;
     rt_bool_t terminated;
+    rt_bool_t need_schedule;
 
     if (!lwp || signo < 0 || signo >= _LWP_NSIG)
     {
@@ -650,6 +650,7 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
     }
     else
     {
+        need_schedule = RT_FALSE;
         NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
 
         /* FIXME: acquire READ lock to lwp */
@@ -658,13 +659,18 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
 
         /* short-circuit code for inactive task, ignored signals */
         if (terminated || _sighandler_is_ignored(lwp, signo))
+        {
             ret = 0;
+        }
         else
         {
             siginfo = siginfo_create(signo, code, value);
 
             if (siginfo)
-                ret = _siginfo_deliver_to_lwp(lwp, siginfo);
+            {
+                need_schedule = _siginfo_deliver_to_lwp(lwp, siginfo);
+                ret = 0;
+            }
             else
             {
                 LOG_I("%s: siginfo malloc failed", __func__);
@@ -674,6 +680,9 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
 
         rt_hw_interrupt_enable(level);
         NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+
+        if (need_schedule)
+            rt_schedule();
     }
     return ret;
 }
@@ -749,6 +758,7 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
     rt_base_t level;
     struct rt_lwp *lwp;
     lwp_siginfo_t siginfo;
+    rt_bool_t need_schedule;
 
     if (!thread || signo < 0 || signo >= _LWP_NSIG)
     {
@@ -757,6 +767,8 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
     else
     {
         lwp = thread->lwp;
+        need_schedule = RT_FALSE;
+
         RT_ASSERT(lwp);
         NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
 
@@ -772,7 +784,10 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
             siginfo = siginfo_create(signo, code, value);
 
             if (siginfo)
-                ret = _siginfo_deliver_to_thread(lwp, thread, siginfo);
+            {
+                need_schedule = _siginfo_deliver_to_thread(lwp, thread, siginfo);
+                ret = 0;
+            }
             else
             {
                 LOG_I("%s: siginfo malloc failed", __func__);
@@ -782,6 +797,9 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
 
         rt_hw_interrupt_enable(level);
         NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+
+        if (need_schedule)
+            rt_schedule();
     }
 
     return ret;
@@ -880,6 +898,8 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *us
 rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                      siginfo_t *usi, struct timespec *timeout)
 {
+    struct rt_lwp *lwp;
+    rt_base_t level;
     rt_err_t ret;
     int sig;
 
@@ -894,7 +914,17 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     _sigdelset(sigset, SIGSTOP);
     _signotsets(sigset, sigset);
 
+    lwp = thread->lwp;
+
+    NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
+    /* FIXME: acquire READ lock to lwp */
+    level = rt_hw_interrupt_disable();
+
     sig = _dequeue_signal(thread, sigset, usi);
+
+    rt_hw_interrupt_enable(level);
+    NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
+
     if (sig)
         return sig;
 
@@ -921,13 +951,12 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
         if (time == 0)
             return -EAGAIN;
 
-        rt_enter_critical();
         ret = rt_thread_suspend_with_flag(thread, RT_INTERRUPTIBLE);
         rt_timer_control(&(thread->thread_timer),
                          RT_TIMER_CTRL_SET_TIME,
                          &timeout);
         rt_timer_start(&(thread->thread_timer));
-        rt_exit_critical();
+
     }
     else
     {
@@ -942,7 +971,14 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     }
     /* else ret == -EINTR */
 
+    NEVER_FAIL(rt_mutex_take(&lwp->signal.sig_lock, RT_WAITING_FOREVER));
+    /* FIXME: acquire READ lock to lwp */
+    level = rt_hw_interrupt_disable();
+
     sig = _dequeue_signal(thread, sigset, usi);
+
+    rt_hw_interrupt_enable(level);
+    NEVER_FAIL(rt_mutex_release(&lwp->signal.sig_lock));
 
     return sig ? sig : ret;
 }
