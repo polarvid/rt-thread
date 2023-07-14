@@ -22,6 +22,7 @@
 
 #include "lwp.h"
 #include "lwp_pid.h"
+#include "lwp_signal.h"
 #include "tty.h"
 
 #ifdef ARCH_MM_MMU
@@ -538,6 +539,7 @@ int lwp_ref_dec(struct rt_lwp *lwp)
             memset(&msg, 0, sizeof msg);
             rt_raw_channel_send(gdb_server_channel(), &msg);
         }
+        lwp_signal_detach(&lwp->signal);
 
 #ifndef ARCH_MM_MMU
 #ifdef RT_LWP_USING_SHM

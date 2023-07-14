@@ -7,8 +7,12 @@
  * Date           Author       Notes
  * 2018-10-30     Bernard      The first version
  */
+#include "backtrace.h"
+#include "rtdef.h"
 #include <rthw.h>
 #include <rtthread.h>
+
+#include "lock_tracer.h"
 
 #ifdef RT_USING_SMART
 #include <lwp.h>
@@ -202,9 +206,10 @@ rt_base_t rt_cpus_lock(void)
     pcpu = rt_cpu_self();
     if (pcpu->current_thread != RT_NULL)
     {
-        register rt_ubase_t lock_nest = pcpu->current_thread->cpus_lock_nest;
+        rt_ubase_t lock_nest = pcpu->current_thread->cpus_lock_nest;
 
         pcpu->current_thread->cpus_lock_nest++;
+        lock_tracer_add(pcpu->current_thread, RT_TRUE);
         if (lock_nest == 0)
         {
             pcpu->current_thread->scheduler_lock_nest++;
@@ -227,7 +232,14 @@ void rt_cpus_unlock(rt_base_t level)
 
     if (pcpu->current_thread != RT_NULL)
     {
-        RT_ASSERT(pcpu->current_thread->cpus_lock_nest > 0);
+        lock_tracer_add(pcpu->current_thread, RT_FALSE);
+        if (pcpu->current_thread->cpus_lock_nest == 0)
+        {
+            rt_kprintf("current %s tid %d nested %p\n", pcpu->current_thread->parent.name, pcpu->current_thread->tid, &pcpu->current_thread->cpus_lock_nest);
+            // lock_trace_dump(pcpu->current_thread);
+            rt_backtrace();
+            RT_ASSERT(0);
+        }
         pcpu->current_thread->cpus_lock_nest--;
 
         if (pcpu->current_thread->cpus_lock_nest == 0)

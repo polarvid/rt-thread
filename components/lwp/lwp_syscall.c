@@ -14,6 +14,7 @@
  * 2023-07-06     Shell        adapt the sys_kill to new implementation of POSIX signal
  */
 
+#include "lock_tracer.h"
 #include "lwp_signal.h"
 #define _GNU_SOURCE
 
@@ -2479,6 +2480,10 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
         level = rt_hw_interrupt_disable();
 
         rt_strncpy(thread->parent.name, run_name + last_backslash, RT_NAME_MAX);
+        if (strcmp("timer_thread", thread->parent.name) == 0)
+        {
+            lock_tracer_start(thread);
+        }
 
         rt_pages_free(page, 0);
 
@@ -2506,6 +2511,9 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
         lwp_aspace_switch(thread);
 
         rt_hw_interrupt_enable(level);
+
+        /* setup the signal for the dummy lwp, so that is can be smoothly recycled */
+        lwp_signal_init(&new_lwp->signal);
 
         lwp_ref_dec(new_lwp);
         arch_start_umode(lwp->args,

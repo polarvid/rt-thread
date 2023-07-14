@@ -31,6 +31,7 @@
  * 2023-03-27     rose_man     Split into scheduler upc and scheduler_mp.c
  */
 
+#include "lock_tracer.h"
 #include <rtthread.h>
 #include <rthw.h>
 
@@ -488,6 +489,7 @@ void rt_scheduler_do_irq_switch(void *context)
                 LOG_D("switch in interrupt");
 
                 RT_ASSERT(current_thread->cpus_lock_nest > 0);
+                lock_tracer_add(pcpu->current_thread, RT_FALSE);
                 current_thread->cpus_lock_nest--;
                 current_thread->scheduler_lock_nest--;
 
@@ -680,6 +682,7 @@ void rt_enter_critical(void)
     {
         rt_uint16_t lock_nest = current_thread->cpus_lock_nest;
         current_thread->cpus_lock_nest++;
+        lock_tracer_add(current_thread, RT_TRUE);
         RT_ASSERT(current_thread->cpus_lock_nest != 0);
         if (lock_nest == 0)
         {
@@ -721,6 +724,7 @@ void rt_exit_critical(void)
     current_thread->critical_lock_nest --;
 
     RT_ASSERT(current_thread->cpus_lock_nest > 0);
+    lock_tracer_add(current_thread, RT_FALSE);
     current_thread->cpus_lock_nest--;
     if (current_thread->cpus_lock_nest == 0)
     {

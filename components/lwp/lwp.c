@@ -13,6 +13,7 @@
  * 2023-02-20     wangxiaoyao  fix bug on foreground app switch
  */
 
+#include "lock_tracer.h"
 #define DBG_TAG "LWP"
 #define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
@@ -1048,6 +1049,7 @@ void lwp_cleanup(struct rt_thread *tid)
     rt_list_remove(&tid->sibling);
 
     lwp_thread_signal_detach(&tid->signal);
+
     rt_hw_interrupt_enable(level);
 
     lwp_ref_dec(lwp);

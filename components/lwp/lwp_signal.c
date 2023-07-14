@@ -36,6 +36,11 @@
     if ((stat) != RT_EOK)       \
         RT_ASSERT(0);
 
+#if 0
+#define rt_hw_interrupt_disable() 0
+#define rt_hw_interrupt_enable(value)
+#endif
+
 static lwp_siginfo_t siginfo_create(int signo, int code, int value)
 {
     lwp_siginfo_t siginfo;
@@ -68,7 +73,7 @@ static lwp_siginfo_t siginfo_create(int signo, int code, int value)
 
 rt_inline void siginfo_delete(lwp_siginfo_t siginfo)
 {
-    // rt_free(siginfo);
+    rt_free(siginfo);
 }
 
 rt_inline void _sigorsets(lwp_sigset_t *dset, const lwp_sigset_t *set0, const lwp_sigset_t *set1)
@@ -516,7 +521,7 @@ void lwp_thread_signal_catch(void *exp_frame)
         if (handler == LWP_SIG_ACT_DFL)
         {
             /* FIXME: is the way good enough? */
-            LOG_I("%s: default handler; and exit", __func__);
+            LOG_D("%s: default handler; and exit", __func__);
             sys_exit(0);
         }
 

@@ -8,11 +8,12 @@
  * 2020/10/7      bernard      the first version
  */
 
+#include "lock_tracer.h"
 #include <stdio.h>
 
 int main(void)
 {
     printf("hello rt-thread\n");
-
+    lock_tracer_init();
     return 0;
 }
