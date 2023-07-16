@@ -236,7 +236,7 @@ void rt_cpus_unlock(rt_base_t level)
         if (pcpu->current_thread->cpus_lock_nest == 0)
         {
             rt_kprintf("current %s tid %d nested %p\n", pcpu->current_thread->parent.name, pcpu->current_thread->tid, &pcpu->current_thread->cpus_lock_nest);
-            // lock_trace_dump(pcpu->current_thread);
+            lock_trace_dump(pcpu->current_thread);
             rt_backtrace();
             RT_ASSERT(0);
         }

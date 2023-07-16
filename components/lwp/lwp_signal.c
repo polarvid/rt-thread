@@ -14,7 +14,7 @@
  */
 
 #define DBG_TAG    "LWP_SIGNAL"
-#define DBG_LVL    DBG_INFO
+#define DBG_LVL    DBG_DEBUG
 #include <rtdbg.h>
 
 #include <rthw.h>
@@ -27,6 +27,9 @@
 #include "sys/signal.h"
 #include "syscall_generic.h"
 
+#if 0
+#define rt_hw_interrupt_disable() 0
+#define rt_hw_interrupt_enable(value)
 /**
  * ASSERT the operation should never failed
  * if the RT_ASSERT is disable, there should be
@@ -35,10 +38,8 @@
 #define NEVER_FAIL(stat)        \
     if ((stat) != RT_EOK)       \
         RT_ASSERT(0);
-
-#if 0
-#define rt_hw_interrupt_disable() 0
-#define rt_hw_interrupt_enable(value)
+#else
+#define NEVER_FAIL(stat)
 #endif
 
 static lwp_siginfo_t siginfo_create(int signo, int code, int value)
@@ -903,6 +904,8 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *us
 rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                      siginfo_t *usi, struct timespec *timeout)
 {
+    LOG_D("%s", __func__);
+
     struct rt_lwp *lwp;
     rt_base_t level;
     rt_err_t ret;

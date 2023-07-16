@@ -12,7 +12,7 @@
 #include "rtdef.h"
 
 /* RING BUFFER for lock tracer */
-const static size_t _lock_tracer_rbuf_sz = 128ul << 10;
+const static size_t _lock_tracer_rbuf_sz = 1ul << 20;
 static ring_buffer_t _lock_tracer_rbuf;
 static void *_lock_tracer_rbuf_va;
 
@@ -39,7 +39,7 @@ void lock_tracer_start(rt_thread_t thread)
 {
     ring_buffer_init(&_lock_tracer_rbuf, _lock_tracer_rbuf_va, _lock_tracer_rbuf_sz);
 
-    _enable = 1;
+    _enable = 0;
 }
 
 rt_inline rt_bool_t _not_the_thread(rt_thread_t thread)
@@ -59,7 +59,7 @@ void lock_tracer_add(rt_thread_t thread, rt_bool_t is_lock)
 
     struct lock_trace_entry entry;
     entry.current_nest = thread->cpus_lock_nest;
-    entry.is_lock = thread->cpus_lock_nest;
+    entry.is_lock = is_lock;
     entry.tid = thread->tid;
     _backtrace_skipn(1, entry.backtrace, BACKTRACE_SLOT);
 
