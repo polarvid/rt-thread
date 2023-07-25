@@ -273,6 +273,13 @@ START_POINT_END(_thread_start)
 #endif
 
 .text
+
+.global rt_hw_interrupt_is_disabled
+rt_hw_interrupt_is_disabled:
+    mrs     x0, DAIF
+    and     x0, x0, #0xc0
+    ret
+
 /*
  * rt_base_t rt_hw_interrupt_disable();
  */

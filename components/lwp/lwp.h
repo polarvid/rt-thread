@@ -74,7 +74,7 @@ struct rt_lwp
 #ifdef ARCH_MM_MPU
     struct rt_mpu_info mpu_info;
 #endif /* ARCH_MM_MPU */
-#endif
+#endif /* ARCH_MM_MMU */
 
 #ifdef RT_USING_SMP
     int bind_cpu;
@@ -88,9 +88,14 @@ struct rt_lwp
     struct rt_lwp *sibling;
 
     rt_list_t wait_list;
+
+    /* flags */
     rt_bool_t finish;
     rt_bool_t terminated;
     rt_bool_t background;
+
+    int debug;
+    rt_uint32_t bak_first_inst;
     int lwp_ret;
 
     void *text_entry;
@@ -124,8 +129,8 @@ struct rt_lwp
 
     struct lwp_avl_struct *address_search_head; /* for addressed object fast search */
     char working_directory[DFS_PATH_MAX];
-    int debug;
-    uint32_t bak_first_ins;
+
+    struct rt_mutex lwp_mtx;
 
 #ifdef LWP_ENABLE_ASID
     uint64_t generation;
@@ -168,6 +173,9 @@ int lwp_setaffinity(pid_t pid, int cpu);
 
 /* ctime lwp API */
 int timer_list_free(rt_list_t *timer_list);
+
+struct rt_futex;
+rt_err_t lwp_futex(struct rt_lwp *lwp, struct rt_futex *futex, int *uaddr, int op, int val, const struct timespec *timeout);
 
 #ifdef ARCH_MM_MMU
 struct __pthread {

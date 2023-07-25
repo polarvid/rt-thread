@@ -334,6 +334,7 @@ struct rt_lwp* lwp_new(void)
     lwp->ref = 1;
 
     lwp_signal_init(&lwp->signal);
+    rt_mutex_init(&lwp->lwp_mtx, "lwpmtx", RT_IPC_FLAG_PRIO);
 
     level = rt_hw_interrupt_disable();
     pid = lwp_pid_get();
@@ -394,6 +395,7 @@ void lwp_free(struct rt_lwp* lwp)
 
     lwp_user_object_clear(lwp);
     lwp_user_object_lock_destroy(lwp);
+    rt_mutex_detach(&lwp->lwp_mtx);
 
     /* free data section */
     if (lwp->data_entry != RT_NULL)
