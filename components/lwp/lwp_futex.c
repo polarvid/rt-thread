@@ -9,6 +9,9 @@
  * 2023-07-25     Shell        Remove usage of rt_hw_interrupt API in the lwp
  *                             Coding style: remove multiple `return` in a routine
  */
+#define DBG_TAG "lwp.futex"
+#define DBG_LVL DBG_LOG
+#include <rtdbg.h>
 
 #include "lwp_internal.h"
 #include "lwp_pid.h"
