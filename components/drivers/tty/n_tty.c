@@ -2010,7 +2010,7 @@ static int job_control(struct tty_struct *tty)
 
 static int n_tty_read(struct dfs_file *fd, void *buf, size_t count)
 {
-    int level = 0;
+    rt_base_t level = 0;
     char *b = (char *)buf;
     struct tty_struct *tty = RT_NULL;
     struct rt_lwp *lwp = RT_NULL;
@@ -2044,7 +2044,10 @@ static int n_tty_read(struct dfs_file *fd, void *buf, size_t count)
                 break;
             }
 
+            rt_hw_interrupt_enable(level);
             wait_ret = rt_wqueue_wait_interruptible(wq, 0, RT_WAITING_FOREVER);
+            level = rt_hw_interrupt_disable();
+
             if (wait_ret != 0)
             {
                 break;

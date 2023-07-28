@@ -738,8 +738,11 @@ static void _lwp_timer_event_from_tid(struct rt_work *work, void *param)
 
     RT_ASSERT(data->tid);
 
-    thread = lwp_tid_get_thread(data->tid);
+    lwp_tid_lock_take();
+    thread = lwp_tid_get_thread_locked(data->tid);
     ret = lwp_thread_signal_kill(thread, data->signo, SI_TIMER, 0);
+    lwp_tid_lock_release();
+
     if (ret)
     {
         LOG_W("%s: Do kill failed(tid %d) returned %d", __func__, data->tid, ret);
@@ -753,7 +756,9 @@ static void _lwp_timer_event_from_pid(struct rt_work *work, void *param)
     rt_err_t ret;
     struct lwp_timer_event_param *data = (void *)work;
 
-    ret = lwp_signal_kill(lwp_from_pid(data->pid), data->signo, SI_TIMER, 0);
+    lwp_pid_lock_take();
+    ret = lwp_signal_kill(lwp_from_pid_locked(data->pid), data->signo, SI_TIMER, 0);
+    lwp_pid_lock_release();
     if (ret)
     {
         LOG_W("%s: Do kill failed(pid %d) returned %d", __func__, data->pid, ret);

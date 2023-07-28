@@ -90,7 +90,6 @@ struct rt_lwp
     rt_list_t wait_list;
 
     /* flags */
-    rt_bool_t finish;
     rt_bool_t terminated;
     rt_bool_t background;
 
@@ -103,7 +102,7 @@ struct rt_lwp
     void *data_entry;
     uint32_t data_size;
 
-    int ref;
+    rt_atomic_t ref;
     void *args;
     uint32_t args_length;
     pid_t pid;
@@ -139,6 +138,8 @@ struct rt_lwp
 };
 
 struct rt_lwp *lwp_self(void);
+rt_err_t lwp_children_register(struct rt_lwp *parent, struct rt_lwp *child);
+rt_err_t lwp_children_unregister(struct rt_lwp *parent, struct rt_lwp *child);
 
 enum lwp_exit_request_type
 {
@@ -154,9 +155,12 @@ int  lwp_check_exit_request(void);
 void lwp_terminate(struct rt_lwp *lwp);
 void lwp_wait_subthread_exit(void);
 
+int lwp_tid_init(void);
 int lwp_tid_get(void);
 void lwp_tid_put(int tid);
-rt_thread_t lwp_tid_get_thread(int tid);
+void lwp_tid_lock_take(void);
+void lwp_tid_lock_release(void);
+rt_thread_t lwp_tid_get_thread_locked(int tid);
 void lwp_tid_set_thread(int tid, rt_thread_t thread);
 
 size_t lwp_user_strlen(const char *s, int *err);

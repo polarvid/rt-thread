@@ -481,7 +481,7 @@ struct rt_object
 #endif /* RT_USING_MODULE */
 
 #ifdef RT_USING_SMART
-    int         lwp_ref_count;                           /**< ref count for lwp */
+    rt_atomic_t lwp_ref_count_at;                           /**< ref count for lwp */
 #endif /* RT_USING_SMART */
 
     rt_list_t   list;                                    /**< list node of kernel object */

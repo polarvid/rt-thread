@@ -15,45 +15,14 @@
 
 #include <rtthread.h>
 #include <rthw.h>
-#include <lwp.h>
 
-#include "backtrace.h"
+#include "lwp_internal.h"
 #include "lwp_ipc.h"
 #include "lwp_ipc_internal.h"
 
+#include <backtrace.h>
 #include <dfs_file.h>
 #include <poll.h>
-
-#define UNINITIALIZED 0xcafe
-
-#ifndef RT_USING_DEBUG
-#define DEF_RETURN_CODE(name)   rt_err_t name
-#define RETURN(name)            return name
-#else
-#define DEF_RETURN_CODE(name)   rt_err_t name = UNINITIALIZED
-#define RETURN(name)            RT_ASSERT(name != UNINITIALIZED);return name
-#endif /* RT_USING_DEBUG */
-
-#undef rt_hw_interrupt_disable
-#undef rt_hw_interrupt_enable
-
-#define rt_hw_interrupt_disable() ({                \
-    rt_base_t irq = rt_hw_interrupt_is_disabled();  \
-    if (irq)                                        \
-    {                                               \
-        LOG_W("Nested interrupt disable");          \
-        rt_backtrace();                             \
-        irq = 0xabadcafe;                           \
-    } else {                                        \
-        irq = rt_cpus_lock();                       \
-    }                                               \
-    irq;                                            \
-})
-
-#define rt_hw_interrupt_enable(level) do {  \
-    if (level != 0xabadcafe)                \
-        rt_cpus_unlock(level);              \
-    } while (0)
 
 /**
  * the IPC channel states

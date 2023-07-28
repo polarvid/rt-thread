@@ -11,15 +11,15 @@
 #include <rthw.h>
 #include <rtthread.h>
 
-#include "lwp.h"
+#define DBG_TAG    "lwp.tid"
+#define DBG_LVL    DBG_LOG
+#include <rtdbg.h>
+
+#include "lwp_internal.h"
 
 #ifdef ARCH_MM_MMU
 #include "lwp_user_mm.h"
 #endif
-
-#define DBG_TAG    "LWP_TID"
-#define DBG_LVL    DBG_INFO
-#include <rtdbg.h>
 
 #define TID_MAX 10000
 
@@ -34,14 +34,38 @@ static struct lwp_avl_struct *lwp_tid_free_head = RT_NULL;
 static int lwp_tid_ary_alloced = 0;
 static struct lwp_avl_struct *lwp_tid_root = RT_NULL;
 static int current_tid = 0;
+static struct rt_mutex tid_mtx;
+
+int lwp_tid_init(void)
+{
+    rt_mutex_init(&tid_mtx, "tidmtx", RT_IPC_FLAG_PRIO);
+    return 0;
+}
+
+void lwp_tid_lock_take(void)
+{
+    DEF_RETURN_CODE(rc);
+
+    rc = lwp_mutex_take_safe(&tid_mtx, RT_WAITING_FOREVER, 0);
+    /* should never failed */
+    RT_ASSERT(rc == RT_EOK);
+}
+
+void lwp_tid_lock_release(void)
+{
+    DEF_RETURN_CODE(rc);
+
+    rc = lwp_mutex_release_safe(&tid_mtx);
+    /* should never failed */
+    RT_ASSERT(rc == RT_EOK);
+}
 
 int lwp_tid_get(void)
 {
-    rt_base_t level;
     struct lwp_avl_struct *p;
     int tid = 0;
 
-    level = rt_hw_interrupt_disable();
+    lwp_tid_lock_take();
     p = lwp_tid_free_head;
     if (p)
     {
@@ -80,16 +104,15 @@ int lwp_tid_get(void)
         lwp_avl_insert(p, &lwp_tid_root);
         current_tid = tid;
     }
-    rt_hw_interrupt_enable(level);
+    lwp_tid_lock_release();
     return tid;
 }
 
 void lwp_tid_put(int tid)
 {
-    rt_base_t level;
     struct lwp_avl_struct *p;
 
-    level = rt_hw_interrupt_disable();
+    lwp_tid_lock_take();
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
     {
@@ -98,35 +121,32 @@ void lwp_tid_put(int tid)
         p->avl_right = lwp_tid_free_head;
         lwp_tid_free_head = p;
     }
-    rt_hw_interrupt_enable(level);
+    lwp_tid_lock_release();
 }
 
-rt_thread_t lwp_tid_get_thread(int tid)
+rt_thread_t lwp_tid_get_thread_locked(int tid)
 {
-    rt_base_t level;
     struct lwp_avl_struct *p;
     rt_thread_t thread = RT_NULL;
+    RT_ASSERT(rt_mutex_owner_get(&tid_mtx) == rt_thread_self());
 
-    level = rt_hw_interrupt_disable();
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
     {
         thread = (rt_thread_t)p->data;
     }
-    rt_hw_interrupt_enable(level);
     return thread;
 }
 
 void lwp_tid_set_thread(int tid, rt_thread_t thread)
 {
-    rt_base_t level;
     struct lwp_avl_struct *p;
 
-    level = rt_hw_interrupt_disable();
+    lwp_tid_lock_take();
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
     {
         p->data = thread;
     }
-    rt_hw_interrupt_enable(level);
+    lwp_tid_lock_release();
 }

@@ -276,9 +276,10 @@ START_POINT_END(_thread_start)
 
 .global rt_hw_interrupt_is_disabled
 rt_hw_interrupt_is_disabled:
-    mrs     x0, DAIF
-    and     x0, x0, #0xc0
-    ret
+    MRS     X0, DAIF
+    TST     X0, #0xc0
+    CSET    X0, NE
+    RET
 
 /*
  * rt_base_t rt_hw_interrupt_disable();

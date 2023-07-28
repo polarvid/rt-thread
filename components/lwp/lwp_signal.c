@@ -12,7 +12,7 @@
  *                             update the generation, pending and delivery routines
  */
 
-#define DBG_TAG    "LWP_SIGNAL"
+#define DBG_TAG    "lwp.signal"
 #define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
 
@@ -20,9 +20,7 @@
 #include <rtthread.h>
 #include <string.h>
 
-#include "lwp.h"
-#include "lwp_arch.h"
-#include "lwp_signal.h"
+#include "lwp_internal.h"
 #include "sys/signal.h"
 #include "syscall_generic.h"
 
@@ -462,7 +460,6 @@ int lwp_thread_signal_suspend_check(rt_thread_t thread, int suspend_flag)
 
 void lwp_thread_signal_catch(void *exp_frame)
 {
-    rt_base_t level;
     int signo;
     struct rt_thread *thread;
     struct rt_lwp *lwp;
@@ -479,7 +476,7 @@ void lwp_thread_signal_catch(void *exp_frame)
     lwp = (struct rt_lwp*)thread->lwp;
 
     RT_ASSERT(!!lwp);
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
 
     /* check if signal exist */
     if (!sigqueue_isempty(_SIGQ(thread)))
@@ -528,7 +525,7 @@ void lwp_thread_signal_catch(void *exp_frame)
                 p_usi = RT_NULL;
         }
     }
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
 
     if (pending && signo)
     {
@@ -555,23 +552,27 @@ void lwp_thread_signal_catch(void *exp_frame)
 static int _do_signal_wakeup(rt_thread_t thread, int sig)
 {
     int need_schedule;
-    if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
+    if (!_sigismember(&thread->signal.sigset_mask, sig))
     {
-
-        if ((thread->stat & RT_SIGNAL_COMMON_WAKEUP_MASK) != RT_SIGNAL_COMMON_WAKEUP_MASK)
+        if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
         {
-            rt_thread_wakeup(thread);
-            need_schedule = 1;
-        }
-        else if ((sig == SIGKILL) && ((thread->stat & RT_SIGNAL_KILL_WAKEUP_MASK) != RT_SIGNAL_KILL_WAKEUP_MASK))
-        {
-            rt_thread_wakeup(thread);
-            need_schedule = 1;
+            if ((thread->stat & RT_SIGNAL_COMMON_WAKEUP_MASK) != RT_SIGNAL_COMMON_WAKEUP_MASK)
+            {
+                rt_thread_wakeup(thread);
+                need_schedule = 1;
+            }
+            else if ((sig == SIGKILL) && ((thread->stat & RT_SIGNAL_KILL_WAKEUP_MASK) != RT_SIGNAL_KILL_WAKEUP_MASK))
+            {
+                rt_thread_wakeup(thread);
+                need_schedule = 1;
+            }
+            else
+            {
+                need_schedule = 0;
+            }
         }
         else
-        {
             need_schedule = 0;
-        }
     }
     else
         need_schedule = 0;
@@ -665,7 +666,7 @@ rt_inline rt_bool_t _sighandler_cannot_caught(struct rt_lwp *lwp, int signo)
 rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
 {
     rt_err_t ret = -1;
-    rt_base_t level;
+    
     lwp_siginfo_t siginfo;
     rt_bool_t terminated;
     rt_bool_t need_schedule;
@@ -681,8 +682,7 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
     {
         need_schedule = RT_FALSE;
 
-        /* FIXME: acquire READ lock to lwp */
-        level = rt_hw_interrupt_disable();
+        LWP_LOCK(lwp);
         terminated = lwp->terminated;
 
         /* short-circuit code for inactive task, ignored signals */
@@ -706,7 +706,7 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
             }
         }
 
-        rt_hw_interrupt_enable(level);
+        LWP_UNLOCK(lwp);
 
         if (need_schedule)
             rt_schedule();
@@ -750,12 +750,12 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
     lwp_sigqueue_t thread_sigq;
     rt_list_t *thread_list;
     rt_err_t ret = RT_EOK;
-    rt_base_t level;
+    
 
     if (lwp)
     {
         /** acquire READ access to lwp */
-        level = rt_hw_interrupt_disable();
+        LWP_LOCK(lwp);
 
         if (oact)
         {
@@ -805,7 +805,7 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
             }
         }
 
-        rt_hw_interrupt_enable(level);
+        LWP_UNLOCK(lwp);
     }
     else
         ret = -RT_EINVAL;
@@ -816,7 +816,7 @@ rt_err_t lwp_signal_action(struct rt_lwp *lwp, int signo,
 rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long value)
 {
     rt_err_t ret = -1;
-    rt_base_t level;
+    
     struct rt_lwp *lwp;
     lwp_siginfo_t siginfo;
     rt_bool_t need_schedule;
@@ -835,8 +835,7 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
 
         RT_ASSERT(lwp);
 
-        /* FIXME: acquire READ lock to lwp */
-        level = rt_hw_interrupt_disable();
+        LWP_LOCK(lwp);
 
         if (!lwp)
             ret = -RT_EPERM;
@@ -858,7 +857,7 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
             }
         }
 
-        rt_hw_interrupt_enable(level);
+        LWP_UNLOCK(lwp);
 
         if (need_schedule)
             rt_schedule();
@@ -884,15 +883,13 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
                                 const lwp_sigset_t *sigset, lwp_sigset_t *oset)
 {
     rt_err_t ret = -1;
-    rt_base_t level;
     struct rt_lwp *lwp;
 
     if (thread)
     {
-        /** FIXME: acquire READ access to rt_thread */
-        level = rt_hw_interrupt_disable();
-
         lwp = (struct rt_lwp*)thread->lwp;
+        LWP_LOCK(lwp);
+
         if (!lwp)
         {
             ret = -RT_EPERM;
@@ -903,7 +900,7 @@ rt_err_t lwp_thread_signal_mask(rt_thread_t thread, lwp_sig_mask_cmd_t how,
             _thread_signal_mask(thread, how, sigset, oset);
         }
 
-        rt_hw_interrupt_enable(level);
+        LWP_UNLOCK(lwp);
     }
     else
         ret = -RT_EINVAL;
@@ -944,8 +941,7 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                      siginfo_t *usi, struct timespec *timeout)
 {
     LOG_D("%s", __func__);
-
-    rt_base_t level;
+    struct rt_lwp *lwp = thread->lwp;
     rt_err_t ret;
     int sig;
 
@@ -960,14 +956,11 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     _sigdelset(sigset, SIGSTOP);
     _signotsets(sigset, sigset);
 
-    /* FIXME: acquire READ lock to lwp */
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
     sig = _dequeue_signal(thread, sigset, usi);
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
     if (sig)
         return sig;
-
-    /* WARNING atomic problem, what if pending signal arrives before we sleep */
 
     /**
      * @brief POSIX
@@ -1010,10 +1003,9 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     }
     /* else ret == -EINTR */
 
-    /* FIXME: acquire READ lock to lwp */
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
     sig = _dequeue_signal(thread, sigset, usi);
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
 
     return sig ? sig : ret;
 }

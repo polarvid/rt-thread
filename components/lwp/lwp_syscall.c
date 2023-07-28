@@ -12,6 +12,7 @@
  * 2021-02-20     lizhirui     fix some warnings
  * 2023-03-13     WangXiaoyao  Format & fix syscall return value
  * 2023-07-06     Shell        adapt the signal API, and clone, fork to new implementation of lwp signal
+ * 2023-07-27     Shell        Move tid_put() from lwp_free() to sys_exit()
  */
 
 #define _GNU_SOURCE
@@ -20,19 +21,18 @@
 #include <rtthread.h>
 #include <rthw.h>
 #include <board.h>
-#include <mm_aspace.h>
+
 #include <string.h>
 #include <stdint.h>
 
-#define DBG_TAG    "SYSCALL"
+#define DBG_TAG    "lwp.syscall"
 #define DBG_LVL    DBG_INFO
 #include <rtdbg.h>
 
 #include "syscall_generic.h"
-
-#include <lwp.h>
-#include "lwp_signal.h"
+#include "lwp_internal.h"
 #ifdef ARCH_MM_MMU
+#include <mm_aspace.h>
 #include <lwp_user_mm.h>
 #include <lwp_arch.h>
 #endif
@@ -326,7 +326,6 @@ static void _crt_thread_entry(void *parameter)
 /* thread/process */
 void sys_exit(int value)
 {
-    rt_base_t level;
     rt_thread_t tid, main_thread;
     struct rt_lwp *lwp;
 
@@ -335,7 +334,6 @@ void sys_exit(int value)
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
 
-    level = rt_hw_interrupt_disable();
 #ifdef ARCH_MM_MMU
     if (tid->clear_child_tid)
     {
@@ -373,9 +371,13 @@ void sys_exit(int value)
     }
 #endif /* ARCH_MM_MMU */
 
+    /**
+     * @note the tid tree always hold a reference to thread, hence the tid must
+     * be release before cleanup of thread
+     */
+    lwp_tid_put(tid->tid);
     rt_thread_delete(tid);
     rt_schedule();
-    rt_hw_interrupt_enable(level);
 
     return;
 }
@@ -1016,15 +1018,18 @@ sysret_t sys_kill(int pid, int signo)
 {
     rt_err_t kret;
     sysret_t sysret;
-    rt_base_t level;
     struct rt_lwp *lwp;
 
     /* handling the semantics of sys_kill */
     if (pid > 0)
     {
-        /* TODO: lock the lwp strcut */
-        level = rt_hw_interrupt_disable();
-        lwp = lwp_from_pid(pid);
+        /**
+         * @brief Match the pid and send signal to the lwp if found
+         * @note Critical Section
+         * - pid tree (READ. since the lwp is fetch from the pid tree, it must stay there)
+         */
+        lwp_pid_lock_take();
+        lwp = lwp_from_pid_locked(pid);
 
         /* lwp_signal_kill() can handle NULL lwp */
         if (lwp)
@@ -1032,7 +1037,7 @@ sysret_t sys_kill(int pid, int signo)
         else
             kret = -RT_ENOENT;
 
-        rt_hw_interrupt_enable(level);
+        lwp_pid_lock_release();
     }
     else if (pid == 0)
     {
@@ -1480,7 +1485,6 @@ sysret_t sys_timer_getoverrun(timer_t timerid)
 
 rt_thread_t sys_thread_create(void *arg[])
 {
-    rt_base_t level = 0;
     void *user_stack = 0;
     struct rt_lwp *lwp = 0;
     rt_thread_t thread = RT_NULL;
@@ -1560,9 +1564,9 @@ rt_thread_t sys_thread_create(void *arg[])
         rt_thread_control(thread, RT_THREAD_CTRL_BIND_CPU, (void*)0);
     }
 
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
     rt_list_insert_after(&lwp->t_grp, &thread->sibling);
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
 
     return thread;
 
@@ -1580,7 +1584,6 @@ fail:
 
 long _sys_clone(void *arg[])
 {
-    rt_base_t level = 0;
     struct rt_lwp *lwp = 0;
     rt_thread_t thread = RT_NULL;
     rt_thread_t self = RT_NULL;
@@ -1674,9 +1677,9 @@ long _sys_clone(void *arg[])
         rt_thread_control(thread, RT_THREAD_CTRL_BIND_CPU, (void*)0);
     }
 
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
     rt_list_insert_after(&lwp->t_grp, &thread->sibling);
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
 
     /* copy origin stack */
     rt_memcpy(thread->stack_addr, self->stack_addr, thread->stack_size);
@@ -1848,17 +1851,14 @@ sysret_t _sys_fork(void)
     thread->lwp = (void *)lwp;
     thread->tid = tid;
 
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(self_lwp);
 
     /* add thread to lwp process */
     rt_list_insert_after(&lwp->t_grp, &thread->sibling);
 
-    /* lwp add to children link */
-    lwp->sibling = self_lwp->first_child;
-    self_lwp->first_child = lwp;
-    lwp->parent = self_lwp;
+    lwp_children_register(self_lwp, lwp);
 
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(self_lwp);
 
     /* copy origin stack */
     rt_memcpy(thread->stack_addr, self_thread->stack_addr, self_thread->stack_size);
@@ -1867,15 +1867,16 @@ sysret_t _sys_fork(void)
     /* duplicate user objects */
     lwp_user_object_dup(lwp, self_lwp);
 
-    level = rt_hw_interrupt_disable();
+    level = LOCAL_IRQ_MASK();
     user_stack = arch_get_user_sp();
-    rt_hw_interrupt_enable(level);
+    LOCAL_IRQ_UNMASK(level);
 
     arch_set_thread_context(arch_fork_exit,
             (void *)((char *)thread->stack_addr + thread->stack_size),
             user_stack, &thread->sp);
+
     /* new thread never reach there */
-    level = rt_hw_interrupt_disable();
+    LWP_LOCK(lwp);
     if (lwp->tty != RT_NULL)
     {
         int ret;
@@ -1894,7 +1895,8 @@ sysret_t _sys_fork(void)
 
         lwp->tty->foreground = lwp;
     }
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
+
     rt_thread_startup(thread);
     return lwp_to_pid(lwp);
 fail:
@@ -2285,7 +2287,6 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
     char *p;
     struct rt_lwp *new_lwp = NULL;
     struct rt_lwp *lwp;
-    rt_base_t level;
     int uni_thread;
     rt_thread_t thread;
     struct process_aux *aux;
@@ -2300,7 +2301,8 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
     lwp = lwp_self();
     thread = rt_thread_self();
     uni_thread = 1;
-    level = rt_hw_interrupt_disable();
+
+    LWP_LOCK(lwp);
     if (lwp->t_grp.prev != &thread->sibling)
     {
         uni_thread = 0;
@@ -2309,7 +2311,8 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
     {
         uni_thread = 0;
     }
-    rt_hw_interrupt_enable(level);
+    LWP_UNLOCK(lwp);
+
     if (!uni_thread)
     {
         SET_ERRNO(EINVAL);
@@ -2481,7 +2484,9 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
         }
 
         /* load ok, now set thread name and swap the data of lwp and new_lwp */
-        level = rt_hw_interrupt_disable();
+        /**
+         * ??? seriously ???, if there is other thread, they should all be detroy
+         */
 
         rt_strncpy(thread->parent.name, run_name + last_backslash, RT_NAME_MAX);
 
@@ -2511,7 +2516,6 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
 
         lwp_aspace_switch(thread);
 
-        rt_hw_interrupt_enable(level);
 
         lwp_ref_dec(new_lwp);
         arch_start_umode(lwp->args,
@@ -3537,14 +3541,37 @@ sysret_t sys_sigtimedwait(const sigset_t *sigset, siginfo_t *info, const struct 
 sysret_t sys_tkill(int tid, int sig)
 {
 #ifdef ARCH_MM_MMU
-    rt_base_t level;
     rt_thread_t thread;
-    int ret;
+    sysret_t ret;
 
-    level = rt_hw_interrupt_disable();
-    thread = lwp_tid_get_thread(tid);
+    /**
+     * @brief Match a tid and do the kill
+     *
+     * @note Critical Section
+     * - the thread (READ. may be released at the meantime; protected by locked)
+     */
+    lwp_tid_lock_take();
+    thread = lwp_tid_get_thread_locked(tid);
     ret = lwp_thread_signal_kill(thread, sig, SI_USER, 0);
-    rt_hw_interrupt_enable(level);
+    lwp_tid_lock_release();
+
+    switch (ret)
+    {
+        case RT_EOK:
+            ret = 0;
+            break;
+        case -RT_EINVAL:
+            ret = -EINVAL;
+            break;
+        case -RT_EPERM:
+            ret = -EPERM;
+            break;
+        /* Errors like insifficient memory in syscall */
+        default:
+            ret = -EAGAIN;
+            break;
+    }
+
     return ret;
 #else
     return lwp_thread_kill((rt_thread_t)tid, sig);
@@ -4556,9 +4583,10 @@ sysret_t sys_setaffinity(pid_t pid, size_t size, void *set)
     return -1;
 }
 
-sysret_t sys_getaffinity(pid_t pid, size_t size, void *set)
+sysret_t sys_getaffinity(const pid_t pid, size_t size, void *set)
 {
 #ifdef ARCH_MM_MMU
+    DEF_RETURN_CODE(rc);
     cpu_set_t mask;
     struct rt_lwp *lwp;
 
@@ -4571,33 +4599,44 @@ sysret_t sys_getaffinity(pid_t pid, size_t size, void *set)
         return -EFAULT;
     }
 
-    if (pid == 0) lwp = lwp_self();
-    else lwp = lwp_from_pid(pid);
+    if (pid == 0)
+        lwp = lwp_self();
+    else
+    {
+        lwp_pid_lock_take();
+        lwp = lwp_from_pid_locked(pid);
+    }
+
     if (!lwp)
     {
-        return -ESRCH;
+        rc = -ESRCH;
+    }
+    else
+    {
+    #ifdef RT_USING_SMP
+        if (lwp->bind_cpu == RT_CPUS_NR)    /* not bind */
+        {
+            CPU_ZERO_S(size, &mask);
+        }
+        else /* set bind cpu */
+        {
+            /* TODO: only single-core bindings are now supported of rt-smart */
+            CPU_SET_S(lwp->bind_cpu, size, &mask);
+        }
+    #else
+        CPU_SET_S(0, size, &mask);
+    #endif
+
+        if (lwp_put_to_user(set, &mask, size) != size)
+            rc = -EFAULT;
+        else
+            rc = 0;
     }
 
-#ifdef RT_USING_SMP
-    if (lwp->bind_cpu == RT_CPUS_NR)    /* not bind */
-    {
-        CPU_ZERO_S(size, &mask);
-    }
-    else /* set bind cpu */
-    {
-        /* TODO: only single-core bindings are now supported of rt-smart */
-        CPU_SET_S(lwp->bind_cpu, size, &mask);
-    }
-#else
-    CPU_SET_S(0, size, &mask);
-#endif
+    if (pid != 0)
+        lwp_pid_lock_release();
 
-    if (lwp_put_to_user(set, &mask, size) != size)
-    {
-        return -1;
-    }
-
-    return 0;
+    RETURN(rc);
 #else
     return -1;
 #endif
@@ -4649,7 +4688,7 @@ sysret_t sys_sysinfo(void *info)
 #endif
 }
 
-sysret_t sys_sched_setparam(pid_t pid, void *param)
+sysret_t sys_sched_setparam(const pid_t pid, void *param)
 {
     struct sched_param *sched_param = (struct sched_param *)param;
     struct rt_lwp *lwp = NULL;
@@ -4661,21 +4700,26 @@ sysret_t sys_sched_setparam(pid_t pid, void *param)
     }
     if (pid > 0)
     {
-        lwp = lwp_from_pid(pid);
+        lwp_pid_lock_take();
+        lwp = lwp_from_pid_locked(pid);
     }
     else if (pid == 0)
     {
         lwp = lwp_self();
     }
+
     if (lwp)
     {
         main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
+        if (pid > 0)
+            lwp_pid_lock_release();
+
         return rt_thread_control(main_thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
     }
     return ret;
 }
 
-sysret_t sys_sched_getparam(pid_t pid, void *param)
+sysret_t sys_sched_getparam(const pid_t pid, void *param)
 {
     struct sched_param *sched_param = (struct sched_param *)param;
     struct rt_lwp *lwp = NULL;
@@ -4687,7 +4731,8 @@ sysret_t sys_sched_getparam(pid_t pid, void *param)
     }
     if (pid > 0)
     {
-        lwp = lwp_from_pid(pid);
+        lwp_pid_lock_take();
+        lwp = lwp_from_pid_locked(pid);
     }
     else if (pid == 0)
     {
@@ -4696,6 +4741,9 @@ sysret_t sys_sched_getparam(pid_t pid, void *param)
     if (lwp)
     {
         main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
+        if (pid > 0)
+            lwp_pid_lock_release();
+
         sched_param->sched_priority = main_thread->current_priority;
         ret = 0;
     }
@@ -4724,28 +4772,55 @@ sysret_t sys_sched_get_priority_min(int policy)
 
 sysret_t sys_sched_setscheduler(int tid, int policy, void *param)
 {
+    sysret_t ret;
+    rt_thread_t thread;
     struct sched_param *sched_param = (struct sched_param *)param;
-    rt_thread_t thread = lwp_tid_get_thread(tid);
 
     if (!lwp_user_accessable(param, sizeof(struct sched_param)))
     {
-        return -EFAULT;
+        ret = -EFAULT;
     }
-    return rt_thread_control(thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
-    return 0;
+    else
+    {
+        lwp_tid_lock_take();
+        thread = lwp_tid_get_thread_locked(tid);
+
+        /**
+         * @note This operation is always return RT_EOK on head
+         * ff0c14824499324d025fbc110f6b38f0f33e4040
+         */
+        ret = rt_thread_control(thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
+        lwp_tid_lock_release();
+
+        RT_ASSERT(ret == RT_EOK);
+        ret = 0;
+    }
+
+    return ret;
 }
 
 sysret_t sys_sched_getscheduler(int tid, int *policy, void *param)
 {
+    sysret_t ret;
+    rt_thread_t thread;
     struct sched_param *sched_param = (struct sched_param *)param;
-    rt_thread_t thread = lwp_tid_get_thread(tid);
+
     if (!lwp_user_accessable(sched_param, sizeof(struct sched_param)))
     {
-        return -EFAULT;
+        ret = -EFAULT;
     }
-    sched_param->sched_priority = thread->current_priority;
-    *policy = 0;
-    return 0;
+    else
+    {
+        lwp_tid_lock_take();
+        thread = lwp_tid_get_thread_locked(tid);
+        /** this operation is done as atomic op on mordern cpu */
+        sched_param->sched_priority = thread->current_priority;
+        lwp_tid_lock_release();
+
+        *policy = 0;
+        ret = 0;
+    }
+    return ret;
 }
 
 sysret_t sys_fsync(int fd)
