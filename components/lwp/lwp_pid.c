@@ -965,75 +965,79 @@ void lwp_terminate(struct rt_lwp *lwp)
         return;
     }
 
+    LOG_D("%s(lwp=%p \"%s\")", __func__, lwp, lwp->cmd);
+
     LWP_LOCK(lwp);
-
-    /* stop the receiving of signals */
-    lwp->terminated = RT_TRUE;
-
-    /**
-     * @brief Detach children from lwp
-     *
-     * @note Critical Section
-     * - the lwp (RW. Release lwp)
-     * - the pid resource manager (RW. Release the pid)
-     */
-    while (lwp->first_child)
+    if (!lwp->terminated)
     {
-        struct rt_lwp *child;
+        /* stop the receiving of signals */
+        lwp->terminated = RT_TRUE;
 
-        child = lwp->first_child;
-        lwp->first_child = child->sibling;
-
-        LWP_LOCK(child);
-        child->sibling = RT_NULL;
-        child->parent = RT_NULL;
-        LWP_UNLOCK(child);
-        lwp_ref_dec(child);
-        lwp_ref_dec(lwp);
-    }
-
-    /**
-     * @brief Wakeup parent if he waiting for this lwp
-     *
-     * @note Critical Section
-     * - the parent lwp (RW.)
-     */
-    if (lwp->parent)
-    {
-        struct rt_thread *thread;
-
-        if (!rt_list_isempty(&lwp->wait_list))
+        /**
+        * @brief Detach children from lwp
+        *
+        * @note Critical Section
+        * - the lwp (RW. Release lwp)
+        * - the pid resource manager (RW. Release the pid)
+        */
+        while (lwp->first_child)
         {
-            thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
-            thread->error = RT_EOK;
-            thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
-            rt_thread_resume(thread);
+            struct rt_lwp *child;
+
+            child = lwp->first_child;
+            lwp->first_child = child->sibling;
+
+            LWP_LOCK(child);
+            child->sibling = RT_NULL;
+            child->parent = RT_NULL;
+            LWP_UNLOCK(child);
+            lwp_ref_dec(child);
+            lwp_ref_dec(lwp);
         }
-        /* children cannot detach itself and must wait for parent to take care of it */
+
+        /**
+        * @brief Wakeup parent if he waiting for this lwp
+        *
+        * @note Critical Section
+        * - the parent lwp (RW.)
+        */
+        if (lwp->parent)
+        {
+            struct rt_thread *thread;
+
+            if (!rt_list_isempty(&lwp->wait_list))
+            {
+                thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
+                thread->error = RT_EOK;
+                thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
+                rt_thread_resume(thread);
+            }
+            /* children cannot detach itself and must wait for parent to take care of it */
+        }
+
+        /* FIXME: hold the thread lock or using atomic operation */
+        level = rt_hw_interrupt_disable();
+
+        /* broadcast exit request for sibling threads */
+        for (list = lwp->t_grp.next; list != &lwp->t_grp; list = list->next)
+        {
+            rt_thread_t thread;
+
+            thread = rt_list_entry(list, struct rt_thread, sibling);
+            if (thread->exit_request == LWP_EXIT_REQUEST_NONE)
+            {
+                thread->exit_request = LWP_EXIT_REQUEST_TRIGGERED;
+            }
+            if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
+            {
+                thread->error = RT_EINTR;
+                rt_hw_dsb();
+                rt_thread_wakeup(thread);
+            }
+        }
+        rt_hw_interrupt_enable(level);
     }
     LWP_UNLOCK(lwp);
-
-    /* FIXME: hold the thread lock or using atomic operation */
-    level = rt_hw_interrupt_disable();
-
-    /* broadcast exit request for sibling threads */
-    for (list = lwp->t_grp.next; list != &lwp->t_grp; list = list->next)
-    {
-        rt_thread_t thread;
-
-        thread = rt_list_entry(list, struct rt_thread, sibling);
-        if (thread->exit_request == LWP_EXIT_REQUEST_NONE)
-        {
-            thread->exit_request = LWP_EXIT_REQUEST_TRIGGERED;
-        }
-        if ((thread->stat & RT_THREAD_SUSPEND_MASK) == RT_THREAD_SUSPEND_MASK)
-        {
-            thread->error = RT_EINTR;
-            rt_hw_dsb();
-            rt_thread_wakeup(thread);
-        }
-    }
-    rt_hw_interrupt_enable(level);
 }
 
 void lwp_wait_subthread_exit(void)
@@ -1059,6 +1063,7 @@ void lwp_wait_subthread_exit(void)
     while (1)
     {
         int subthread_is_terminated;
+        LOG_D("%s: wait for subthread exiting", __func__);
 
         /* FIXME: hold the thread lock or using atomic operation */
         level = rt_hw_interrupt_disable();

@@ -246,6 +246,7 @@ START_POINT(arch_ret_to_user)
 
     /**
      * push 2 dummy words to simulate a exception frame of interrupt
+     * @note in kernel state, the context switch dont saved the context
      */
     mrs x0, spsr_el1
     mrs x1, elr_el1
@@ -478,7 +479,7 @@ arch_thread_signal_enter:
      */
 
     /** 
-     * reset the cpsr (WFT change the spsr during running???)
+     * reset the cpsr
      * and drop exp frame on kernel stack, reset kernel sp
      *
      * @note Since we will reset spsr, but the reschedule will

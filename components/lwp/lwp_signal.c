@@ -543,12 +543,12 @@ void lwp_thread_signal_catch(void *exp_frame)
          * @note that the p_usi is release before entering signal action by
          * reseting the kernel sp.
          */
+        LOG_D("%s: enter signal handler(signo=%d) at %p", __func__, signo, handler);
         arch_thread_signal_enter(signo, p_usi, exp_frame, handler, &save_sig_mask);
         /* the arch_thread_signal_enter() never return */
         RT_ASSERT(0);
     }
 }
-
 static int _do_signal_wakeup(rt_thread_t thread, int sig)
 {
     int need_schedule;
@@ -634,7 +634,7 @@ static int _siginfo_deliver_to_lwp(struct rt_lwp *lwp, lwp_siginfo_t siginfo)
     return _do_signal_wakeup(catcher, siginfo->ksiginfo.signo);
 }
 
-static int _siginfo_deliver_to_thread(struct rt_lwp *lwp, rt_thread_t thread, lwp_siginfo_t siginfo)
+static int _siginfo_deliver_to_thread(rt_thread_t thread, lwp_siginfo_t siginfo)
 {
     sigqueue_enqueue(_SIGQ(thread), siginfo);
     return _do_signal_wakeup(thread, siginfo->ksiginfo.signo);
@@ -680,6 +680,9 @@ rt_err_t lwp_signal_kill(struct rt_lwp *lwp, long signo, long code, long value)
     }
     else
     {
+        LOG_D("%s(lwp=%p \"%s\",signo=%ld,code=%ld,value=%ld)",
+              __func__, lwp, lwp->cmd, signo, code, value);
+
         need_schedule = RT_FALSE;
 
         LWP_LOCK(lwp);
@@ -847,7 +850,7 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
 
             if (siginfo)
             {
-                need_schedule = _siginfo_deliver_to_thread(lwp, thread, siginfo);
+                need_schedule = _siginfo_deliver_to_thread(thread, siginfo);
                 ret = 0;
             }
             else
@@ -940,7 +943,6 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *us
 rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                      siginfo_t *usi, struct timespec *timeout)
 {
-    LOG_D("%s", __func__);
     struct rt_lwp *lwp = thread->lwp;
     rt_err_t ret;
     int sig;
@@ -967,10 +969,14 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
      * if none of the signals specified by set are pending, sigtimedwait() shall
      * wait for the time interval specified in the timespec structure referenced
      * by timeout.
+     *
+     * @note If the pending signal arrives before thread suspend, the suspend
+     * operation will return a failure
      */
+    _sigandsets(&blocked_sigset, &thread->signal.sigset_mask, sigset);
+    _thread_signal_mask(thread, LWP_SIG_MASK_CMD_SET_MASK, &blocked_sigset, &saved_sigset);
     if (timeout)
     {
-        /* TODO: verify timeout valid ? not overflow 32bits, nanosec valid, ... */
         rt_uint32_t time;
         time = rt_timespec_to_tick(timeout);
 
@@ -999,9 +1005,14 @@ rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
     if (ret == RT_EOK)
     {
         rt_schedule();
-        ret = -EAGAIN;
+        /* If thread->error reliable? */
+        if (thread->error == -RT_EINTR)
+            ret = -EINTR;
+        else
+            ret = -EAGAIN;
     }
     /* else ret == -EINTR */
+    _thread_signal_mask(thread, LWP_SIG_MASK_CMD_SET_MASK, &saved_sigset, RT_NULL);
 
     LWP_LOCK(lwp);
     sig = _dequeue_signal(thread, sigset, usi);
