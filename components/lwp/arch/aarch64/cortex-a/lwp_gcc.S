@@ -168,6 +168,14 @@ START_POINT_END(SVC_Handler)
 
 .global arch_syscall_exit
 arch_syscall_exit:
+
+    /**
+     * @brief back up former x0 which is required to restart syscall, then setup
+     * syscall return value in stack frame
+     */
+    mov x1, sp
+    bl arch_syscall_verify
+
     msr daifset, #3
 
     ldp x2, x3, [sp], #0x10  /* SPSR and ELR. */
@@ -190,7 +198,10 @@ arch_syscall_exit:
     ldp x12, x13, [sp], #0x10
     ldp x10, x11, [sp], #0x10
     ldp x8, x9, [sp], #0x10
-    add sp, sp, #0x40
+    ldp x6, x7, [sp], #0x10
+    ldp x4, x5, [sp], #0x10
+    ldp x2, x3, [sp], #0x10
+    ldp x0, x1, [sp], #0x10
     RESTORE_FPU sp
 
 /* the sp is reset to the outer most level, irq and fiq are disabled */
@@ -394,11 +405,54 @@ lwp_check_debug_quit:
     ldp x29, x30, [sp], #0x10
     ret
 
+#define SP_BACKUP x19
+.global arch_syscall_restart
+arch_syscall_restart:
+    mov sp, SP_BACKUP
+    /* drop exception frame in user stack */
+    add x0, x0, #-CONTEXT_SIZE
+    msr sp_el0, x0
+
+    /* restore previous exception frame */
+    msr spsel, #0
+
+    ldp x2, x3, [sp], #0x10
+    msr elr_el1, x2
+    msr spsr_el1, x3
+
+    ldp x29, x30, [sp], #0x10
+
+    ldp x28, x29, [sp], #0x10
+    msr fpcr, x28
+    msr fpsr, x29
+
+    ldp x28, x29, [sp], #0x10
+    ldp x26, x27, [sp], #0x10
+    ldp x24, x25, [sp], #0x10
+    ldp x22, x23, [sp], #0x10
+    ldp x20, x21, [sp], #0x10
+    ldp x18, x19, [sp], #0x10
+    ldp x16, x17, [sp], #0x10
+    ldp x14, x15, [sp], #0x10
+    ldp x12, x13, [sp], #0x10
+    ldp x10, x11, [sp], #0x10
+    ldp x8, x9, [sp], #0x10
+    ldp x6, x7, [sp], #0x10
+    ldp x4, x5, [sp], #0x10
+    ldp x2, x3, [sp], #0x10
+    ldp x0, x1, [sp], #0x10
+    RESTORE_FPU sp
+
+    msr spsel, #1
+
+    b vector_exception
+
 arch_signal_quit:
     msr daifset, #3
 
     /* drop current exception frame */
     add sp, sp, #CONTEXT_SIZE
+    mov SP_BACKUP, sp
     mrs x0, sp_el0
     bl  arch_signal_ucontext_restore
     add x0, x0, #-CONTEXT_SIZE

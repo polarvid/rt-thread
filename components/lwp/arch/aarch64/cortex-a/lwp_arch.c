@@ -110,14 +110,56 @@ struct signal_ucontext
     struct rt_hw_exp_stack frame;
 };
 
+void arch_syscall_verify(rt_base_t rc, struct rt_hw_exp_stack *exp_frame)
+{
+    long sys_id = exp_frame->x8;
+    long x0 = exp_frame->x0;
+
+    if (rc == -EINTR)
+    {
+        LOG_D("%s(rc=%ld,sys_id=%ld)", __func__, rc, sys_id);
+    }
+    RT_UNUSED(sys_id);
+
+    exp_frame->x0 = rc;
+    exp_frame->x7 = x0;
+    return ;
+}
+
+void arch_syscall_restart(void *sp);
+
+void arch_signal_post_action(struct signal_ucontext *new_sp)
+{
+    struct rt_hw_exp_stack *exp_frame = &new_sp->frame;
+    long rc = exp_frame->x0;
+    long sys_id = exp_frame->x8;
+    const void *syscall;
+
+    if (rc == -EINTR)
+    {
+        LOG_D("%s(rc=%ld,sys_id=%ld)", __func__, rc, sys_id);
+        syscall = lwp_get_sys_api(sys_id);
+        if (syscall == (void *)&sys_pmutex)
+        {    
+            LOG_D("%s: restart rc = %ld\n", lwp_get_syscall_name(sys_id), rc);
+            exp_frame->x0 = exp_frame->x7;
+            arch_syscall_restart((char *)&new_sp->frame + sizeof(struct rt_hw_exp_stack));
+        }
+    }
+
+    return ;
+}
+
 void *arch_signal_ucontext_restore(rt_base_t user_sp)
 {
     struct signal_ucontext *new_sp;
     new_sp = (void *)user_sp;
 
+    LOG_D("%s", __func__);
     if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
     {
         lwp_thread_signal_mask(rt_thread_self(), LWP_SIG_MASK_CMD_SET_MASK, &new_sp->save_sigmask, RT_NULL);
+        arch_signal_post_action(new_sp);
     }
     else
     {
