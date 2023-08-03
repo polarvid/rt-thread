@@ -7,8 +7,8 @@
  * Date           Author       Notes
  * 2023-07-06     RT-Thread    the first version
  */
-#ifndef __LWP_CLONE_H__
-#define __LWP_CLONE_H__
+#ifndef __LWP_SYS_MUSL_H__
+#define __LWP_SYS_MUSL_H__
 
 #define CLONE_VM    0x00000100
 #define CLONE_FS    0x00000200
@@ -44,4 +44,29 @@
  *          */
 #define SYS_CLONE_ARGS_NR 7
 
-#endif /* __LWP_CLONE_H__ */
+/* wait.h */
+
+/* options */
+#define WNOHANG    1
+#define WUNTRACED  2
+
+#define WSTOPPED   2
+#define WEXITED    4
+#define WCONTINUED 8
+#define WNOWAIT    0x1000000
+
+#define __WNOTHREAD 0x20000000
+#define __WALL      0x40000000
+#define __WCLONE    0x80000000
+
+/* status */
+#define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
+#define WTERMSIG(s) ((s) & 0x7f)
+#define WSTOPSIG(s) WEXITSTATUS(s)
+#define WCOREDUMP(s) ((s) & 0x80)
+#define WIFEXITED(s) (!WTERMSIG(s))
+#define WIFSTOPPED(s) ((short)((((s)&0xffff)*0x10001)>>8) > 0x7f00)
+#define WIFSIGNALED(s) (((s)&0xffff)-1U < 0xffu)
+#define WIFCONTINUED(s) ((s) == 0xffff)
+
+#endif /* __LWP_SYS_MUSL_H__ */

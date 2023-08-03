@@ -225,6 +225,7 @@ START_POINT(arch_ret_to_user)
     bl lwp_check_exit_request
     cbz w0, 1f
     /* exit on event */
+    msr daifclr, #3
     mov x0, xzr
     b sys_exit
 1:

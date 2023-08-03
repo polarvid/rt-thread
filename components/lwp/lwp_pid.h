@@ -38,6 +38,7 @@ char* lwp_pid2name(int32_t pid);
 
 int lwp_getpid(void);
 
+pid_t lwp_waitpid(const pid_t pid, int *status, int options);
 pid_t waitpid(pid_t pid, int *status, int options);
 long list_process(void);
 

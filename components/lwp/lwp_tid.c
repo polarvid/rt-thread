@@ -8,6 +8,7 @@
  * 2021-01-15     shaojinchun  first version
  */
 
+#include "lwp.h"
 #include <rthw.h>
 #include <rtthread.h>
 
@@ -34,30 +35,45 @@ static struct lwp_avl_struct *lwp_tid_free_head = RT_NULL;
 static int lwp_tid_ary_alloced = 0;
 static struct lwp_avl_struct *lwp_tid_root = RT_NULL;
 static int current_tid = 0;
-static struct rt_mutex tid_mtx;
+
+#include "pfrwlock.h"
+
+static struct p64_pfrwlock tid_lock;
 
 int lwp_tid_init(void)
 {
-    rt_mutex_init(&tid_mtx, "tidmtx", RT_IPC_FLAG_PRIO);
+    p64_pfrwlock_init(&tid_lock);
     return 0;
 }
 
-void lwp_tid_lock_take(void)
+void lwp_tid_lock_take(enum lwp_tid_lock_cmd cmd)
 {
-    DEF_RETURN_CODE(rc);
-
-    rc = lwp_mutex_take_safe(&tid_mtx, RT_WAITING_FOREVER, 0);
-    /* should never failed */
-    RT_ASSERT(rc == RT_EOK);
+    switch (cmd)
+    {
+        case LWP_TID_LOCK_READ:
+            p64_pfrwlock_acquire_rd(&tid_lock);
+            break;
+        case LWP_TID_LOCK_WRITE:
+            p64_pfrwlock_acquire_wr(&tid_lock);
+            break;
+        default:
+            RT_ASSERT(0);
+    }
 }
 
-void lwp_tid_lock_release(void)
+void lwp_tid_lock_release(enum lwp_tid_lock_cmd cmd)
 {
-    DEF_RETURN_CODE(rc);
-
-    rc = lwp_mutex_release_safe(&tid_mtx);
-    /* should never failed */
-    RT_ASSERT(rc == RT_EOK);
+    switch (cmd)
+    {
+        case LWP_TID_LOCK_READ:
+            p64_pfrwlock_release_rd(&tid_lock);
+            break;
+        case LWP_TID_LOCK_WRITE:
+            p64_pfrwlock_release_wr(&tid_lock);
+            break;
+        default:
+            RT_ASSERT(0);
+    }
 }
 
 int lwp_tid_get(void)
@@ -65,7 +81,7 @@ int lwp_tid_get(void)
     struct lwp_avl_struct *p;
     int tid = 0;
 
-    lwp_tid_lock_take();
+    lwp_tid_lock_take(LWP_TID_LOCK_WRITE);
     p = lwp_tid_free_head;
     if (p)
     {
@@ -104,7 +120,7 @@ int lwp_tid_get(void)
         lwp_avl_insert(p, &lwp_tid_root);
         current_tid = tid;
     }
-    lwp_tid_lock_release();
+    lwp_tid_lock_release(LWP_TID_LOCK_WRITE);
     return tid;
 }
 
@@ -112,7 +128,7 @@ void lwp_tid_put(int tid)
 {
     struct lwp_avl_struct *p;
 
-    lwp_tid_lock_take();
+    lwp_tid_lock_take(LWP_TID_LOCK_WRITE);
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
     {
@@ -121,14 +137,14 @@ void lwp_tid_put(int tid)
         p->avl_right = lwp_tid_free_head;
         lwp_tid_free_head = p;
     }
-    lwp_tid_lock_release();
+    lwp_tid_lock_release(LWP_TID_LOCK_WRITE);
 }
 
 rt_thread_t lwp_tid_get_thread_locked(int tid)
 {
     struct lwp_avl_struct *p;
     rt_thread_t thread = RT_NULL;
-    RT_ASSERT(rt_mutex_owner_get(&tid_mtx) == rt_thread_self());
+    // RT_ASSERT(rt_mutex_owner_get(&tid_lock) == rt_thread_self());
 
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
@@ -142,11 +158,11 @@ void lwp_tid_set_thread(int tid, rt_thread_t thread)
 {
     struct lwp_avl_struct *p;
 
-    lwp_tid_lock_take();
+    lwp_tid_lock_take(LWP_TID_LOCK_WRITE);
     p  = lwp_avl_find(tid, lwp_tid_root);
     if (p)
     {
         p->data = thread;
     }
-    lwp_tid_lock_release();
+    lwp_tid_lock_release(LWP_TID_LOCK_WRITE);
 }

@@ -2,6 +2,7 @@ menuconfig RT_USING_LWP
     bool "light-weight process"
     depends on RT_USING_SMART
     default y
+    select RT_USING_ADT_PFRDLOCK
     help
         The lwP is a light weight process running in user mode.
 

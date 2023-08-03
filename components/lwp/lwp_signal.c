@@ -827,6 +827,8 @@ rt_err_t lwp_thread_signal_kill(rt_thread_t thread, long signo, long code, long 
     /** must be able to be suspended */
     RT_DEBUG_SCHEDULER_AVAILABLE(RT_TRUE);
 
+    LOG_D("%s(signo=%d)", __func__, signo);
+
     if (!thread || signo < 0 || signo >= _LWP_NSIG)
     {
         ret = -RT_EINVAL;
@@ -943,9 +945,11 @@ static int _dequeue_signal(rt_thread_t thread, lwp_sigset_t *mask, siginfo_t *us
 rt_err_t lwp_thread_signal_timedwait(rt_thread_t thread, lwp_sigset_t *sigset,
                                      siginfo_t *usi, struct timespec *timeout)
 {
-    struct rt_lwp *lwp = thread->lwp;
     rt_err_t ret;
     int sig;
+    lwp_sigset_t saved_sigset;
+    lwp_sigset_t blocked_sigset;
+    struct rt_lwp *lwp = thread->lwp;
 
     /**
      * @brief POSIX

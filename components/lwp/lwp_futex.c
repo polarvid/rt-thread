@@ -10,7 +10,7 @@
  *                             Coding style: remove multiple `return` in a routine
  */
 #define DBG_TAG "lwp.futex"
-#define DBG_LVL DBG_LOG
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 #include "lwp_internal.h"
@@ -199,9 +199,8 @@ static int _futex_wait(struct rt_futex *futex, struct rt_lwp *lwp, int value, co
             ret = EINTR;
         }
 
-        rt_exit_critical();
-
         LWP_UNLOCK(lwp);
+        rt_exit_critical();
 
         if (ret == RT_EOK)
         {

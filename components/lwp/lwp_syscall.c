@@ -344,13 +344,48 @@ void sys_exit(int value)
         lwp_put_to_user(clear_child_tid, &t, sizeof t);
         sys_futex(clear_child_tid, FUTEX_WAKE, 1, RT_NULL, RT_NULL, 0);
     }
+
+    LWP_LOCK(lwp);
+    /**
+     * @brief if multiple threads call exit() with failure, exit code is the
+     *        first value which is not EXIT_SUCCESS
+     */
+    if (value != EXIT_SUCCESS && WEXITSTATUS(lwp->lwp_ret) == 0)
+    {
+        lwp->lwp_ret = LWP_CREATE_STAT(value);
+    }
+    LWP_UNLOCK(lwp);
+
     lwp_terminate(lwp);
 
     main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
     if (main_thread == tid)
     {
         lwp_wait_subthread_exit();
-        lwp->lwp_ret = value;
+
+        /**
+         * @brief Wakeup parent if it's waiting for this lwp, otherwise a signal
+         *        will be sent to parent
+         *
+         * @note Critical Section
+         * - the parent lwp (RW.)
+         */
+        if (lwp->parent)
+        {
+            struct rt_thread *thread;
+            if (!rt_list_isempty(&lwp->wait_list))
+            {
+                thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
+                thread->error = RT_EOK;
+                thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
+                rt_thread_resume(thread);
+            }
+            else
+            {
+                /* children cannot detach itself and must wait for parent to take care of it */
+                lwp_signal_kill(lwp->parent, SIGCHLD, CLD_EXITED, 0);
+            }
+        }
     }
 #else
     main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
@@ -377,6 +412,7 @@ void sys_exit(int value)
      * be release before cleanup of thread
      */
     lwp_tid_put(tid->tid);
+    rt_list_remove(&tid->sibling);
     rt_thread_delete(tid);
     rt_schedule();
 
@@ -1581,7 +1617,6 @@ fail:
 }
 
 #ifdef ARCH_MM_MMU
-#include "lwp_clone.h"
 
 long _sys_clone(void *arg[])
 {
@@ -1853,13 +1888,11 @@ sysret_t _sys_fork(void)
     thread->tid = tid;
 
     LWP_LOCK(self_lwp);
-
     /* add thread to lwp process */
     rt_list_insert_after(&lwp->t_grp, &thread->sibling);
+    LWP_UNLOCK(self_lwp);
 
     lwp_children_register(self_lwp, lwp);
-
-    LWP_UNLOCK(self_lwp);
 
     /* copy origin stack */
     rt_memcpy(thread->stack_addr, self_thread->stack_addr, self_thread->stack_size);
@@ -3552,10 +3585,10 @@ sysret_t sys_tkill(int tid, int sig)
      * @note Critical Section
      * - the thread (READ. may be released at the meantime; protected by locked)
      */
-    lwp_tid_lock_take();
+    lwp_tid_lock_take(LWP_TID_LOCK_READ);
     thread = lwp_tid_get_thread_locked(tid);
     ret = lwp_thread_signal_kill(thread, sig, SI_USER, 0);
-    lwp_tid_lock_release();
+    lwp_tid_lock_release(LWP_TID_LOCK_READ);
 
     switch (ret)
     {
@@ -3681,7 +3714,23 @@ sysret_t sys_waitpid(int32_t pid, int *status, int options)
     }
     else
     {
-        ret = waitpid(pid, status, options);
+        ret = lwp_waitpid(pid, status, options);
+    }
+
+    if (ret < 0)
+    {
+        switch (ret)
+        {
+            case -RT_EINTR:
+                ret = -EINTR;
+                break;
+            case -RT_ERROR:
+                ret = -ECHILD;
+                break;
+            default:
+                ret = -EINVAL;
+                break;
+        }
     }
 #else
     if (!lwp_user_accessable((void *)status, sizeof(int)))
@@ -4784,7 +4833,7 @@ sysret_t sys_sched_setscheduler(int tid, int policy, void *param)
     }
     else
     {
-        lwp_tid_lock_take();
+        lwp_tid_lock_take(LWP_TID_LOCK_READ);
         thread = lwp_tid_get_thread_locked(tid);
 
         /**
@@ -4792,7 +4841,7 @@ sysret_t sys_sched_setscheduler(int tid, int policy, void *param)
          * ff0c14824499324d025fbc110f6b38f0f33e4040
          */
         ret = rt_thread_control(thread, RT_THREAD_CTRL_CHANGE_PRIORITY, (void *)&sched_param->sched_priority);
-        lwp_tid_lock_release();
+        lwp_tid_lock_release(LWP_TID_LOCK_READ);
 
         RT_ASSERT(ret == RT_EOK);
         ret = 0;
@@ -4813,11 +4862,11 @@ sysret_t sys_sched_getscheduler(int tid, int *policy, void *param)
     }
     else
     {
-        lwp_tid_lock_take();
+        lwp_tid_lock_take(LWP_TID_LOCK_READ);
         thread = lwp_tid_get_thread_locked(tid);
         /** this operation is done as atomic op on mordern cpu */
         sched_param->sched_priority = thread->current_priority;
-        lwp_tid_lock_release();
+        lwp_tid_lock_release(LWP_TID_LOCK_READ);
 
         *policy = 0;
         ret = 0;

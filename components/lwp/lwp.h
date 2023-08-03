@@ -64,6 +64,12 @@ struct rt_lwp_objs
     struct rt_mem_obj mem_obj;
 };
 
+#ifdef RT_USING_MUSLLIBC
+#define LWP_CREATE_STAT(exit_code) (((exit_code) & 0xff) << 8)
+#else
+#error "No compatible lwp set status provided"
+#endif
+
 struct rt_lwp
 {
 #ifdef ARCH_MM_MMU
@@ -147,6 +153,12 @@ enum lwp_exit_request_type
     LWP_EXIT_REQUEST_TRIGGERED,
     LWP_EXIT_REQUEST_IN_PROCESS,
 };
+
+enum lwp_tid_lock_cmd {
+    LWP_TID_LOCK_READ,
+    LWP_TID_LOCK_WRITE,
+};
+
 struct termios *get_old_termios(void);
 void lwp_setcwd(char *buf);
 char *lwp_getcwd(void);
@@ -158,8 +170,8 @@ void lwp_wait_subthread_exit(void);
 int lwp_tid_init(void);
 int lwp_tid_get(void);
 void lwp_tid_put(int tid);
-void lwp_tid_lock_take(void);
-void lwp_tid_lock_release(void);
+void lwp_tid_lock_take(enum lwp_tid_lock_cmd cmd);
+void lwp_tid_lock_release(enum lwp_tid_lock_cmd cmd);
 rt_thread_t lwp_tid_get_thread_locked(int tid);
 void lwp_tid_set_thread(int tid, rt_thread_t thread);
 

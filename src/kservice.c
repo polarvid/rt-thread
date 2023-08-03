@@ -2002,6 +2002,8 @@ void rt_assert_set_hook(void (*hook)(const char *ex, const char *func, rt_size_t
     rt_assert_hook = hook;
 }
 
+#include <backtrace.h>
+
 /**
  * The RT_ASSERT function.
  *
@@ -2027,6 +2029,7 @@ void rt_assert_handler(const char *ex_string, const char *func, rt_size_t line)
 #endif /*RT_USING_MODULE*/
         {
             rt_kprintf("(%s) assertion failed at function:%s, line number:%d \n", ex_string, func, line);
+            rt_backtrace();
             while (dummy == 0);
         }
     }

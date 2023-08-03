@@ -14,7 +14,7 @@
  */
 
 #define DBG_TAG "lwp"
-#define DBG_LVL DBG_WARNING
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 #include <rthw.h>
@@ -33,7 +33,7 @@
 #error "lwp need file system(RT_USING_DFS)"
 #endif
 
-#include "lwp.h"
+#include "lwp_internal.h"
 #include "lwp_arch.h"
 #include "lwp_arch_comm.h"
 #include "lwp_signal.h"
@@ -1061,10 +1061,8 @@ void lwp_cleanup(struct rt_thread *tid)
      *
      * @note Critical Section
      * - thread control block (RW. This should only happened when no others can
-     *   access the thread control block)
+     *   access the thread control block other than lwp tid tree)
      */
-    lwp_tid_put(tid->tid);
-    rt_list_remove(&tid->sibling);
     lwp_thread_signal_detach(&tid->signal);
 
     /* tty will be release in lwp_ref_dec() if ref is cleared */
@@ -1149,10 +1147,13 @@ struct rt_lwp *lwp_self(void)
 rt_err_t lwp_children_register(struct rt_lwp *parent, struct rt_lwp *child)
 {
     /* lwp add to children link */
+    LWP_LOCK(parent);
     child->sibling = parent->first_child;
     parent->first_child = child;
     child->parent = parent;
+    LWP_UNLOCK(parent);
 
+    LOG_D("%s(parent=%p, child=%p)", __func__, parent, child);
     /* parent holds reference to child */
     lwp_ref_inc(parent);
     /* child holds reference to parent */
@@ -1165,6 +1166,7 @@ rt_err_t lwp_children_unregister(struct rt_lwp *parent, struct rt_lwp *child)
 {
     struct rt_lwp **lwp_node;
 
+    LWP_LOCK(parent);
     lwp_node = &parent->first_child;
     while (*lwp_node != child)
     {
@@ -1173,7 +1175,9 @@ rt_err_t lwp_children_unregister(struct rt_lwp *parent, struct rt_lwp *child)
     }
     (*lwp_node) = child->sibling;
     child->parent = RT_NULL;
+    LWP_UNLOCK(parent);
 
+    LOG_D("%s(parent=%p, child=%p)", __func__, parent, child);
     lwp_ref_dec(child);
     lwp_ref_dec(parent);
 

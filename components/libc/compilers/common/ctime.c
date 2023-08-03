@@ -738,14 +738,16 @@ static void _lwp_timer_event_from_tid(struct rt_work *work, void *param)
 
     RT_ASSERT(data->tid);
 
-    lwp_tid_lock_take();
+    lwp_tid_lock_take(LWP_TID_LOCK_READ);
     thread = lwp_tid_get_thread_locked(data->tid);
+    /** The tid of thread is a READ ONLY value, but here still facing the risk of thread already been delete error */
     ret = lwp_thread_signal_kill(thread, data->signo, SI_TIMER, 0);
-    lwp_tid_lock_release();
+    /* stop others from delete thread */
+    lwp_tid_lock_release(LWP_TID_LOCK_READ);
 
     if (ret)
     {
-        LOG_W("%s: Do kill failed(tid %d) returned %d", __func__, data->tid, ret);
+        LOG_D("%s: Do kill failed(tid %d) returned %d", __func__, data->tid, ret);
     }
 }
 
@@ -759,7 +761,7 @@ static void _lwp_timer_event_from_pid(struct rt_work *work, void *param)
     lwp_pid_lock_release();
     if (ret)
     {
-        LOG_W("%s: Do kill failed(pid %d) returned %d", __func__, data->pid, ret);
+        LOG_D("%s: Do kill failed(pid %d) returned %d", __func__, data->pid, ret);
     }
 }
 
