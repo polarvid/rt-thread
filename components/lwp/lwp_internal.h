@@ -29,6 +29,7 @@ rt_err_t lwp_mutex_release_safe(rt_mutex_t mtx);
 
 #ifndef LWP_USING_CPUS_LOCK
 rt_err_t lwp_critical_enter(struct rt_lwp *lwp);
+rt_err_t lwp_critical_enter_with(struct rt_lwp *lwp, rt_mutex_t taken);
 rt_err_t lwp_critical_exit(struct rt_lwp *lwp);
 
 #define LWP_LOCK(lwp)                           \
@@ -39,6 +40,16 @@ rt_err_t lwp_critical_exit(struct rt_lwp *lwp);
         {                                       \
             RT_ASSERT(0);                       \
         }                                       \
+    } while (0)
+
+#define LWP_LOCK_WITH(lwp, child)                                       \
+    do {                                                                \
+        LOG_D("LOCK   %s", __func__);                                   \
+        RT_DEBUG_SCHEDULER_AVAILABLE(1);                                \
+        if (lwp_critical_enter_with(lwp, &child->lwp_mtx) != RT_EOK)    \
+        {                                                               \
+            RT_ASSERT(0);                                               \
+        }                                                               \
     } while (0)
 
 #define LWP_UNLOCK(lwp)                         \

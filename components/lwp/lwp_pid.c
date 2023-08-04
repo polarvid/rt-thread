@@ -1064,6 +1064,8 @@ void lwp_terminate(struct rt_lwp *lwp)
             child = lwp->first_child;
             lwp->first_child = child->sibling;
 
+            /** @note safe since the slist node is release */
+            LWP_UNLOCK(lwp);
             LWP_LOCK(child);
             child->sibling = RT_NULL;
             /* TODO: this may cause an orphan lwp */
@@ -1071,6 +1073,8 @@ void lwp_terminate(struct rt_lwp *lwp)
             LWP_UNLOCK(child);
             lwp_ref_dec(child);
             lwp_ref_dec(lwp);
+
+            LWP_LOCK(lwp);
         }
 
         level = rt_hw_interrupt_disable();

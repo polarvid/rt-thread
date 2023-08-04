@@ -423,7 +423,7 @@ void sys_exit(int value)
 /* exit group */
 void sys_exit_group(int status)
 {
-    return;
+    return sys_exit(status);
 }
 
 /* syscall: "read" ret: "ssize_t" args: "int" "void *" "size_t" */
@@ -563,6 +563,11 @@ sysret_t sys_open(const char *name, int flag, ...)
     {
         ret = GET_ERRNO();
     }
+    else
+    {
+        LOG_I("%s: pid=%ld open %s(flag=0x%x,mode=0x%x), fd=%d", __func__, lwp_self()->pid, kname
+            , flag, mode, ret);
+    }
 
     kmem_put(kname);
 
@@ -633,6 +638,8 @@ sysret_t sys_openat(int dirfd, const char *name, int flag, mode_t mode)
 /* syscall: "close" ret: "int" args: "int" */
 sysret_t sys_close(int fd)
 {
+    if (fd == 0)
+        rt_kprintf("clode fd=%d\n", fd);
     int ret = close(fd);
     return (ret < 0 ? GET_ERRNO() : ret);
 }

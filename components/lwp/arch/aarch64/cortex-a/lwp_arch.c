@@ -115,6 +115,7 @@ void *arch_signal_ucontext_restore(rt_base_t user_sp)
     struct signal_ucontext *new_sp;
     new_sp = (void *)user_sp;
 
+    LOG_D("%s", __func__);
     if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
     {
         lwp_thread_signal_mask(rt_thread_self(), LWP_SIG_MASK_CMD_SET_MASK, &new_sp->save_sigmask, RT_NULL);
@@ -135,6 +136,7 @@ void *arch_signal_ucontext_save(rt_base_t user_sp, siginfo_t *psiginfo,
     struct signal_ucontext *new_sp;
     new_sp = (void *)(user_sp - sizeof(struct signal_ucontext));
 
+    LOG_D("%s", __func__);
     if (lwp_user_accessable(new_sp, sizeof(*new_sp)))
     {
         /* push psiginfo */

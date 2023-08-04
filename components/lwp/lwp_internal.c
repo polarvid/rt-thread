@@ -15,16 +15,7 @@
 #include <backtrace.h>
 #include "lwp_internal.h"
 
-/**
- * @brief TODO
- * @note TODO: Dead lock detect, if hangup for someone waiting for it
- *
- * @param mtx 
- * @param timeout 
- * @param interruptable 
- * @return rt_err_t 
- */
-rt_err_t lwp_mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t interruptable)
+rt_err_t lwp_mutex_take_safe_with(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t interruptable, rt_mutex_t taken)
 {
     DEF_RETURN_CODE(rc);
     rt_thread_t thread = rt_thread_self();
@@ -38,14 +29,23 @@ rt_err_t lwp_mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t inter
 
         if (!rt_list_isempty(&(thread->taken_object_list)) && timeout != 0)
         {
+            int exception = 0;
             rt_list_for_each(node, &(thread->taken_object_list))
             {
                 mutex = rt_list_entry(node, struct rt_mutex, taken_list);
-                LOG_W("Potential dead lock - Taken: %s, Try take: %s",
-                    mutex->parent.parent.name, mtx->parent.parent.name);
+                if (mutex != taken)
+                {
+                    exception = 1;
+                    LOG_W("Potential dead lock - Taken: %s, Try take: %s",
+                        mutex->parent.parent.name, mtx->parent.parent.name);
+                }
             }
-            rt_backtrace();
-            timeout = 0;
+
+            if (exception)
+            {
+                rt_backtrace();
+                timeout = 0;
+            }
         }
 
         if (interruptable)
@@ -83,6 +83,22 @@ rt_err_t lwp_mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t inter
     RETURN(rc);
 }
 
+/**
+ * @brief TODO
+ * @note TODO: Dead lock detect, if hangup for someone waiting for it
+ *
+ * @param mtx 
+ * @param timeout 
+ * @param interruptable 
+ * @return rt_err_t 
+ */
+rt_err_t lwp_mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t interruptable)
+{
+    DEF_RETURN_CODE(rc);
+    rc = lwp_mutex_take_safe_with(mtx, timeout, interruptable, 0);
+    RETURN(rc);
+}
+
 rt_err_t lwp_mutex_release_safe(rt_mutex_t mtx)
 {
     DEF_RETURN_CODE(rc);
@@ -99,6 +115,11 @@ rt_err_t lwp_mutex_release_safe(rt_mutex_t mtx)
     // }
 
     RETURN(rc);
+}
+
+rt_err_t lwp_critical_enter_with(struct rt_lwp *lwp, rt_mutex_t taken)
+{
+    return lwp_mutex_take_safe_with(&lwp->lwp_mtx, RT_WAITING_FOREVER, 0, taken);
 }
 
 rt_err_t lwp_critical_enter(struct rt_lwp *lwp)
