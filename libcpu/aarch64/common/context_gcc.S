@@ -9,10 +9,14 @@
  * 2023-06-24     WangXiaoyao  Support backtrace for user thread
  */
 
+#ifndef __ASSEMBLY__
+#define __ASSEMBLY__
+#endif
+
 #include "rtconfig.h"
 #include "asm-generic.h"
-
 #include "asm-fpu.h"
+#include "armv8.h"
 
 .text
 .weak rt_hw_cpu_id_set
@@ -387,6 +391,16 @@ vector_fiq:
 1:
 .endm
 
+.macro RESTORE_USER_CTX, ctx
+    LDR     X1, [\ctx, #CONTEXT_OFFSET_SPSR_EL1]
+    AND     X1, X1, 0x1f
+    CMP     X1, XZR
+
+    BNE     1f
+    BL      lwp_uthread_ctx_restore
+1:
+.endm
+
 .globl vector_irq
 vector_irq:
     SAVE_CONTEXT
@@ -399,7 +413,8 @@ vector_irq:
 #endif
     BL      rt_hw_trap_irq
 #ifdef RT_USING_LWP
-    BL      lwp_uthread_ctx_restore
+    LDP     X0, X1, [SP]
+    RESTORE_USER_CTX X0
 #endif
     BL      rt_interrupt_leave
 
@@ -540,7 +555,8 @@ START_POINT(vector_exception)
 
     BL      rt_hw_trap_exception
 #ifdef RT_USING_LWP
-    BL      lwp_uthread_ctx_restore
+    LDP     X0, X1, [SP]
+    RESTORE_USER_CTX X0
 #endif
 
     LDP     X0, X1, [SP], #0x10

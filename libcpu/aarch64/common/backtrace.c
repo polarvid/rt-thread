@@ -15,6 +15,7 @@
 #include <rtthread.h>
 #include <backtrace.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define BT_NESTING_MAX 100
 
@@ -121,43 +122,6 @@ int rt_backtrace_user_thread(rt_thread_t thread)
 
 #endif /* RT_USING_SMART */
 
-static long custom_hex_to_long(const char* hex)
-{
-    long result = 0;
-    int i = 0;
-
-    // Skip the "0x" prefix
-    if (hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
-    {
-        i = 2;
-    }
-
-    // Convert each hex digit to its decimal value
-    for (; hex[i] != '\0'; i++)
-    {
-        char digit = hex[i];
-        if (digit >= '0' && digit <= '9')
-        {
-            result = result * 16 + (digit - '0');
-        }
-        else if (digit >= 'a' && digit <= 'f')
-        {
-            result = result * 16 + (digit - 'a' + 10);
-        }
-        else if (digit >= 'A' && digit <= 'F')
-        {
-            result = result * 16 + (digit - 'A' + 10);
-        }
-        else
-        {
-            // Invalid hex digit
-            return 0;
-        }
-    }
-
-    return result;
-}
-
 static void cmd_backtrace(int argc, char** argv)
 {
     long pid;
@@ -170,12 +134,13 @@ static void cmd_backtrace(int argc, char** argv)
 
     if (strncmp(argv[1], "0x", 2) == 0)
     {
-        pid = custom_hex_to_long(argv[1]);
+        sscanf(argv[1], "0x%lx", &pid);
     }
     else
     {
         pid = atol(argv[1]);
     }
+
     if (pid)
     {
         rt_kprintf("backtrace %s(0x%lx), from %s\n", ((rt_thread_t)pid)->parent.name, pid, argv[1]);
