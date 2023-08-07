@@ -955,8 +955,13 @@ FINSH_FUNCTION_EXPORT_ALIAS(chdir, cd, change current working directory);
 int access(const char *path, int amode)
 {
     struct stat sb;
-    if (stat(path, &sb) < 0)
+    int rc;
+    rc = stat(path, &sb);
+    if (rc < 0 && rc != -ENOSYS)
+    {
+        rt_kprintf("rc = %ld\n", rc);
         return -1; /* already sets errno */
+    }
 
     /* ignore R_OK,W_OK,X_OK condition */
     return 0;

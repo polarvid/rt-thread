@@ -64,16 +64,17 @@
 #define RT_CONSOLE_DEVICE_NAME "uart0"
 #define RT_VER_NUM 0x50001
 #define RT_USING_STDC_ATOMIC
-
-/* RT-Thread Architecture */
-
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
+#define RT_USING_CPU_FFS
 #define ARCH_MM_MMU
 #define ARCH_ARM
 #define ARCH_ARM_MMU
 #define KERNEL_VADDR_START 0xffff000000000000
 #define ARCH_ARMV8
+
+/* AArch64 Architecture Configuration */
+
 #define ARCH_TEXT_OFFSET 0x80000
 #define ARCH_RAM_OFFSET 0x40000000
 #define ARCH_SECONDARY_CPU_STACK_SIZE 4096
@@ -126,8 +127,8 @@
 #define RT_USING_DFS_DEVFS
 #define RT_USING_DFS_ROMFS
 #define RT_USING_LWP
-#define RT_LWP_MAX_NR 30
-#define LWP_TASK_STACK_SIZE 16384
+#define RT_LWP_MAX_NR 64
+#define LWP_TASK_STACK_SIZE 8192
 #define RT_CH_MSG_MAX_NR 1024
 #define LWP_CONSOLE_INPUT_BUFFER_SIZE 1024
 #define LWP_TID_MAX_NR 64

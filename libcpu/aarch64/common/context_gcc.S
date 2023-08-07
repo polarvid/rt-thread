@@ -390,7 +390,7 @@ vector_fiq:
 
 .macro SAVE_USER_CTX
     MRS     X1, SPSR_EL1
-    AND     X1, X1, 0xf
+    AND     X1, X1, 0x1f
     CMP     X1, XZR
 
     BNE     1f
@@ -425,6 +425,7 @@ START_POINT(vector_irq)
     LDP     X0, X1, [SP], #0x10
     BL      rt_scheduler_do_irq_switch
     B       rt_hw_context_switch_exit
+START_POINT_END(vector_irq)
 
 .global rt_hw_context_switch_exit
 rt_hw_context_switch_exit:

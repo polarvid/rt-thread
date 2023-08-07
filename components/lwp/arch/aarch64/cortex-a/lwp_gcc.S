@@ -92,11 +92,16 @@ arch_crt_start_umode:
     msr elr_el1, x1
     eret
 
-/*
-void arch_set_thread_context(void *exit_addr, void *new_thread_stack, void *user_stack, void **thread_sp);
-*/
+/**
+ * @brief entry point of the new thread in fork and clone routine
+ * void
+ * arch_set_thread_context(
+ *    void *exit_addr, void *new_thread_stack, void *user_stack, void **thread_sp);
+ */
+#if 0
 .global arch_set_thread_context
 arch_set_thread_context:
+    and x1, x1, #~0x10
     sub x1, x1, #CONTEXT_SIZE
     str x2, [x1, #CONTEXT_OFFSET_SP_EL0]
     sub x1, x1, #CONTEXT_SIZE
@@ -106,6 +111,7 @@ arch_set_thread_context:
     str x0, [x1, #CONTEXT_OFFSET_ELR_EL1]
     str x1, [x3]
     ret
+#endif
 
 .global arch_get_user_sp
 arch_get_user_sp:
