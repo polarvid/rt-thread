@@ -404,9 +404,10 @@ void lwp_free(struct rt_lwp* lwp)
      * access to it, it cannot freed itself until its parent clear their ref to
      * it.
      *
-     * @note if someone can access the lwp, it's ridiculous to mark a flag
-     * because this will do the writing operation which is definitely exclusive
+     * @note after the pid is released, no one else can access the lwp
      */
+    lwp_pid_put(lwp_to_pid(lwp));
+    LWP_LOCK(lwp);
 
     if (lwp->args != RT_NULL)
     {
@@ -429,7 +430,6 @@ void lwp_free(struct rt_lwp* lwp)
 
     lwp_user_object_clear(lwp);
     lwp_user_object_lock_destroy(lwp);
-    rt_mutex_detach(&lwp->lwp_mtx);
 
     /* free data section */
     if (lwp->data_entry != RT_NULL)
@@ -490,7 +490,8 @@ void lwp_free(struct rt_lwp* lwp)
     }
 
     timer_list_free(&lwp->timer);
-    lwp_pid_put(lwp_to_pid(lwp));
+    LWP_UNLOCK(lwp);
+    rt_mutex_detach(&lwp->lwp_mtx);
 
     rt_free(lwp);
 }
@@ -509,7 +510,7 @@ int lwp_ref_dec(struct rt_lwp *lwp)
     int ref;
 
     ref = rt_atomic_add(&lwp->ref, -1);
-    LOG_D("%s(%p(%s)): before %d", __func__, lwp, lwp->cmd, ref);
+    LOG_D("%s(%p(%s)): before ref=%d", __func__, lwp, lwp->cmd, ref);
 
     if (ref == 1)
     {
