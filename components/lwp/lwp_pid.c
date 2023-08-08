@@ -127,7 +127,11 @@ static pid_t lwp_pid_get_locked(void)
 static void lwp_pid_put_locked(pid_t pid)
 {
     struct lwp_avl_struct *p;
-    RT_ASSERT(rt_mutex_owner_get(&pid_mtx) == rt_thread_self());
+
+    if (pid == 0)
+    {
+        return;
+    }
 
     p  = lwp_avl_find(pid, lwp_pid_root);
     if (p)
