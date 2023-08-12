@@ -518,7 +518,7 @@ struct rt_object
 #endif /* RT_USING_MODULE */
 
 #ifdef RT_USING_SMART
-    int         lwp_ref_count;                           /**< ref count for lwp */
+    rt_atomic_t lwp_ref_count_at;                           /**< ref count for lwp */
 #endif /* RT_USING_SMART */
 
     rt_list_t   list;                                    /**< list node of kernel object */
@@ -948,6 +948,8 @@ struct rt_thread
     struct rt_wakeup            wakeup;                 /**< wakeup data */
     int                         exit_request;
     int                         tid;
+    int                         tid_ref;
+    void                        *susp_putter;
 
     rt_uint64_t                 user_time;
     rt_uint64_t                 system_time;

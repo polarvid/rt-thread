@@ -178,6 +178,7 @@ struct rt_spinlock
 {
     rt_hw_spinlock_t lock;
 };
+typedef struct rt_spinlock rt_spinlock_t;
 
 void rt_hw_spin_lock_init(rt_hw_spinlock_t *lock);
 void rt_hw_spin_lock(rt_hw_spinlock_t *lock);

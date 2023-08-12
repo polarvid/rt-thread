@@ -94,11 +94,16 @@ arch_crt_start_umode:
     msr elr_el1, x1
     eret
 
-/*
-void arch_set_thread_context(void *exit_addr, void *new_thread_stack, void *user_stack, void **thread_sp);
-*/
+/**
+ * @brief entry point of the new thread in fork and clone routine
+ * void
+ * arch_set_thread_context(
+ *    void *exit_addr, void *new_thread_stack, void *user_stack, void **thread_sp);
+ */
+#if 0
 .global arch_set_thread_context
 arch_set_thread_context:
+    and x1, x1, #~0x10
     sub x1, x1, #CONTEXT_SIZE
     str x2, [x1, #CONTEXT_OFFSET_SP_EL0]
     sub x1, x1, #CONTEXT_SIZE
@@ -108,6 +113,7 @@ arch_set_thread_context:
     str x0, [x1, #CONTEXT_OFFSET_ELR_EL1]
     str x1, [x3]
     ret
+#endif
 
 .global arch_get_user_sp
 arch_get_user_sp:
@@ -195,8 +201,9 @@ arch_syscall_exit:
     add sp, sp, #0x40
     RESTORE_FPU sp
 
-/* the sp is reset to the outer most level, irq and fiq are disabled */
+/* the sp is reset to the outer most level, irq and fiq is disabled */
 START_POINT(arch_ret_to_user)
+    msr daifset, #3
     /* save exception frame */
     SAVE_FPU sp
     stp x0, x1, [sp, #-0x10]!
@@ -226,6 +233,7 @@ START_POINT(arch_ret_to_user)
     bl lwp_check_exit_request
     cbz w0, 1f
     /* exit on event */
+    msr daifclr, #3
     mov x0, xzr
     b sys_exit
 1:
@@ -397,7 +405,6 @@ lwp_check_debug_quit:
     ret
 
 arch_signal_quit:
-    msr daifset, #3
 
     /* drop current exception frame */
     add sp, sp, #CONTEXT_SIZE
@@ -405,6 +412,12 @@ arch_signal_quit:
     bl  arch_signal_ucontext_restore
     add x0, x0, #-CONTEXT_SIZE
     msr sp_el0, x0
+
+    /**
+     * @note Since we will reset spsr, but the reschedule will
+     * corrupt the spsr, we diable irq for a short period here
+     */
+    msr daifset, #3
 
     /* restore previous exception frame */
     msr spsel, #0
@@ -501,6 +514,7 @@ arch_thread_signal_enter:
 
     /**
      * handler(signo, psi, ucontext);
+     *
      */
     eret
 

@@ -13,8 +13,8 @@
  * 2023-02-20     wangxiaoyao  fix bug on foreground app switch
  */
 
-#define DBG_TAG "LWP"
-#define DBG_LVL DBG_WARNING
+#define DBG_TAG "lwp"
+#define DBG_LVL DBG_LOG
 #include <rtdbg.h>
 
 #include <rthw.h>
@@ -33,7 +33,7 @@
 #error "lwp need file system(RT_USING_DFS)"
 #endif
 
-#include "lwp.h"
+#include "lwp_internal.h"
 #include "lwp_arch.h"
 #include "lwp_arch_comm.h"
 #include "lwp_signal.h"
@@ -66,6 +66,19 @@ struct termios *get_old_termios(void)
 {
     return &old_stdin_termios;
 }
+
+int lwp_component_init(void)
+{
+    int rc;
+    if ((rc = lwp_tid_init()) != RT_EOK)
+    {
+    }
+    else if ((rc = lwp_pid_init()) != RT_EOK)
+    {
+    }
+    return rc;
+}
+INIT_COMPONENT_EXPORT(lwp_component_init);
 
 void lwp_setcwd(char *buf)
 {
@@ -842,7 +855,7 @@ static int load_elf(int fd, int len, struct rt_lwp *lwp, uint8_t *load_addr, str
                 {
                     pa = lwp_v2p(lwp, va);
                     va_self = (void *)((char *)pa - PV_OFFSET);
-                    LOG_D("va_self = %p pa = %p", va_self, pa);
+                    // LOG_D("va_self = %p pa = %p", va_self, pa);
                     tmp_len = (size < ARCH_PAGE_SIZE) ? size : ARCH_PAGE_SIZE;
                     tmp_len = load_fread(va_self, 1, tmp_len, fd);
                     rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, va_self, tmp_len);
@@ -1032,7 +1045,6 @@ out:
 /* lwp thread clean up */
 void lwp_cleanup(struct rt_thread *tid)
 {
-    rt_base_t level;
     struct rt_lwp *lwp;
 
     if (tid == NULL)
@@ -1043,15 +1055,15 @@ void lwp_cleanup(struct rt_thread *tid)
     else
         LOG_D("cleanup thread: %s, stack_addr: 0x%x", tid->parent.name, tid->stack_addr);
 
-    level = rt_hw_interrupt_disable();
+    /**
+     * @brief lwp thread cleanup
+     *
+     * @note Critical Section
+     * - thread control block (RW. It's ensure that no one else can access tcb
+     *   other than itself, because the thread)
+     */
     lwp = (struct rt_lwp *)tid->lwp;
-
-    /* lwp thread cleanup */
-    lwp_tid_put(tid->tid);
-    rt_list_remove(&tid->sibling);
     lwp_thread_signal_detach(&tid->signal);
-
-    rt_hw_interrupt_enable(level);
 
     /* tty will be release in lwp_ref_dec() if ref is cleared */
     lwp_ref_dec(lwp);
@@ -1132,10 +1144,49 @@ struct rt_lwp *lwp_self(void)
     return RT_NULL;
 }
 
+rt_err_t lwp_children_register(struct rt_lwp *parent, struct rt_lwp *child)
+{
+    /* lwp add to children link */
+    LWP_LOCK(parent);
+    child->sibling = parent->first_child;
+    parent->first_child = child;
+    child->parent = parent;
+    LWP_UNLOCK(parent);
+
+    LOG_D("%s(parent=%p, child=%p)", __func__, parent, child);
+    /* parent holds reference to child */
+    lwp_ref_inc(parent);
+    /* child holds reference to parent */
+    lwp_ref_inc(child);
+
+    return 0;
+}
+
+rt_err_t lwp_children_unregister(struct rt_lwp *parent, struct rt_lwp *child)
+{
+    struct rt_lwp **lwp_node;
+
+    LWP_LOCK(parent);
+    lwp_node = &parent->first_child;
+    while (*lwp_node != child)
+    {
+        RT_ASSERT(*lwp_node != RT_NULL);
+        lwp_node = &(*lwp_node)->sibling;
+    }
+    (*lwp_node) = child->sibling;
+    child->parent = RT_NULL;
+    LWP_UNLOCK(parent);
+
+    LOG_D("%s(parent=%p, child=%p)", __func__, parent, child);
+    lwp_ref_dec(child);
+    lwp_ref_dec(parent);
+
+    return 0;
+}
+
 pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
 {
     int result;
-    rt_base_t level;
     struct rt_lwp *lwp;
     char *thread_name;
     char *argv_last = argv[argc - 1];
@@ -1230,7 +1281,6 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
             lwp_tid_set_thread(tid, thread);
             LOG_D("lwp kernel => (0x%08x, 0x%08x)\n", (rt_size_t)thread->stack_addr,
                     (rt_size_t)thread->stack_addr + thread->stack_size);
-            level = rt_hw_interrupt_disable();
             self_lwp = lwp_self();
             if (self_lwp)
             {
@@ -1238,9 +1288,7 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
                 lwp->__pgrp = tid;
                 lwp->session = self_lwp->session;
                 /* lwp add to children link */
-                lwp->sibling = self_lwp->first_child;
-                self_lwp->first_child = lwp;
-                lwp->parent = self_lwp;
+                lwp_children_register(self_lwp, lwp);
             }
             else
             {
@@ -1330,7 +1378,6 @@ pid_t lwp_execve(char *filename, int debug, int argc, char **argv, char **envp)
                 lwp->debug = debug;
                 rt_thread_control(thread, RT_THREAD_CTRL_BIND_CPU, (void*)0);
             }
-            rt_hw_interrupt_enable(level);
 
             rt_thread_startup(thread);
             return lwp_to_pid(lwp);

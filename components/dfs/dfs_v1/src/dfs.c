@@ -258,7 +258,7 @@ int fdt_fd_new(struct dfs_fdtable *fdt)
     dfs_file_lock();
 
     /* find an empty fd entry */
-    idx = fd_alloc(fdt, DFS_STDIO_OFFSET);
+    idx = fd_alloc(fdt, 0);
 
     /* can't find an empty fd entry */
     if (idx < 0)
@@ -800,11 +800,13 @@ struct dfs_fdtable *dfs_fdtable_get_pid(int pid)
     struct rt_lwp *lwp = RT_NULL;
     struct dfs_fdtable *fdt = RT_NULL;
 
-    lwp = lwp_from_pid(pid);
+    lwp_pid_lock_take();
+    lwp = lwp_from_pid_locked(pid);
     if (lwp)
     {
         fdt = &lwp->fdt;
     }
+    lwp_pid_lock_release();
 
     return fdt;
 }
