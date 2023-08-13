@@ -1188,12 +1188,26 @@ rt_base_t sys_brk(void *addr)
 void *sys_mmap2(void *addr, size_t length, int prot,
         int flags, int fd, off_t pgoffset)
 {
-    return lwp_mmap2(addr, length, prot, flags, fd, pgoffset);
+    sysret_t rc = 0;
+
+    /* aligned for user addr */
+    if ((rt_base_t)addr & ARCH_PAGE_MASK)
+    {
+        if (flags & MAP_FIXED)
+            rc = -EINVAL;
+        else
+            addr = (void *)RT_ALIGN_DOWN((rt_base_t)addr, ARCH_PAGE_SIZE);
+    }
+
+    if (rc == 0)
+        rc = (sysret_t)lwp_mmap2(lwp_self(), addr, length, prot, flags, fd, pgoffset);
+
+    return (void *)rc;
 }
 
 sysret_t sys_munmap(void *addr, size_t length)
 {
-    return lwp_munmap(addr);
+    return lwp_munmap(lwp_self(), addr);
 }
 
 void *sys_mremap(void *old_address, size_t old_size,

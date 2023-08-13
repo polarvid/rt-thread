@@ -57,6 +57,9 @@
 #define MAP_FIXED_NOREPLACE 0x100000
 #define MAP_FILE       0
 
+#define MAP_UNINITIALIZED 0x4000000 /** For anonymous mmap, memory could be
+					                 * uninitialized */
+
 #define MAP_HUGE_SHIFT 26
 #define MAP_HUGE_MASK  0x3f
 #define MAP_HUGE_16KB  (14 << 26)
