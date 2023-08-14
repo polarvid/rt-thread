@@ -92,6 +92,7 @@
 #define MMU_MAP_U_RWCB          PTE_WRAP(PAGE_ATTR_CB | PTE_U | PAGE_ATTR_RWX | PTE_V)
 #define MMU_MAP_U_RWCB_XN       PTE_WRAP(PAGE_ATTR_CB | PTE_U | PAGE_ATTR_XN | PTE_V)
 #define MMU_MAP_U_RW            PTE_WRAP(PTE_U | PAGE_ATTR_RWX | PTE_V)
+#define MMU_MAP_TRACE(attr)     (attr)
 
 #define PTE_XWR_MASK            0xe
 

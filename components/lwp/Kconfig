@@ -6,6 +6,10 @@ menuconfig RT_USING_LWP
         The lwP is a light weight process running in user mode.
 
 if RT_USING_LWP
+    config LWP_PAGE_RECYCLER
+        bool "Page recycler subsystem for kernel memory management"
+        default false
+
     config RT_LWP_MAX_NR
         int "The max number of light-weight process"
         default 30

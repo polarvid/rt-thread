@@ -1782,6 +1782,7 @@ static int lwp_copy_files(struct rt_lwp *dst, struct rt_lwp *src)
     return -RT_ERROR;
 }
 
+/* TODO: support mem_obj based duplication of process image */
 sysret_t _sys_fork(void)
 {
     rt_base_t level;

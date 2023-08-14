@@ -8,6 +8,7 @@
  * 2012-01-10     bernard      porting to AM1808
  * 2021-11-28     GuEe-GUI     first version
  * 2022-12-10     WangXiaoyao  porting to MM
+ * 2023-08-14     Shell        Supporting page recycler
  */
 #include <rthw.h>
 #include <rtthread.h>

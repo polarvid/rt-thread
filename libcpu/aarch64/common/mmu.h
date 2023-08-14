@@ -38,18 +38,23 @@ struct mem_desc
 #define MMU_AP_KAUA      1UL /* kernel r/w, user r/w */
 #define MMU_AP_KRUN      2UL /* kernel r, user none */
 #define MMU_AP_KRUR      3UL /* kernel r, user r */
+#define MMU_ATTR_AF      (1ul << MMU_AF_SHIFT)  /* the access flag */
+#define MMU_ATTR_DBM     (1ul << 51)            /* the dirty bit modifier */
 
 #define MMU_MAP_CUSTOM(ap, mtype)                                              \
     ((0x1UL << MMU_AF_SHIFT) | (0x2UL << MMU_SHARED_SHIFT) |                   \
      ((ap) << MMU_AP_SHIFT) | ((mtype) << MMU_MA_SHIFT))
-#define MMU_MAP_K_RO     MMU_MAP_CUSTOM(MMU_AP_KRUN, NORMAL_MEM)
-#define MMU_MAP_K_RWCB   MMU_MAP_CUSTOM(MMU_AP_KAUN, NORMAL_MEM)
-#define MMU_MAP_K_RW     MMU_MAP_CUSTOM(MMU_AP_KAUN, NORMAL_NOCACHE_MEM)
-#define MMU_MAP_K_DEVICE MMU_MAP_CUSTOM(MMU_AP_KAUN, DEVICE_MEM)
-#define MMU_MAP_U_RO     MMU_MAP_CUSTOM(MMU_AP_KRUR, NORMAL_NOCACHE_MEM)
-#define MMU_MAP_U_RWCB   MMU_MAP_CUSTOM(MMU_AP_KAUA, NORMAL_MEM)
-#define MMU_MAP_U_RW     MMU_MAP_CUSTOM(MMU_AP_KAUA, NORMAL_NOCACHE_MEM)
-#define MMU_MAP_U_DEVICE MMU_MAP_CUSTOM(MMU_AP_KAUA, DEVICE_MEM)
+#define MMU_MAP_K_ROCB      MMU_MAP_CUSTOM(MMU_AP_KRUN, NORMAL_MEM)
+#define MMU_MAP_K_RO        MMU_MAP_CUSTOM(MMU_AP_KRUN, NORMAL_NOCACHE_MEM)
+#define MMU_MAP_K_RWCB      MMU_MAP_CUSTOM(MMU_AP_KAUN, NORMAL_MEM)
+#define MMU_MAP_K_RW        MMU_MAP_CUSTOM(MMU_AP_KAUN, NORMAL_NOCACHE_MEM)
+#define MMU_MAP_K_DEVICE    MMU_MAP_CUSTOM(MMU_AP_KAUN, DEVICE_MEM)
+#define MMU_MAP_U_ROCB      MMU_MAP_CUSTOM(MMU_AP_KRUR, NORMAL_MEM)
+#define MMU_MAP_U_RO        MMU_MAP_CUSTOM(MMU_AP_KRUR, NORMAL_NOCACHE_MEM)
+#define MMU_MAP_U_RWCB      MMU_MAP_CUSTOM(MMU_AP_KAUA, NORMAL_MEM)
+#define MMU_MAP_U_RW        MMU_MAP_CUSTOM(MMU_AP_KAUA, NORMAL_NOCACHE_MEM)
+#define MMU_MAP_U_DEVICE    MMU_MAP_CUSTOM(MMU_AP_KAUA, DEVICE_MEM)
+#define MMU_MAP_TRACE(attr) ((attr) & ~(MMU_ATTR_AF | MMU_ATTR_DBM))
 
 #define ARCH_SECTION_SHIFT  21
 #define ARCH_SECTION_SIZE   (1 << ARCH_SECTION_SHIFT)
@@ -101,8 +106,8 @@ static inline void *rt_hw_mmu_kernel_v2p(void *v_addr)
 {
     rt_ubase_t par;
     void *paddr;
-    asm volatile("at s1e1w, %0"::"r"(v_addr):"memory");
-    asm volatile("mrs %0, par_el1":"=r"(par)::"memory");
+    __asm__ volatile("at s1e1w, %0"::"r"(v_addr):"memory");
+    __asm__ volatile("mrs %0, par_el1":"=r"(par)::"memory");
 
     if (par & 0x1)
     {

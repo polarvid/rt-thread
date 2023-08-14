@@ -57,6 +57,7 @@ rt_base_t lwp_brk(void *addr);
  */
 void* lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
 int lwp_munmap(struct rt_lwp *lwp, void *addr);
+rt_mem_obj_t lwp_get_mmap_obj(struct rt_lwp *lwp);
 
 size_t lwp_get_from_user(void *dst, void *src, size_t size);
 size_t lwp_put_to_user(void *dst, void *src, size_t size);

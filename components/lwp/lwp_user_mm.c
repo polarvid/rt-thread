@@ -536,6 +536,11 @@ rt_inline rt_size_t _attr_user_to_kernel(int prot)
     return k_attr;
 }
 
+rt_weak rt_mem_obj_t lwp_get_mmap_obj(struct rt_lwp *lwp)
+{
+    return &lwp->lwp_obj->mem_obj;
+}
+
 void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
                 int flags, int fd, off_t pgoffset)
 {
@@ -543,6 +548,7 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
     rt_size_t k_attr;
     rt_size_t k_flags;
     rt_aspace_t uspace;
+    rt_mem_obj_t mem_obj;
     void *ret = 0;
 
     if (flags & MAP_ANONYMOUS)
@@ -560,7 +566,12 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
 
         uspace = lwp_self()->aspace;
         length = RT_ALIGN(length, ARCH_PAGE_SIZE);
-        rc = rt_aspace_map(uspace, &addr, length, k_attr, k_flags, &lwp->lwp_obj->mem_obj, 0);
+        mem_obj = lwp_get_mmap_obj(lwp);
+
+        if (mem_obj)
+            rc = rt_aspace_map(uspace, &addr, length, k_attr, k_flags, mem_obj, 0);
+        else
+            rc = -RT_ENOMEM;
 
         if (rc == RT_EOK)
         {
