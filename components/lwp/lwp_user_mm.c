@@ -527,7 +527,7 @@ rt_inline rt_size_t _attr_user_to_kernel(int prot)
 {
     rt_size_t k_attr = 0;
 
-    if ((prot & PROT_EXEC) ||
+    if ((prot & PROT_EXEC) || (prot & PROT_WRITE) ||
         ((prot & PROT_READ) && (prot & PROT_WRITE)))
         k_attr = MMU_MAP_U_RWCB;
     else
@@ -574,7 +574,7 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
         if (rc == RT_EOK)
         {
             ret = addr;
-            if (!(flags & MAP_UNINITIALIZED))
+            if (!(flags & MAP_UNINITIALIZED) && (prot & PROT_WRITE))
                 memset(ret, 0, length);
         }
         else
