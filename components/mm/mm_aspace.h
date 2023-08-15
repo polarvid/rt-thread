@@ -124,6 +124,7 @@ enum rt_mmu_cntl
 #define WR_UNLOCK(aspace)                                                      \
     rt_thread_self() ? rt_mutex_release(&(aspace)->bst_lock) : 0
 
+/* FIXME: fix rd_lock */
 #define RD_LOCK(aspace)   WR_LOCK(aspace)
 #define RD_UNLOCK(aspace) WR_UNLOCK(aspace)
 

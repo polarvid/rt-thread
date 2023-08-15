@@ -403,8 +403,8 @@ static inline int _not_align(void *start, rt_size_t length, rt_size_t mask)
 /** if the flag is currently supported */
 static inline int _not_support(rt_size_t flags)
 {
-    rt_size_t support_ops = MMF_CREATE(__MMF_INVALID - 2, 0);
-    return flags & ~(support_ops | _MMF_ALIGN_MASK);
+    rt_size_t support_ops = MMF_CREATE(((__MMF_INVALID - 1) << 1) - 1, 1);
+    return flags & ~(support_ops);
 }
 
 int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
@@ -916,6 +916,7 @@ int rt_varea_unmap_range(rt_varea_t varea, void *vaddr, rt_size_t length)
         va_align = RT_ALIGN_DOWN((rt_base_t)vaddr, ARCH_PAGE_SIZE);
         rt_hw_mmu_unmap(varea->aspace, (void *)va_align, length);
         rt_hw_tlb_invalidate_range(varea->aspace, (void *)va_align, length, ARCH_PAGE_SIZE);
+        err = RT_EOK;
     }
     return err;
 }

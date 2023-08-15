@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2006-2018, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Change Logs:
  * Date           Author       Notes
  * 2021-05-12     RT-Thread    the first version
+ * 2023-08-15     Shell        Support more mapping attribution
  */
 #ifndef __MMU_H_
 #define __MMU_H_
