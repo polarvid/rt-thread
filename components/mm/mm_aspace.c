@@ -916,6 +916,7 @@ int rt_varea_unmap_range(rt_varea_t varea, void *vaddr, rt_size_t length)
         va_align = RT_ALIGN_DOWN((rt_base_t)vaddr, ARCH_PAGE_SIZE);
         rt_hw_mmu_unmap(varea->aspace, (void *)va_align, length);
         rt_hw_tlb_invalidate_range(varea->aspace, (void *)va_align, length, ARCH_PAGE_SIZE);
+        err = RT_EOK;
     }
     return err;
 }

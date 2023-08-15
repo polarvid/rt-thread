@@ -562,6 +562,7 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
     if (fd == -1)
     {
         k_flags = _flag_user_to_kernel(flags);
+        k_flags |= MMF_PREFETCH;
         k_attr = _attr_user_to_kernel(prot);
 
         uspace = lwp_self()->aspace;
@@ -667,11 +668,10 @@ size_t lwp_put_to_user(void *dst, void *src, size_t size)
     return lwp_data_put(lwp, dst, src, size);
 }
 
-int lwp_user_accessable(void *addr, size_t size)
+int lwp_user_accessible_ext(struct rt_lwp *lwp, void *addr, size_t size)
 {
     void *addr_start = RT_NULL, *addr_end = RT_NULL, *next_page = RT_NULL;
     void *tmp_addr = RT_NULL;
-    struct rt_lwp *lwp = lwp_self();
 
     if (!lwp)
     {
@@ -720,7 +720,7 @@ int lwp_user_accessable(void *addr, size_t size)
                     .fault_type = MM_FAULT_TYPE_PAGE_FAULT,
                     .fault_vaddr = addr_start,
                 };
-                if (!rt_aspace_fault_try_fix(&msg))
+                if (!rt_aspace_fault_try_fix(lwp->aspace, &msg))
                     return 0;
             }
             else
@@ -731,6 +731,11 @@ int lwp_user_accessable(void *addr, size_t size)
         next_page = (void *)((char *)next_page + ARCH_PAGE_SIZE);
     } while (addr_start < addr_end);
     return 1;
+}
+
+int lwp_user_accessable(void *addr, size_t size)
+{
+    return lwp_user_accessible_ext(lwp_self(), addr, size);
 }
 
 /* src is in mmu_info space, dst is in current thread space */
