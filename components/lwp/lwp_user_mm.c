@@ -11,6 +11,7 @@
  * 2021-02-19     lizhirui     add riscv64 support for lwp_user_accessable and lwp_get_from_user
  * 2021-06-07     lizhirui     modify user space bound check
  * 2022-12-25     wangxiaoyao  adapt to new mm
+ * 2023-08-12     Shell        Fix parameter passing of lwp_mmap()
  */
 
 #include <rtthread.h>
@@ -192,12 +193,16 @@ static void *_lwp_map_user(struct rt_lwp *lwp, void *map_va, size_t map_size,
                            int text)
 {
     void *va = map_va;
+    rt_mem_obj_t mem_obj;
     int ret = 0;
-    size_t flags = MMF_PREFETCH;
+    rt_size_t flags = MMF_PREFETCH;
+
     if (text)
         flags |= MMF_TEXT;
+    if (va != RT_NULL)
+        flags |= MMF_MAP_FIXED;
 
-    rt_mem_obj_t mem_obj = &lwp->lwp_obj->mem_obj;
+    mem_obj = &lwp->lwp_obj->mem_obj;
 
     ret = rt_aspace_map(lwp->aspace, &va, map_size, MMU_MAP_U_RWCB, flags,
                         mem_obj, 0);
@@ -506,29 +511,73 @@ rt_base_t lwp_brk(void *addr)
     return ret;
 }
 
-#define MAP_ANONYMOUS 0x20
-
-void *lwp_mmap2(void *addr, size_t length, int prot, int flags, int fd,
-                off_t pgoffset)
+rt_inline rt_size_t _flag_user_to_kernel(int flags)
 {
-    void *ret = (void *)-1;
+    rt_size_t k_flags = 0;
+    if (flags & MAP_FIXED)
+        k_flags |= MMF_MAP_FIXED;
+    if (flags & MAP_PRIVATE)
+        k_flags |= MMF_MAP_PRIVATE;
+    if (flags & MAP_SHARED)
+        k_flags |= MMF_MAP_SHARED;
+    return k_flags;
+}
+
+rt_inline rt_size_t _attr_user_to_kernel(int prot)
+{
+    rt_size_t k_attr = 0;
+
+    if ((prot & PROT_EXEC) ||
+        ((prot & PROT_READ) && (prot & PROT_WRITE)))
+        k_attr = MMU_MAP_U_RWCB;
+    else
+        k_attr = MMU_MAP_U_ROCB;
+
+    return k_attr;
+}
+
+rt_inline rt_mem_obj_t _get_mmap_obj(struct rt_lwp *lwp)
+{
+    return &lwp->lwp_obj->mem_obj;
+}
+
+void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
+                int flags, int fd, off_t pgoffset)
+{
+    rt_err_t rc;
+    rt_size_t k_attr;
+    rt_size_t k_flags;
+    rt_aspace_t uspace;
+    rt_mem_obj_t mem_obj;
+    void *ret = 0;
+
+    if (flags & MAP_ANONYMOUS)
+    {
+        fd = -1;
+        /* remove unsupported flags (those are not for anonymous mapping) */
+        flags &= ~MAP_SHARED;
+        flags &= ~MAP_PRIVATE;
+    }
 
     if (fd == -1)
     {
+        k_flags = _flag_user_to_kernel(flags);
+        k_attr = _attr_user_to_kernel(prot);
 
-        ret = lwp_map_user(lwp_self(), addr, length, 0);
+        uspace = lwp_self()->aspace;
+        length = RT_ALIGN(length, ARCH_PAGE_SIZE);
+        mem_obj = _get_mmap_obj(lwp);
+        /* Note: no offset applied to anonymous mapping */
+        rc = rt_aspace_map(uspace, &addr, length, k_attr, k_flags, mem_obj, 0);
 
-        if (ret)
+        if (rc == RT_EOK)
         {
-            if ((flags & MAP_ANONYMOUS) != 0)
-            {
-                rt_memset(ret, 0, length);
-            }
+            ret = addr;
+            if (!(flags & MAP_UNINITIALIZED))
+                memset(ret, 0, length);
         }
         else
-        {
-            ret = (void *)-1;
-        }
+            ret = (void *)lwp_errno_to_posix(rc);
     }
     else
     {
@@ -556,14 +605,10 @@ void *lwp_mmap2(void *addr, size_t length, int prot, int flags, int fd,
     return ret;
 }
 
-int lwp_munmap(void *addr)
+int lwp_munmap(struct rt_lwp *lwp, void *addr)
 {
-    int ret = 0;
-
-    rt_mm_lock();
-    ret = lwp_unmap_user(lwp_self(), addr);
-    rt_mm_unlock();
-
+    int ret;
+    ret = lwp_unmap_user(lwp, addr);
     return ret;
 }
 

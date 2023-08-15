@@ -46,6 +46,7 @@
 #define PAGE_ATTR_NEXT_LEVEL (0)
 #define PAGE_ATTR_RWX (PTE_X | PTE_W | PTE_R)
 #define PAGE_ATTR_READONLY (PTE_R)
+#define PAGE_ATTR_READWRITE (PTE_W | PTE_R)
 #define PAGE_ATTR_READEXECUTE (PTE_X | PTE_R)
 
 #define PAGE_ATTR_USER (PTE_U)
@@ -71,12 +72,15 @@
 #define ARCH_VADDR_WIDTH        39
 #define SATP_MODE               SATP_MODE_SV39
 
-#define MMU_MAP_K_DEVICE        (PTE_G | PTE_W | PTE_R | PTE_V)
-#define MMU_MAP_K_RWCB          (PTE_G | PTE_X | PTE_W | PTE_R | PTE_V)
-#define MMU_MAP_K_RW            (PTE_G | PTE_X | PTE_W | PTE_R | PTE_V)
-#define MMU_MAP_U_RWCB          (PTE_U | PTE_X | PTE_W | PTE_R | PTE_V)
-#define MMU_MAP_U_RWCB_XN       (PTE_U | PTE_W | PTE_R | PTE_V)
-#define MMU_MAP_U_RW            (PTE_U | PTE_X | PTE_W | PTE_R | PTE_V)
+#define MMU_MAP_K_DEVICE        (PTE_G | PAGE_ATTR_READWRITE | PTE_V)
+#define MMU_MAP_K_RW            (PTE_G | PAGE_ATTR_RWX | PTE_V)
+#define MMU_MAP_K_RWCB          MMU_MAP_K_RW
+#define MMU_MAP_K_RO            (PTE_G | PAGE_ATTR_READONLY | PTE_V)
+#define MMU_MAP_K_ROCB          MMU_MAP_K_RO
+#define MMU_MAP_U_ROCB          (PAGE_ATTR_USER | PAGE_ATTR_READONLY | PTE_V)
+#define MMU_MAP_U_RWCB          (PAGE_ATTR_USER | PAGE_ATTR_RWX | PTE_V)
+#define MMU_MAP_U_RWCB_XN       (PAGE_ATTR_USER | PAGE_ATTR_READWRITE | PTE_V)
+#define MMU_MAP_U_RW            (PAGE_ATTR_USER | PAGE_ATTR_RWX | PTE_V)
 
 #define PTE_XWR_MASK            0xe
 

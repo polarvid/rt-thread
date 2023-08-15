@@ -42,8 +42,21 @@ void *lwp_map_user_phy(struct rt_lwp *lwp, void *map_va, void *map_pa, size_t ma
 int lwp_unmap_user_phy(struct rt_lwp *lwp, void *va);
 
 rt_base_t lwp_brk(void *addr);
-void* lwp_mmap2(void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
-int lwp_munmap(void *addr);
+
+/**
+ * @brief Map files or devices into memory.
+ * It will create a new mapping in the virtual address space of the target lwp
+ *
+ * @param addr address from user space
+ * @param length length in bytes of mapping
+ * @param prot protect attribution of mapping
+ * @param flags flags of control
+ * @param fd file descriptor
+ * @param pgoffset offset to fd in 4096 bytes unit
+ * @return void* the address is successful, otherwise return MAP_FAILED
+ */
+void* lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
+int lwp_munmap(struct rt_lwp *lwp, void *addr);
 
 size_t lwp_get_from_user(void *dst, void *src, size_t size);
 size_t lwp_put_to_user(void *dst, void *src, size_t size);

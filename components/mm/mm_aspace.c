@@ -400,11 +400,11 @@ static inline int _not_align(void *start, rt_size_t length, rt_size_t mask)
            (((uintptr_t)start & mask) || (length & mask));
 }
 
+/** if the flag is currently supported */
 static inline int _not_support(rt_size_t flags)
 {
-    rt_size_t support_ops = (MMF_PREFETCH | MMF_MAP_FIXED | MMF_TEXT |
-        MMF_STATIC_ALLOC | MMF_REQUEST_ALIGN);
-    return flags & ~(support_ops | _MMF_ALIGN_MASK);
+    rt_size_t support_ops = MMF_CREATE(((__MMF_INVALID - 1) << 1) - 1, 1);
+    return flags & ~(support_ops);
 }
 
 int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
