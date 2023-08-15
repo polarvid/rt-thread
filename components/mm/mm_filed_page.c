@@ -30,4 +30,14 @@ void *rt_filed_page_alloc(void)
     }
 }
 
+rt_err_t rt_filed_page_register_pool(rt_filed_page_pool_t pool, rt_base_t capability)
+{
+    rt_err_t rc = RT_EOK;
+
+    rt_list_insert_after(&_dispatch_session.pool_list, &pool->list_node);
+    _dispatch_session.pool_count += 1;
+
+    return rc;
+}
+
 void rt_filed_page_free(void *va);

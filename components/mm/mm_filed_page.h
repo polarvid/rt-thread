@@ -23,7 +23,11 @@ typedef struct rt_filed_page_pool {
     /* committed page frames to user */
     rt_base_t committed_page;
 
-    void *private_data;
+    /* dispatcher access only */
+    rt_base_t id_start;
+    rt_base_t id_count;
+    rt_list_t list_node;
+
 } *rt_filed_page_pool_t;
 
 void *rt_filed_page_alloc(void);
