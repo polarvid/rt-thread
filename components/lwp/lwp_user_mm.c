@@ -32,6 +32,10 @@
 #include <mmu.h>
 #include <page.h>
 
+#ifdef RT_USING_MUSLLIBC
+#include "libc_musl.h"
+#endif
+
 #define DBG_TAG "LwP"
 #define DBG_LVL DBG_LOG
 #include <rtdbg.h>
