@@ -62,7 +62,7 @@ static void test_user_map_varea(void)
     uassert_true(varea->attr == (MMU_MAP_U_RWCB));
     uassert_true(varea->size == buf_sz);
     uassert_true(varea->aspace == lwp->aspace);
-    uassert_true(varea->flag == 0);
+    uassert_true(varea->flags == 0);
     uassert_true(varea->start != 0);
     uassert_true(varea->start >= (void *)USER_VADDR_START && varea->start < (void *)USER_VADDR_TOP);
 
@@ -86,7 +86,7 @@ static void test_user_map_varea_ext(void)
     uassert_true(varea->attr == (MMU_MAP_U_RW));
     uassert_true(varea->size == buf_sz);
     uassert_true(varea->aspace == lwp->aspace);
-    uassert_true(varea->flag == 0);
+    uassert_true(varea->flags == 0);
     uassert_true(varea->start != 0);
     uassert_true(varea->start >= (void *)USER_VADDR_START && varea->start < (void *)USER_VADDR_TOP);
 

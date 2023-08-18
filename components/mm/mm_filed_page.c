@@ -28,6 +28,7 @@ void *rt_filed_page_alloc(void)
     {
         /* choose a free page pool */
     }
+    return RT_NULL;
 }
 
 rt_err_t rt_filed_page_register_pool(rt_filed_page_pool_t pool, rt_base_t capability)

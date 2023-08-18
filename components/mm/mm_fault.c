@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2022-12-06     WangXiaoyao  the first version
  */
+#include "mm_page.h"
 #include <rtthread.h>
 
 #ifdef RT_USING_SMART
@@ -25,6 +26,72 @@
 
 #define UNRECOVERABLE 0
 #define RECOVERABLE   1
+
+static int _fix_private_mapping(rt_varea_t varea, void *pa,
+                                struct rt_aspace_fault_msg *msg)
+{
+    /**
+     * this will modified existing address space by overlapping the source mapping
+     * with a private one
+     * READ -> WRITE lock here
+     */
+
+    rt_mem_obj_t private;
+    rt_mem_obj_t source;
+    rt_aspace_t aspace;
+    void *page;
+    int error = UNRECOVERABLE;
+    source = varea->mem_obj;
+
+    if (source)
+    {
+        aspace = varea->aspace;
+        RT_ASSERT(!!aspace);
+        private = aspace->_private_obj;
+
+        if (private && varea->mem_obj->page_read)
+        {
+            page = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+            if (page)
+            {
+                struct rt_aspace_io_msg io_msg;
+
+                /** setup message & fetch the data from source object */
+                rt_mm_fault_res_init(&io_msg.response);
+                io_msg.fault_vaddr = msg->fault_vaddr;
+                io_msg.off = msg->off;
+                source->page_read(varea, &io_msg);
+                if (io_msg.response.status == MM_FAULT_STATUS_OK)
+                {
+                    io_msg.response.status = MM_FAULT_STATUS_OK;
+                    io_msg.response.vaddr = page;
+                    io_msg.response.size = ARCH_PAGE_SIZE;
+                }
+
+                if (source->on_page_offload)
+                    source->on_page_offload(varea, msg->fault_vaddr, ARCH_PAGE_SIZE);
+
+                /**
+                 * remap (before the remap, it should unmap varea. Because
+                 * other can access the varea at the meantime while we filling pages)
+                 */
+                rt_aspace_overide_map();
+            }
+        }
+    }
+
+    /**
+     * prepare to replace the existing varea, and replace the existing one
+     */
+    return error;
+}
+
+rt_inline rt_bool_t _is_writable(rt_varea_t varea)
+{
+    rt_size_t attr = varea->attr;
+    /* TODO: fix with prot, add architecture implemented API rt_hw_mmu_pte_writable() */
+    return attr == MMU_MAP_U_RW || attr == MMU_MAP_U_RWCB;
+}
 
 static int _fetch_page(rt_varea_t varea, struct rt_aspace_fault_msg *msg)
 {
@@ -47,7 +114,7 @@ static int _read_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *m
     if (msg->fault_type == MM_FAULT_TYPE_PAGE_FAULT)
     {
         RT_ASSERT(pa == ARCH_MAP_FAILED);
-        RT_ASSERT(!(varea->flag & MMF_PREFETCH));
+        RT_ASSERT(!(varea->flags & MMF_PREFETCH));
         err = _fetch_page(varea, msg);
     }
     else
@@ -63,12 +130,13 @@ static int _write_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *
     if (msg->fault_type == MM_FAULT_TYPE_PAGE_FAULT)
     {
         RT_ASSERT(pa == ARCH_MAP_FAILED);
-        RT_ASSERT(!(varea->flag & MMF_PREFETCH));
+        RT_ASSERT(!(varea->flags & MMF_PREFETCH));
         err = _fetch_page(varea, msg);
     }
     else if (msg->fault_type == MM_FAULT_TYPE_ACCESS_FAULT &&
-             varea->flag & MMF_COW)
+             _is_writable(varea) && _is_private_flag(varea->flags))
     {
+        err = _fix_private_mapping(varea, pa, msg);
     }
     else
     {
@@ -83,7 +151,7 @@ static int _exec_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *m
     if (msg->fault_type == MM_FAULT_TYPE_PAGE_FAULT)
     {
         RT_ASSERT(pa == ARCH_MAP_FAILED);
-        RT_ASSERT(!(varea->flag & MMF_PREFETCH));
+        RT_ASSERT(!(varea->flags & MMF_PREFETCH));
         err = _fetch_page(varea, msg);
     }
     return err;

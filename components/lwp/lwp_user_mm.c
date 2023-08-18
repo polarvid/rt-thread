@@ -45,19 +45,22 @@ static void _init_lwp_objs(struct rt_lwp_objs *lwp_objs, rt_aspace_t aspace);
 int lwp_user_space_init(struct rt_lwp *lwp, rt_bool_t is_fork)
 {
     int err = -RT_ENOMEM;
+    const size_t flags = 0;
 
     lwp->lwp_obj = rt_malloc(sizeof(struct rt_lwp_objs));
     if (lwp->lwp_obj)
     {
-        _init_lwp_objs(lwp->lwp_obj, lwp->aspace);
-
         err = arch_user_space_init(lwp);
         if (!is_fork && err == RT_EOK)
         {
+            _init_lwp_objs(lwp->lwp_obj, lwp->aspace);
+            rt_aspace_register_private(lwp->aspace, &lwp->lwp_obj->mem_obj);
+
             void *addr = (void *)USER_STACK_VSTART;
+            /* TODO: add stack object */
             err = rt_aspace_map(lwp->aspace, &addr,
                                 USER_STACK_VEND - USER_STACK_VSTART,
-                                MMU_MAP_U_RWCB, 0, &lwp->lwp_obj->mem_obj, 0);
+                                MMU_MAP_U_RWCB, flags, &lwp->lwp_obj->mem_obj, 0);
         }
     }
 
@@ -94,7 +97,7 @@ void lwp_unmap_user_space(struct rt_lwp *lwp)
 static const char *user_get_name(rt_varea_t varea)
 {
     char *name;
-    if (varea->flag & MMF_TEXT)
+    if (varea->flags & MMF_TEXT)
     {
         name = "user.text";
     }
@@ -134,7 +137,7 @@ static void _user_do_page_fault(struct rt_varea *varea,
             void *vaddr;
             vaddr = paddr - PV_OFFSET;
 
-            if (!(varea->flag & MMF_TEXT))
+            if (!(varea->flags & MMF_TEXT))
             {
                 void *cp = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
                 if (cp)
@@ -161,7 +164,7 @@ static void _user_do_page_fault(struct rt_varea *varea,
                 msg->response.size = ARCH_PAGE_SIZE;
             }
         }
-        else if (!(varea->flag & MMF_TEXT))
+        else if (!(varea->flags & MMF_TEXT))
         {
             /* if data segment not exist in source do a fallback */
             rt_mm_dummy_mapper.on_page_fault(varea, msg);
@@ -219,6 +222,35 @@ static void *_lwp_map_user(struct rt_lwp *lwp, void *map_va, size_t map_size,
 
     return va;
 }
+
+static const char *_anonymous_get_name(rt_varea_t varea)
+{
+    return "anonymous";
+}
+
+static void _anonymous_page_install(struct rt_varea *varea,
+                                    struct rt_aspace_fault_msg *msg)
+{
+    static void *null_page;
+    if (!null_page)
+    {
+        null_page = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+        if (null_page)
+            memset(null_page, 0, ARCH_PAGE_SIZE);
+        else
+            return;
+    }
+
+    msg->response.status = MM_FAULT_STATUS_OK;
+    msg->response.size = ARCH_PAGE_SIZE;
+    msg->response.vaddr = null_page;
+}
+
+static struct rt_mem_obj _anonymous_object = {
+    .get_name = _anonymous_get_name,
+    .hint_free = RT_NULL,
+    .on_page_fault = _anonymous_page_install,
+};
 
 int lwp_unmap_user(struct rt_lwp *lwp, void *va)
 {
@@ -297,8 +329,7 @@ int lwp_dup_user(rt_varea_t varea, void *arg)
         /* duplicate a mem_obj backing mapping */
         va = varea->start;
         err = rt_aspace_map(new_lwp->aspace, &va, varea->size, varea->attr,
-                            varea->flag, &new_lwp->lwp_obj->mem_obj,
-                            varea->offset);
+                            varea->flags, mem_obj, varea->offset);
         if (err != RT_EOK)
         {
             LOG_W("%s: aspace map failed at %p with size %p", __func__,
@@ -307,7 +338,7 @@ int lwp_dup_user(rt_varea_t varea, void *arg)
         else
         {
             /* loading page frames for !MMF_PREFETCH varea */
-            if (!(varea->flag & MMF_PREFETCH))
+            if (!(varea->flags & MMF_PREFETCH))
             {
                 _dup_varea(varea, self_lwp, new_lwp->aspace);
             }
@@ -389,7 +420,7 @@ static rt_varea_t _lwp_map_user_varea(struct rt_lwp *lwp, void *map_va, size_t m
         ret = rt_aspace_map_static(lwp->aspace, varea, &va, map_size,
                                    attr, mm_flags, mem_obj, 0);
         /* let aspace handle the free of varea */
-        varea->flag &= ~MMF_STATIC_ALLOC;
+        varea->flags &= ~MMF_STATIC_ALLOC;
         /* don't apply auto fetch on this */
         varea->data = (void *)NO_AUTO_FETCH;
     }
@@ -534,6 +565,8 @@ rt_inline rt_size_t _attr_user_to_kernel(int prot)
     if ((prot & PROT_EXEC) || (prot & PROT_WRITE) ||
         ((prot & PROT_READ) && (prot & PROT_WRITE)))
         k_attr = MMU_MAP_U_RWCB;
+    else if (prot == PROT_NONE)
+        k_attr = MMU_MAP_K_RWCB;
     else
         k_attr = MMU_MAP_U_ROCB;
 
@@ -542,7 +575,7 @@ rt_inline rt_size_t _attr_user_to_kernel(int prot)
 
 rt_inline rt_mem_obj_t _get_mmap_obj(struct rt_lwp *lwp)
 {
-    return &lwp->lwp_obj->mem_obj;
+    return &_anonymous_object;
 }
 
 void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
@@ -555,18 +588,14 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
     rt_mem_obj_t mem_obj;
     void *ret = 0;
 
-    if (flags & MAP_ANONYMOUS)
-    {
-        fd = -1;
-        /* remove unsupported flags (those are not for anonymous mapping) */
-        flags &= ~MAP_SHARED;
-        flags &= ~MAP_PRIVATE;
-    }
-
     if (fd == -1)
     {
         k_flags = _flag_user_to_kernel(flags);
-        k_flags |= MMF_PREFETCH;
+
+        /* page if provide as a default behavior in kernel if the page is readable */
+        if (prot | PROT_READ)
+            k_flags |= MMF_PREFETCH;
+
         k_attr = _attr_user_to_kernel(prot);
 
         uspace = lwp_self()->aspace;
@@ -578,8 +607,6 @@ void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,
         if (rc == RT_EOK)
         {
             ret = addr;
-            if (!(flags & MAP_UNINITIALIZED) && (prot & PROT_WRITE))
-                memset(ret, 0, length);
         }
         else
             ret = (void *)lwp_errno_to_posix(rc);

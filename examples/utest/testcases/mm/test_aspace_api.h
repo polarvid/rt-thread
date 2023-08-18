@@ -162,7 +162,7 @@ static rt_varea_t _create_varea(const size_t size)
     varea = rt_malloc(sizeof(*varea));
     uassert_true(!!varea);
     uassert_true(!rt_aspace_map_static(&rt_kernel_space, varea, &vaddr, size, MMU_MAP_K_RWCB, 0, &rt_mm_dummy_mapper, 0));
-    varea->flag &= ~MMF_STATIC_ALLOC;
+    varea->flags &= ~MMF_STATIC_ALLOC;
     uassert_true(!!vaddr);
     return varea;
 }

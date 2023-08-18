@@ -10,6 +10,8 @@
 #ifndef __MM_FLAG_H__
 #define __MM_FLAG_H__
 
+#include <rtthread.h>
+
 /**
  * @brief mm_flag_t
  * |max ------- 7|6 ----- 0|
@@ -27,10 +29,19 @@ typedef unsigned long mm_flag_t;
 enum mm_flag_cntl
 {
     /**
-     * @brief Indicate a possible COW mapping
+     * @brief Modifications to the mapped data shall be visible only to the
+     * aspace only and shall not change the underlying object. It is
+     * unspecified whether modifications to the underlying object done after
+     * the MAP_PRIVATE mapping is established are visible through the
+     * MAP_PRIVATE mapping.
      */
     MMF_MAP_PRIVATE = _DEF_FLAG(0),
-    MMF_COW = _DEF_FLAG(1),
+
+    /**
+     * @brief Same as MMF_MAP_PRIVATE, except the modification after mapping is
+     * invisible to the varea
+     */
+    MMF_MAP_PRIVATE_DONT_SYNC = _DEF_FLAG(1),
 
     /**
      * @brief [POSIX MAP_FIXED] When MAP_FIXED is set in the flags argument, the
@@ -102,4 +113,10 @@ enum mm_flag_cntl
            : (MMF_SET_CNTL((mm_flag_t)0, (cntl) & ~MMF_REQUEST_ALIGN)))
 
 #undef _DEF_FLAG
+
+rt_inline rt_bool_t _is_private_flag(rt_base_t flags)
+{
+    return (flags & MMF_MAP_PRIVATE) || (flags & MMF_MAP_PRIVATE_DONT_SYNC);
+}
+
 #endif /* __MM_FLAG_H__ */

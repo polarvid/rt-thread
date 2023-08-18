@@ -1200,7 +1200,17 @@ void *sys_mmap2(void *addr, size_t length, int prot,
     }
 
     if (rc == 0)
+    {
+        /* fix parameter passing (both along have same effect) */
+        if (fd == -1 || flags & MAP_ANONYMOUS)
+        {
+            fd = -1;
+            /* MAP_SHARED has no effect and treated as nothing */
+            flags &= ~MAP_SHARED;
+            flags |= MAP_PRIVATE | MAP_ANONYMOUS;
+        }
         rc = (sysret_t)lwp_mmap2(lwp_self(), addr, length, prot, flags, fd, pgoffset);
+    }
 
     return (void *)rc;
 }
@@ -1818,7 +1828,7 @@ sysret_t _sys_fork(void)
 
     self_lwp = lwp_self();
 
-    /* copy process */
+    /* copy address space of process */
     if (_copy_process(lwp, self_lwp) != 0)
     {
         SET_ERRNO(ENOMEM);

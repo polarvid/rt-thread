@@ -101,7 +101,9 @@ int check_user_stack(unsigned long esr, struct rt_hw_exp_stack *regs)
         break;
     }
 
-    if (fault_op)
+    /* page fault exception only allow from user space */
+    lwp = lwp_self();
+    if (lwp && fault_op)
     {
         asm volatile("mrs %0, far_el1":"=r"(dfar));
         struct rt_aspace_fault_msg msg = {
@@ -109,9 +111,8 @@ int check_user_stack(unsigned long esr, struct rt_hw_exp_stack *regs)
             .fault_type = fault_type,
             .fault_vaddr = dfar,
         };
-        lwp = lwp_self();
-        RT_ASSERT(lwp);
-        if (rt_aspace_fault_try_fix(lwp->aspace, &msg))
+
+        if (lwp && rt_aspace_fault_try_fix(lwp->aspace, &msg))
         {
             ret = 1;
         }

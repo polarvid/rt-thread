@@ -56,6 +56,7 @@ typedef struct rt_aspace
     struct rt_mutex bst_lock;
 
     rt_uint64_t asid;
+    struct rt_mem_obj *_private_obj;
 } *rt_aspace_t;
 
 typedef struct rt_varea
@@ -65,7 +66,7 @@ typedef struct rt_varea
     rt_size_t offset;
 
     rt_size_t attr;
-    rt_size_t flag;
+    rt_size_t flags;
 
     struct rt_aspace *aspace;
     struct rt_mem_obj *mem_obj;
@@ -96,8 +97,12 @@ typedef struct rt_mem_obj
     void (*on_varea_open)(struct rt_varea *varea);
     /* do post close bushiness like def a ref */
     void (*on_varea_close)(struct rt_varea *varea);
+    /* do preparation for varea shrink */
+    rt_err_t (*on_varea_shrink)(struct rt_varea *varea, void *new_vaddr, rt_size_t size);
 
-    void (*on_page_offload)(struct rt_varea *varea, void *vaddr, rt_size_t size);
+    /* dynamic mem_obj API */
+    void (*page_read)(struct rt_varea *varea, struct rt_aspace_io_msg *msg);
+    void (*page_write)(struct rt_varea *varea, struct rt_aspace_io_msg *msg);
 
     const char *(*get_name)(rt_varea_t varea);
 } *rt_mem_obj_t;
@@ -188,6 +193,15 @@ int rt_aspace_map_phy_static(rt_aspace_t aspace, rt_varea_t varea,
  */
 int rt_aspace_unmap(rt_aspace_t aspace, void *addr);
 
+int rt_aspace_override_locked(rt_aspace_t aspace, void **addr, rt_size_t length,
+                              rt_size_t attr, mm_flag_t flags,
+                              rt_mem_obj_t mem_obj, rt_size_t offset);
+
+int rt_aspace_override_locked_static(rt_aspace_t aspace, rt_varea_t varea,
+                                     void **addr, rt_size_t length,
+                                     rt_size_t attr, mm_flag_t flags,
+                                     rt_mem_obj_t mem_obj, rt_size_t offset);
+
 int rt_aspace_control(rt_aspace_t aspace, void *addr, enum rt_mmu_cntl cmd);
 
 int rt_aspace_load_page(rt_aspace_t aspace, void *addr, rt_size_t npage);
@@ -199,8 +213,23 @@ int rt_aspace_traversal(rt_aspace_t aspace,
 
 void rt_aspace_print_all(rt_aspace_t aspace);
 
+rt_inline rt_err_t rt_aspace_register_private(rt_aspace_t aspace, rt_mem_obj_t private)
+{
+    rt_err_t rc;
+    if (!aspace->_private_obj)
+    {
+        aspace->_private_obj = private;
+        rc = RT_EOK;
+    }
+    else
+        rc = -RT_ENOSPC;
+    return rc;
+}
+
 /**
  * @brief Map one page to varea
+ *
+ * @note caller should take the read/write lock
  *
  * @param varea target varea
  * @param addr user address
@@ -211,6 +240,8 @@ int rt_varea_map_page(rt_varea_t varea, void *vaddr, void *page);
 
 /**
  * @brief Unmap one page in varea
+ *
+ * @note caller should take the read/write lock
  *
  * @param varea target varea
  * @param addr user address

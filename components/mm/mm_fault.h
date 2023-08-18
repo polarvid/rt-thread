@@ -20,13 +20,6 @@
 #define MM_FAULT_STATUS_OK_MAPPED       1
 #define MM_FAULT_STATUS_UNRECOVERABLE   4
 
-struct rt_mm_fault_res
-{
-    void *vaddr;
-    rt_size_t size;
-    int status;
-};
-
 enum rt_mm_fault_op
 {
     MM_FAULT_OP_READ = 1,
@@ -42,6 +35,22 @@ enum rt_mm_fault_type
     MM_FAULT_TYPE_GENERIC,
 };
 
+enum rt_mm_hint_prefetch
+{
+    MM_FAULT_HINT_PREFETCH_NONE,
+    MM_FAULT_HINT_PREFETCH_READY,
+};
+
+struct rt_mm_fault_res
+{
+    void *vaddr;
+    rt_size_t size;
+    int status;
+
+    /* hint for prefetch strategy */
+    enum rt_mm_hint_prefetch hint;
+};
+
 struct rt_aspace_fault_msg
 {
     enum rt_mm_fault_op fault_op;
@@ -51,6 +60,24 @@ struct rt_aspace_fault_msg
 
     struct rt_mm_fault_res response;
 };
+
+struct rt_aspace_io_msg
+{
+    /* offset in varea */
+    rt_size_t off;
+    /* fault address */
+    void *fault_vaddr;
+
+    struct rt_mm_fault_res response;
+};
+
+rt_inline void rt_mm_fault_res_init(struct rt_mm_fault_res *res)
+{
+    res->vaddr = RT_NULL;
+    res->size = 0;
+    res->hint = MM_FAULT_HINT_PREFETCH_NONE;
+    res->status = MM_FAULT_STATUS_UNRECOVERABLE;
+}
 
 struct rt_aspace;
 /* MMU base page fault handler, return 1 is fixable */
