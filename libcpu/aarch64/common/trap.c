@@ -112,7 +112,7 @@ int check_user_stack(unsigned long esr, struct rt_hw_exp_stack *regs)
             .fault_vaddr = dfar,
         };
 
-        if (lwp && rt_aspace_fault_try_fix(lwp->aspace, &msg))
+        if (rt_aspace_fault_try_fix(lwp->aspace, &msg))
         {
             ret = 1;
         }
