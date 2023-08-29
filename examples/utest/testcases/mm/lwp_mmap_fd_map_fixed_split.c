@@ -64,12 +64,14 @@ static rt_err_t _lwp_get_user(struct rt_lwp *lwp, char *vaddr, char *buffer)
         rt_mm_io_msg_init(&io_msg, MM_PA_TO_OFF(vaddr), vaddr, buffer);
         varea->mem_obj->page_read(varea, &io_msg);
     }
+    else
+        return -RT_ERROR;
     return RT_EOK;
 }
 
 static void _verify_file_content(struct rt_lwp *lwp, const char *mmap_buf, int ch)
 {
-    _lwp_get_user(lwp, (char *)mmap_buf, page_sz_buf);
+    utest_int_equal(RT_EOK, _lwp_get_user(lwp, (char *)mmap_buf, page_sz_buf));
     utest_int_equal(RT_EOK, memtest(page_sz_buf, ch, PAGE_SZ));
 }
 

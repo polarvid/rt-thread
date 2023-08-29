@@ -63,6 +63,7 @@ int lwp_munmap(void *addr);
  */
 int lwp_user_accessible_ext(struct rt_lwp *lwp, void *addr, size_t size);
 
+<<<<<<< HEAD
 /**
  * @brief Test if address from user is accessible address by user
  *        Same as lwp_user_accessible_ext except that lwp is current lwp
@@ -155,6 +156,15 @@ int lwp_unmap_user_phy(struct rt_lwp *lwp, void *va);
 
 rt_base_t lwp_brk(void *addr);
 
+=======
+/* like a memcpy(dst,src,size) from address in lwp aspace to kernel space buffer */
+size_t lwp_data_get(struct rt_lwp *lwp, void *dst, void *src, size_t size);
+/* like a memcpy(dst,src,size) from kernel space buffer to address in lwp aspace  */
+size_t lwp_data_put(struct rt_lwp *lwp, void *dst, void *src, size_t size);
+/* like a memset(dst,c,size) to address in lwp aspace */
+size_t lwp_data_set(struct rt_lwp *lwp, void *dst, int c, size_t size);
+
+>>>>>>> ebd015ba31 ([smart] support lwp_data_get()/set()/put())
 void lwp_data_cache_flush(struct rt_lwp *lwp, void *vaddr, size_t size);
 
 static inline void *_lwp_v2p(struct rt_lwp *lwp, void *vaddr)

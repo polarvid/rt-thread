@@ -143,7 +143,7 @@ rt_inline rt_size_t _get_effect_attr(rt_aspace_t aspace, rt_varea_t varea)
     rt_size_t attr = varea->attr;
 
     /* not write permission for user on private mapping */
-    if (rt_mm_flag_is_private(varea->flag) && aspace->private_object != varea->mem_obj)
+    if (rt_varea_is_private_locked(varea))
         attr = rt_hw_mmu_attr_rm_perm(attr, RT_HW_MMU_PROT_USER | RT_HW_MMU_PROT_WRITE);
 
     return attr;
@@ -186,24 +186,6 @@ rt_inline void _do_page_fault(struct rt_aspace_fault_msg *msg, rt_size_t off,
 
     RT_ASSERT(mem_obj->on_page_fault);
     mem_obj->on_page_fault(varea, msg);
-}
-
-rt_inline int _do_cow_fault(struct rt_aspace_fault_msg *msg, rt_size_t off,
-                            void *vaddr, rt_mem_obj_t mem_obj,
-                            rt_varea_t varea)
-{
-    int rc;
-    msg->off = off;
-    msg->fault_vaddr = vaddr;
-    msg->fault_op = MM_FAULT_OP_WRITE;
-    msg->fault_type = MM_FAULT_TYPE_ACCESS_FAULT;
-    rt_mm_fault_res_init(&msg->response);
-
-    if (rt_varea_fix_private_locked(varea, ARCH_MAP_FAILED, msg) == MM_FAULT_FIXABLE_TRUE)
-        rc = RT_EOK;
-    else
-        rc = -RT_ERROR;
-    return rc;
 }
 
 int rt_varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg)
@@ -561,6 +543,7 @@ static int _varea_install(rt_aspace_t aspace, rt_varea_t *pvarea,
 
     if (alloc_va != RT_NULL)
     {
+        /* TODO: fix to private mapping directly */
         if (!_try_expand_and_merge_okay(aspace, pvarea, alloc_va, hint, prop))
         {
             err = _insert_new_varea(aspace, pvarea, alloc_va, hint);
@@ -1446,4 +1429,119 @@ rt_base_t rt_aspace_count_vsz(rt_aspace_t aspace)
     rt_base_t vsz = 0;
     rt_aspace_traversal(aspace, _count_vsz, &vsz);
     return vsz;
+}
+
+/* dst are page aligned */
+rt_inline rt_err_t _page_put(rt_varea_t varea, void *page_va, void *buffer)
+{
+    struct rt_aspace_io_msg iomsg;
+    rt_err_t rc;
+
+    rt_mm_io_msg_init(&iomsg, MM_PA_TO_OFF((char *)page_va - (char *)varea->start), page_va, buffer);
+    varea->mem_obj->page_write(varea, &iomsg);
+
+    if (iomsg.response.status == MM_FAULT_STATUS_UNRECOVERABLE)
+        rc = -RT_ERROR;
+    else
+        rc = RT_EOK;
+    return rc;
+}
+
+/* dst are page aligned */
+rt_inline rt_err_t _page_get(rt_varea_t varea, void *page_va, void *buffer)
+{
+    struct rt_aspace_io_msg iomsg;
+    rt_err_t rc;
+
+    rt_mm_io_msg_init(&iomsg, MM_PA_TO_OFF((char *)page_va - (char *)varea->start), page_va, buffer);
+    varea->mem_obj->page_read(varea, &iomsg);
+
+    if (iomsg.response.status == MM_FAULT_STATUS_UNRECOVERABLE)
+        rc = -RT_ERROR;
+    else
+        rc = RT_EOK;
+    return rc;
+}
+
+rt_err_t rt_aspace_page_put(rt_aspace_t aspace, void *page_va, void *buffer)
+{
+    rt_err_t rc = -RT_ERROR;
+    rt_varea_t varea;
+
+    RD_LOCK(aspace);
+    varea = _aspace_bst_search(aspace, page_va);
+    if (varea && ALIGNED(page_va))
+    {
+        if (varea->mem_obj)
+        {
+            if (varea->mem_obj->page_write)
+            {
+                if (rt_varea_is_private_locked(varea))
+                {
+                    RDWR_LOCK(aspace);
+                    struct rt_aspace_fault_msg msg;
+                    msg.fault_op = MM_FAULT_OP_WRITE;
+                    msg.fault_type = MM_FAULT_TYPE_ACCESS_FAULT;
+                    msg.fault_vaddr = page_va;
+                    rc = rt_varea_fix_private_locked(varea, rt_hw_mmu_v2p(aspace, page_va),
+                                                    &msg, RT_TRUE);
+                    RDWR_UNLOCK(aspace);
+                    if (rc == MM_FAULT_FIXABLE_TRUE)
+                    {
+                        varea = _aspace_bst_search(aspace, page_va);
+                        rc = _page_put(varea, page_va, buffer);
+                    }
+                    else
+                        rc = -RT_ERROR;
+                }
+                else
+                    rc = _page_put(varea, page_va, buffer);
+            }
+        }
+        else
+        {
+            rt_memcpy(page_va, buffer, ARCH_PAGE_SIZE);
+            rc = RT_EOK;
+        }
+    }
+    else
+        rc = -RT_EINVAL;
+    RD_UNLOCK(aspace);
+
+    return rc;
+}
+
+rt_err_t rt_aspace_page_get(rt_aspace_t aspace, void *page_va, void *buffer)
+{
+    rt_err_t rc = -RT_ERROR;
+    rt_varea_t varea;
+
+    /* TODO: cache the last search item */
+    RD_LOCK(aspace);
+    varea = _aspace_bst_search(aspace, page_va);
+    if (varea && ALIGNED(page_va))
+    {
+        if (varea->mem_obj)
+        {
+            if (varea->mem_obj->page_write)
+            {
+                rc = _page_get(varea, page_va, buffer);
+            }
+        }
+        else
+        {
+            rt_memcpy(buffer, page_va, ARCH_PAGE_SIZE);
+            rc = RT_EOK;
+        }
+    }
+    else
+        rc = -RT_EINVAL;
+    RD_UNLOCK(aspace);
+
+    return rc;
+}
+
+rt_varea_t rt_aspace_query(rt_aspace_t aspace, void *vaddr)
+{
+    return _aspace_bst_search(aspace, vaddr);
 }

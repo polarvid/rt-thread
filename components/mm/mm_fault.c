@@ -54,15 +54,20 @@ static int _read_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *m
 
 static int _write_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *msg)
 {
+    rt_aspace_t aspace = varea->aspace;
     int err = MM_FAULT_FIXABLE_FALSE;
 
-    if (rt_mm_flag_is_private(varea->flag))
+    if (rt_varea_is_private_locked(varea))
     {
         if (VAREA_IS_WRITABLE(varea) && (
             msg->fault_type == MM_FAULT_TYPE_ACCESS_FAULT ||
             msg->fault_type == MM_FAULT_TYPE_PAGE_FAULT))
         {
-            err = rt_varea_fix_private_locked(varea, pa, msg);
+            RDWR_LOCK(aspace);
+            err = rt_varea_fix_private_locked(varea, pa, msg, RT_FALSE);
+            RDWR_UNLOCK(aspace);
+            if (err == MM_FAULT_FIXABLE_FALSE)
+                LOG_I("%s: fix private failure", __func__);
         }
         else
         {
@@ -79,7 +84,7 @@ static int _write_fault(rt_varea_t varea, void *pa, struct rt_aspace_fault_msg *
     }
     else
     {
-        LOG_I("%s: can not fix", __func__);
+        LOG_D("%s: can not fix", __func__);
         /* signal a fault to user? */
     }
     return err;
@@ -140,6 +145,10 @@ int rt_aspace_fault_try_fix(rt_aspace_t aspace, struct rt_aspace_fault_msg *msg)
                     break;
                 }
             }
+        }
+        else
+        {
+            LOG_I("%s: varea not found at 0x%lx", __func__, msg->fault_vaddr);
         }
         RD_UNLOCK(aspace);
     }

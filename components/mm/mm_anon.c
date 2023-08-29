@@ -15,6 +15,11 @@
 #include "mm_private.h"
 #include <mmu.h>
 
+/**
+ * Anonymous Object directly represent the mappings without backup files in the
+ * aspace. Their only backup is in the aspace->pgtbl.
+ */
+
 typedef struct rt_private_obj {
     struct rt_mem_obj mem_obj;
     rt_aspace_t backup_aspace;
@@ -27,6 +32,7 @@ static const char *_anon_get_name(rt_varea_t varea)
 
 static void _anon_page_fault(struct rt_varea *varea, struct rt_aspace_fault_msg *msg)
 {
+    rt_mm_dummy_mapper.on_page_fault(varea, msg);
 }
 
 static void on_varea_open(struct rt_varea *varea)
@@ -60,6 +66,64 @@ static rt_err_t on_varea_merge(struct rt_varea *merge_to, struct rt_varea *merge
     return rt_mm_dummy_mapper.on_varea_merge(merge_to, merge_from);
 }
 
+static void page_read(struct rt_varea *varea, struct rt_aspace_io_msg *iomsg)
+{
+    rt_err_t error;
+    rt_aspace_t aspace = varea->aspace;
+    RDWR_LOCK(aspace);
+    if (rt_hw_mmu_v2p(aspace, iomsg->fault_vaddr) == ARCH_MAP_FAILED)
+    {
+        struct rt_aspace_fault_msg msg;
+        msg.fault_op = MM_FAULT_OP_READ;
+        msg.fault_type = MM_FAULT_TYPE_PAGE_FAULT;
+        msg.fault_vaddr = iomsg->fault_vaddr;
+        _anon_page_fault(varea, &msg);
+        if (msg.response.status == MM_FAULT_STATUS_OK)
+        {
+            error = rt_varea_map_with_msg(varea, &msg);
+            if (error == RT_EOK)
+            {
+                memcpy(iomsg->buffer_vaddr, msg.response.vaddr, ARCH_PAGE_SIZE);
+                iomsg->response.status = MM_FAULT_STATUS_OK;
+            }
+        }
+    }
+    else
+    {
+        rt_mm_dummy_mapper.page_read(varea, iomsg);
+    }
+    RDWR_UNLOCK(varea->aspace);
+}
+
+static void page_write(struct rt_varea *varea, struct rt_aspace_io_msg *iomsg)
+{
+    rt_err_t error;
+    rt_aspace_t aspace = varea->aspace;
+    RDWR_LOCK(aspace);
+    if (rt_hw_mmu_v2p(aspace, iomsg->fault_vaddr) == ARCH_MAP_FAILED)
+    {
+        struct rt_aspace_fault_msg msg;
+        msg.fault_op = MM_FAULT_OP_READ;
+        msg.fault_type = MM_FAULT_TYPE_PAGE_FAULT;
+        msg.fault_vaddr = iomsg->fault_vaddr;
+        _anon_page_fault(varea, &msg);
+        if (msg.response.status == MM_FAULT_STATUS_OK)
+        {
+            memcpy(msg.response.vaddr, iomsg->buffer_vaddr, ARCH_PAGE_SIZE);
+            error = rt_varea_map_with_msg(varea, &msg);
+            if (error == RT_EOK)
+            {
+                iomsg->response.status = MM_FAULT_STATUS_OK;
+            }
+        }
+    }
+    else
+    {
+        rt_mm_dummy_mapper.page_write(varea, iomsg);
+    }
+    RDWR_UNLOCK(varea->aspace);
+}
+
 static struct rt_private_obj _priv_obj = {
     .mem_obj.get_name = _anon_get_name,
     .mem_obj.on_page_fault = _anon_page_fault,
@@ -70,6 +134,8 @@ static struct rt_private_obj _priv_obj = {
     .mem_obj.on_varea_split = on_varea_split,
     .mem_obj.on_varea_expand = on_varea_expand,
     .mem_obj.on_varea_merge = on_varea_merge,
+    .mem_obj.page_read = page_read,
+    .mem_obj.page_write = page_write,
 };
 
 rt_inline rt_private_obj_t rt_private_obj_create_n_bind(rt_aspace_t aspace)
@@ -111,7 +177,7 @@ static int _override_map(rt_varea_t varea, rt_aspace_t aspace, void *fault_vaddr
         error = _mm_aspace_map(
             aspace, &map_varea, &fault_vaddr, ARCH_PAGE_SIZE, attr,
             flags, &private_object->mem_obj, MM_PA_TO_OFF(fault_vaddr));
-        
+
         if (ex_vsz != rt_aspace_count_vsz(aspace))
         {
             LOG_E("%s: fault_va=%p,(priv_va=%p,priv_sz=0x%lx) at %s", __func__, msg->fault_vaddr, map_varea->start, map_varea->size, VAREA_NAME(map_varea));
@@ -129,6 +195,7 @@ static int _override_map(rt_varea_t varea, rt_aspace_t aspace, void *fault_vaddr
                 LOG_E("%s: fault_va=%p,(priv_va=%p,priv_sz=0x%lx) at %s", __func__, msg->fault_vaddr, map_varea->start, map_varea->size, VAREA_NAME(map_varea));
                 RT_ASSERT(0 && "should never failed");
             }
+            RT_ASSERT(rt_hw_mmu_v2p(aspace, msg->fault_vaddr) == (page + PV_OFFSET));
             rc = MM_FAULT_FIXABLE_TRUE;
             rt_varea_pgmgr_insert(map_varea, page);
         }
@@ -153,12 +220,12 @@ static int _override_map(rt_varea_t varea, rt_aspace_t aspace, void *fault_vaddr
  * => aspace_map()
  */
 int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
-                                struct rt_aspace_fault_msg *msg)
+                                struct rt_aspace_fault_msg *msg,
+                                rt_bool_t dont_copy)
 {
     /**
      * todo: READ -> WRITE lock here
      */
-
     void *page;
     void *fault_vaddr;
     rt_aspace_t aspace;
@@ -185,23 +252,29 @@ int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
             if (page)
             {
                 /** setup message & fetch the data from source object */
-                struct rt_aspace_io_msg io_msg;
-                rt_mm_io_msg_init(&io_msg, msg->off, msg->fault_vaddr, page);
-                ex_obj->page_read(ex_varea, &io_msg);
-
-                /**
-                 * Note: if ex_obj have mapped into varea, it's still okay since
-                 * we will override it latter
-                 */
-                if (io_msg.response.status != MM_FAULT_STATUS_UNRECOVERABLE)
+                if (!dont_copy)
                 {
-                    rc = _override_map(ex_varea, aspace, fault_vaddr, msg, page);
+                    struct rt_aspace_io_msg io_msg;
+                    rt_mm_io_msg_init(&io_msg, msg->off, msg->fault_vaddr, page);
+                    ex_obj->page_read(ex_varea, &io_msg);
+                    /**
+                    * Note: if ex_obj have mapped into varea, it's still okay since
+                    * we will override it latter
+                    */
+                    if (io_msg.response.status != MM_FAULT_STATUS_UNRECOVERABLE)
+                    {
+                        rc = _override_map(ex_varea, aspace, fault_vaddr, msg, page);
+                    }
+                    else
+                    {
+                        rt_pages_free(page, 0);
+                        LOG_I("%s: page read(va=%p) fault from %s(start=%p,size=%p)", __func__,
+                            msg->fault_vaddr, VAREA_NAME(ex_varea), ex_varea->start, ex_varea->size);
+                    }
                 }
                 else
                 {
-                    rt_pages_free(page, 0);
-                    LOG_I("%s: page read(va=%p) fault from %s(start=%p,size=%p)", __func__,
-                        msg->fault_vaddr, VAREA_NAME(ex_varea), ex_varea->start, ex_varea->size);
+                    rc = _override_map(ex_varea, aspace, fault_vaddr, msg, page);
                 }
             }
             else

@@ -20,6 +20,9 @@
 #include "mm_page.h"
 #include <mmu.h>
 
+#include <string.h>
+#include <stdlib.h>
+
 /** varea based dummy memory object whose data comes directly from page frame */
 
 static const char *get_name(rt_varea_t varea)
@@ -232,6 +235,34 @@ static rt_err_t on_varea_merge(struct rt_varea *merge_to, struct rt_varea *merge
     return RT_EOK;
 }
 
+static void page_read(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
+{
+    char *dst_k;
+    rt_aspace_t aspace = varea->aspace;
+    dst_k = rt_hw_mmu_v2p(aspace, msg->fault_vaddr);
+    if (dst_k != ARCH_MAP_FAILED)
+    {
+        RT_ASSERT(!((long)dst_k & ARCH_PAGE_MASK));
+        dst_k = (void *)((char *)dst_k - PV_OFFSET);
+        memcpy(msg->buffer_vaddr, dst_k, ARCH_PAGE_SIZE);
+        msg->response.status = MM_FAULT_STATUS_OK;
+    }
+}
+
+static void page_write(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
+{
+    void *dst_k;
+    rt_aspace_t aspace = varea->aspace;
+    dst_k = rt_hw_mmu_v2p(aspace, msg->fault_vaddr);
+    if (dst_k != ARCH_MAP_FAILED)
+    {
+        RT_ASSERT(!((long)dst_k & ARCH_PAGE_MASK));
+        dst_k = (void *)((char *)dst_k - PV_OFFSET);
+        memcpy(dst_k, msg->buffer_vaddr, ARCH_PAGE_SIZE);
+        msg->response.status = MM_FAULT_STATUS_OK;
+    }
+}
+
 struct rt_mem_obj rt_mm_dummy_mapper = {
     .get_name = get_name,
     .on_page_fault = on_page_fault,
@@ -243,4 +274,7 @@ struct rt_mem_obj rt_mm_dummy_mapper = {
     .on_varea_split = on_varea_split,
     .on_varea_expand = on_varea_expand,
     .on_varea_merge = on_varea_merge,
+
+    .page_write = page_write,
+    .page_read = page_read,
 };

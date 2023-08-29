@@ -147,6 +147,8 @@ enum rt_mmu_cntl
 /* FIXME: fix rd_lock */
 #define RD_LOCK(aspace)   WR_LOCK(aspace)
 #define RD_UNLOCK(aspace) WR_UNLOCK(aspace)
+#define RDWR_LOCK(aspace)
+#define RDWR_UNLOCK(aspace)
 
 rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl);
 
@@ -246,12 +248,18 @@ int rt_aspace_load_page(rt_aspace_t aspace, void *addr, rt_size_t npage);
 
 int rt_aspace_offload_page(rt_aspace_t aspace, void *addr, rt_size_t npage);
 
+rt_err_t rt_aspace_page_put(rt_aspace_t aspace, void *page_va, void *buffer);
+
+rt_err_t rt_aspace_page_get(rt_aspace_t aspace, void *page_va, void *buffer);
+
 int rt_aspace_traversal(rt_aspace_t aspace,
                         int (*fn)(rt_varea_t varea, void *arg), void *arg);
 
 void rt_aspace_print_all(rt_aspace_t aspace);
 
 rt_base_t rt_aspace_count_vsz(rt_aspace_t aspace);
+
+rt_varea_t rt_aspace_query(rt_aspace_t aspace, void *vaddr);
 
 /**
  * @brief Map one page to varea

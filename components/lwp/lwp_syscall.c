@@ -448,7 +448,8 @@ ssize_t sys_read(int fd, void *buf, size_t nbyte)
     ret = read(fd, kmem, nbyte);
     if (ret > 0)
     {
-        lwp_put_to_user(buf, kmem, ret);
+        if (ret != lwp_put_to_user(buf, kmem, ret))
+            return -EFAULT;
     }
 
     if (ret < 0)
@@ -1229,6 +1230,7 @@ void *sys_mmap2(void *addr, size_t length, int prot,
         int flags, int fd, off_t pgoffset)
 {
     sysret_t rc = 0;
+    long offset = 0;
 
     /* aligned for user addr */
     if ((rt_base_t)addr & ARCH_PAGE_MASK)
@@ -1236,7 +1238,11 @@ void *sys_mmap2(void *addr, size_t length, int prot,
         if (flags & MAP_FIXED)
             rc = -EINVAL;
         else
+        {
+            offset = (char *)addr - (char *)RT_ALIGN_DOWN((rt_base_t)addr, ARCH_PAGE_SIZE);
+            length += offset;
             addr = (void *)RT_ALIGN_DOWN((rt_base_t)addr, ARCH_PAGE_SIZE);
+        }
     }
 
     if (rc == 0)
@@ -1252,7 +1258,7 @@ void *sys_mmap2(void *addr, size_t length, int prot,
         rc = (sysret_t)lwp_mmap2(lwp_self(), addr, length, prot, flags, fd, pgoffset);
     }
 
-    return (void *)rc;
+    return (char *)rc + offset;
 }
 
 sysret_t sys_munmap(void *addr, size_t length)
@@ -5065,6 +5071,9 @@ sysret_t sys_mq_close(mqd_t mqd)
 
 rt_weak sysret_t sys_cacheflush(void *addr, int size, int cache)
 {
+    if (!lwp_user_accessable(addr, size))
+        return -EFAULT;
+
     if (((size_t)addr < (size_t)addr + size) &&
         ((size_t)addr >= USER_VADDR_START) &&
         ((size_t)addr + size < USER_VADDR_TOP))

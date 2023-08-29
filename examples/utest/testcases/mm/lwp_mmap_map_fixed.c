@@ -43,6 +43,8 @@ static rt_base_t count_vcount(rt_aspace_t aspace)
     return vcount;
 }
 
+static char put_data[] = "hello,world";
+
 static void test_map_fixed(void)
 {
     void *effect_override;
@@ -64,6 +66,10 @@ static void test_map_fixed(void)
     uassert_true(effect_override == override_start);
     utest_int_equal(former_vsz, rt_aspace_count_vsz(lwp->aspace));
     utest_int_equal(former_vcount + 2, count_vcount(lwp->aspace));
+    utest_int_equal(
+        lwp_data_put(lwp, effect_override, put_data, sizeof(put_data)),
+        sizeof(put_data)
+    );
 
     utest_int_equal(RT_EOK, rt_aspace_unmap_range(lwp->aspace, vaddr, ex_size));
 }

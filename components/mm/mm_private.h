@@ -108,7 +108,8 @@ void rt_varea_pgmgr_pop(rt_varea_t varea, void *vaddr, rt_size_t size);
 void rt_varea_pgmgr_pop_all(rt_varea_t varea);
 
 int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
-                                struct rt_aspace_fault_msg *msg);
+                                struct rt_aspace_fault_msg *msg,
+                                rt_bool_t dont_copy);
 
 int rt_varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg);
 
@@ -116,9 +117,13 @@ int _mm_aspace_map(rt_aspace_t aspace, rt_varea_t *pvarea, void **addr,
                    rt_size_t length, rt_size_t attr, mm_flag_t flags,
                    rt_mem_obj_t mem_obj, rt_size_t offset);
 
-rt_inline rt_bool_t rt_mm_flag_is_private(rt_base_t flags)
+rt_inline rt_bool_t rt_varea_is_private_locked(rt_varea_t varea)
 {
-    return !!(flags & (MMF_MAP_PRIVATE | MMF_MAP_PRIVATE_DONT_SYNC));
+    rt_base_t flags = varea->flag;
+    return !!(
+        (flags & (MMF_MAP_PRIVATE | MMF_MAP_PRIVATE_DONT_SYNC))
+        && (varea->aspace->private_object != varea->mem_obj)
+    );
 }
 
 #endif /* __MM_PRIVATE_H__ */
