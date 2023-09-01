@@ -72,6 +72,7 @@ struct dfs_mmap2_args
     int flags;
     off_t pgoffset;
 
+    struct rt_lwp *lwp;
     void *ret;
 };
 

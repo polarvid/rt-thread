@@ -91,11 +91,17 @@ int _get_type(unsigned long esr)
         case 0x7:
             ret = MM_FAULT_TYPE_PAGE_FAULT;
             break;
+        case 0xc:
+        case 0xd:
+        case 0xe:
+        case 0xf:
+            ret = MM_FAULT_TYPE_ACCESS_FAULT;
+            break;
+        case 0x8:
         case 0x9:
         case 0xa:
         case 0xb:
-            ret = MM_FAULT_TYPE_ACCESS_FAULT;
-            break;
+            /* access flag fault */
         default:
             ret = MM_FAULT_TYPE_GENERIC;
     }
@@ -104,6 +110,7 @@ int _get_type(unsigned long esr)
 
 int check_user_stack(unsigned long esr, struct rt_hw_exp_stack *regs)
 {
+    rt_ubase_t level;
     unsigned char ec;
     void *dfar;
     int ret = 0;
@@ -130,20 +137,24 @@ int check_user_stack(unsigned long esr, struct rt_hw_exp_stack *regs)
         break;
     }
 
-    if (fault_op)
+    /* page fault exception only allow from user space */
+    lwp = lwp_self();
+    if (lwp && fault_op)
     {
-        asm volatile("mrs %0, far_el1":"=r"(dfar));
+        __asm__ volatile("mrs %0, far_el1":"=r"(dfar));
         struct rt_aspace_fault_msg msg = {
             .fault_op = fault_op,
             .fault_type = fault_type,
             .fault_vaddr = dfar,
         };
-        lwp = lwp_self();
-        RT_ASSERT(lwp);
+
+        lwp_user_setting_save(rt_thread_self());
+        __asm__ volatile("mrs %0, daif\nmsr daifclr, 0x3\nisb\n":"=r"(level));
         if (rt_aspace_fault_try_fix(lwp->aspace, &msg))
         {
             ret = 1;
         }
+        __asm__ volatile("msr daif, %0\nisb\n"::"r"(level));
     }
     return ret;
 }
@@ -315,7 +326,12 @@ void rt_hw_trap_exception(struct rt_hw_exp_stack *regs)
         /* never return here */
     }
 #ifdef RT_USING_LWP
-    if (check_user_stack(esr, regs))
+
+    /**
+     * Note: check_user_stack will take lock and it will possibly be a dead-lock
+     * if exception comes from kernel.
+     */
+    if ((regs->cpsr & 0x1f) == 0 && check_user_stack(esr, regs))
     {
         return;
     }

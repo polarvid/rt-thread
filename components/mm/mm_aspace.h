@@ -1,11 +1,12 @@
 /*
- * Copyright (c) 2006-2022, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
  * Change Logs:
  * Date           Author       Notes
  * 2022-11-14     WangXiaoyao  the first version
+ * 2023-08-17     Shell        Add unmap_range for MAP_PRIVATE
  */
 #ifndef __MM_ASPACE_H__
 #define __MM_ASPACE_H__
@@ -55,6 +56,7 @@ typedef struct rt_aspace
     struct _aspace_tree tree;
     struct rt_mutex bst_lock;
 
+    struct rt_mem_obj *private_object;
     rt_uint64_t asid;
 } *rt_aspace_t;
 
@@ -97,7 +99,25 @@ typedef struct rt_mem_obj
     /* do post close bushiness like def a ref */
     void (*on_varea_close)(struct rt_varea *varea);
 
-    void (*on_page_offload)(struct rt_varea *varea, void *vaddr, rt_size_t size);
+    /* do preparation for address space modification of varea */
+    rt_err_t (*on_varea_shrink)(struct rt_varea *varea, void *new_vaddr, rt_size_t size);
+    /* do preparation for address space modification of varea */
+    rt_err_t (*on_varea_expand)(struct rt_varea *varea, void *new_vaddr, rt_size_t size);
+    /**
+     * this is like an on_varea_open() to `subset`, and an on_varea_shrink() to `existed`
+     * while resource can migrate from `existed` to `subset` at the same time
+     */
+    rt_err_t (*on_varea_split)(struct rt_varea *existed, void *unmap_start,
+                               rt_size_t unmap_len, struct rt_varea *subset);
+    /**
+     * this is like a on_varea_expand() to `merge_to` and on_varea_close() to `merge_from`
+     * while resource can migrate from `merge_from` to `merge_to` at the same time
+     */
+    rt_err_t (*on_varea_merge)(struct rt_varea *merge_to, struct rt_varea *merge_from);
+
+    /* dynamic mem_obj API */
+    void (*page_read)(struct rt_varea *varea, struct rt_aspace_io_msg *msg);
+    void (*page_write)(struct rt_varea *varea, struct rt_aspace_io_msg *msg);
 
     const char *(*get_name)(rt_varea_t varea);
 } *rt_mem_obj_t;
@@ -110,6 +130,8 @@ enum rt_mmu_cntl
     MMU_CNTL_CACHE,
     MMU_CNTL_READONLY,
     MMU_CNTL_READWRITE,
+    MMU_CNTL_OFFLOAD,
+    MMU_CNTL_INSTALL,
     MMU_CNTL_DUMMY_END,
 };
 
@@ -122,6 +144,7 @@ enum rt_mmu_cntl
 #define WR_UNLOCK(aspace)                                                      \
     rt_thread_self() ? rt_mutex_release(&(aspace)->bst_lock) : 0
 
+/* FIXME: fix rd_lock */
 #define RD_LOCK(aspace)   WR_LOCK(aspace)
 #define RD_UNLOCK(aspace) WR_UNLOCK(aspace)
 
@@ -177,13 +200,45 @@ int rt_aspace_map_phy_static(rt_aspace_t aspace, rt_varea_t varea,
                              void **ret_va);
 
 /**
- * @brief Remove any mappings overlap the range [addr, addr + bytes)
+ * @brief Remove mappings containing address specified by addr
  *
- * @param aspace
+ * @param aspace target virtual address space
+ * @param addr addresses that mapping to be removed contains
+ * @return int rt errno
+ */
+int rt_aspace_unmap(rt_aspace_t aspace, void *addr);
+
+/**
+ * @brief Remove pages of existed mappings in the range [addr, addr+length)
+ * Length is automatically rounded up to the next multiple of the page size.
+ *
+ * @param aspace target virtual address space
+ * @param addr the beginning of the range of pages to be unmapped
+ * @param length length of range in bytes
+ * @return int rt errno
+ */
+int rt_aspace_unmap_range(rt_aspace_t aspace, void *addr, size_t length);
+
+/**
+ * @brief Remove pages of existed mappings in the range [addr, addr+length)
+ * Length is automatically rounded up to the next multiple of the page size.
+ *
+ * @param aspace target virtual address space
+ * @param addr the beginning of the range of pages to be unmapped
+ * @param length length of range in bytes
+ * @return int rt errno
+ */
+int rt_aspace_unmap_range(rt_aspace_t aspace, void *addr, size_t length);
+
+/**
+ * @brief Remove pages of existed mappings in the range [addr, addr+length)
+ * Length is automatically rounded up to the next multiple of the page size.
+ *
+ * @param aspace target virtual address space
  * @param addr
  * @return int
  */
-int rt_aspace_unmap(rt_aspace_t aspace, void *addr);
+int rt_aspace_unmap_range(rt_aspace_t aspace, void *addr, size_t length);
 
 int rt_aspace_control(rt_aspace_t aspace, void *addr, enum rt_mmu_cntl cmd);
 
@@ -196,8 +251,12 @@ int rt_aspace_traversal(rt_aspace_t aspace,
 
 void rt_aspace_print_all(rt_aspace_t aspace);
 
+rt_base_t rt_aspace_count_vsz(rt_aspace_t aspace);
+
 /**
  * @brief Map one page to varea
+ *
+ * @note caller should take the read/write lock
  *
  * @param varea target varea
  * @param addr user address
@@ -208,6 +267,8 @@ int rt_varea_map_page(rt_varea_t varea, void *vaddr, void *page);
 
 /**
  * @brief Unmap one page in varea
+ *
+ * @note caller should take the read/write lock
  *
  * @param varea target varea
  * @param addr user address
@@ -251,6 +312,15 @@ int rt_varea_unmap_range(rt_varea_t varea, void *vaddr, rt_size_t length);
  * @param page_addr the page frame to be added
  */
 void rt_varea_pgmgr_insert(rt_varea_t varea, void *page_addr);
+
+rt_inline rt_mem_obj_t rt_mem_obj_create(rt_mem_obj_t source)
+{
+    rt_mem_obj_t target;
+    target = rt_malloc(sizeof(*target));
+    if (target)
+        memcpy(target, source, sizeof(*target));
+    return target;
+}
 
 rt_ubase_t rt_kmem_pvoff(void);
 

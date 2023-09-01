@@ -1228,12 +1228,36 @@ rt_base_t sys_brk(void *addr)
 void *sys_mmap2(void *addr, size_t length, int prot,
         int flags, int fd, off_t pgoffset)
 {
-    return lwp_mmap2(addr, length, prot, flags, fd, pgoffset);
+    sysret_t rc = 0;
+
+    /* aligned for user addr */
+    if ((rt_base_t)addr & ARCH_PAGE_MASK)
+    {
+        if (flags & MAP_FIXED)
+            rc = -EINVAL;
+        else
+            addr = (void *)RT_ALIGN_DOWN((rt_base_t)addr, ARCH_PAGE_SIZE);
+    }
+
+    if (rc == 0)
+    {
+        /* fix parameter passing (both along have same effect) */
+        if (fd == -1 || flags & MAP_ANONYMOUS)
+        {
+            fd = -1;
+            /* MAP_SHARED has no effect and treated as nothing */
+            flags &= ~MAP_SHARED;
+            flags |= MAP_PRIVATE | MAP_ANONYMOUS;
+        }
+        rc = (sysret_t)lwp_mmap2(lwp_self(), addr, length, prot, flags, fd, pgoffset);
+    }
+
+    return (void *)rc;
 }
 
 sysret_t sys_munmap(void *addr, size_t length)
 {
-    return lwp_munmap(addr);
+    return lwp_munmap(lwp_self(), addr, length);
 }
 
 void *sys_mremap(void *old_address, size_t old_size,
@@ -1844,7 +1868,7 @@ sysret_t _sys_fork(void)
 
     self_lwp = lwp_self();
 
-    /* copy process */
+    /* copy address space of process */
     if (_copy_process(lwp, self_lwp) != 0)
     {
         SET_ERRNO(ENOMEM);

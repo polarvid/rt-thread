@@ -11,6 +11,10 @@
 #define __MM_PRIVATE_H__
 
 #include "mm_aspace.h"
+#include "mm_fault.h"
+#include "mm_flag.h"
+#include "mm_page.h"
+
 #include <rtdef.h>
 #include <stddef.h>
 
@@ -28,6 +32,15 @@
  * For implementation, a range is specified by [start, end] tuple
  * where both start and end are inclusive.
  */
+
+#define VAREA_NOT_STATIC(varea) (!((varea)->flag & MMF_STATIC_ALLOC))
+#define VAREA_NAME(varea)                                                      \
+  ((!varea->mem_obj || !varea->mem_obj->get_name)                              \
+       ? "unknow"                                                              \
+       : varea->mem_obj->get_name(varea))
+#define VAREA_IS_WRITABLE(varea)                                               \
+  (rt_hw_mmu_attr_test_perm(varea->attr,                                       \
+                            RT_HW_MMU_PROT_USER | RT_HW_MMU_PROT_WRITE))
 
 struct _mm_range
 {
@@ -94,6 +107,18 @@ void rt_varea_pgmgr_pop(rt_varea_t varea, void *vaddr, rt_size_t size);
 
 void rt_varea_pgmgr_pop_all(rt_varea_t varea);
 
-int _varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg);
+int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
+                                struct rt_aspace_fault_msg *msg);
+
+int rt_varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg);
+
+int _mm_aspace_map(rt_aspace_t aspace, rt_varea_t *pvarea, void **addr,
+                   rt_size_t length, rt_size_t attr, mm_flag_t flags,
+                   rt_mem_obj_t mem_obj, rt_size_t offset);
+
+rt_inline rt_bool_t rt_mm_flag_is_private(rt_base_t flags)
+{
+    return !!(flags & (MMF_MAP_PRIVATE | MMF_MAP_PRIVATE_DONT_SYNC));
+}
 
 #endif /* __MM_PRIVATE_H__ */
