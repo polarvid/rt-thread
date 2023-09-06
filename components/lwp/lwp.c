@@ -180,7 +180,7 @@ struct process_aux *lwp_argscopy(struct rt_lwp *lwp, int argc, char **argv, char
     }
 
     /* args = (int *)lwp_map_user(lwp, 0, size); */
-    args = (int *)lwp_map_user(lwp, (void *)(USER_VADDR_TOP - ARCH_PAGE_SIZE), size, 0);
+    args = (int *)lwp_map_user(lwp, (void *)(USER_STACK_VEND), size, 0);
     if (args == RT_NULL)
     {
         return RT_NULL;
