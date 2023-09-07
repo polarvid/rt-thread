@@ -364,6 +364,10 @@ static inline size_t _flags_to_attr(size_t flags)
 static inline mm_flag_t _flags_to_aspace_flag(size_t flags)
 {
     mm_flag_t mm_flag = 0;
+    if (flags & LWP_MAP_FLAG_MAP_FIXED)
+        mm_flag |= MMF_MAP_FIXED;
+    if (flags & LWP_MAP_FLAG_PREFETCH)
+        mm_flag |= MMF_PREFETCH;
 
     return mm_flag;
 }
@@ -481,33 +485,32 @@ void *lwp_map_user_phy(struct rt_lwp *lwp, void *map_va, void *map_pa,
 rt_base_t lwp_brk(void *addr)
 {
     rt_base_t ret = -1;
+    rt_varea_t varea = RT_NULL;
     struct rt_lwp *lwp = RT_NULL;
+    size_t size = 0;
 
-    rt_mm_lock();
-    lwp = rt_thread_self()->lwp;
+    lwp = lwp_self();
 
-    if ((size_t)addr <= lwp->end_heap)
+    if ((size_t)addr == RT_NULL)
     {
-        ret = (rt_base_t)lwp->end_heap;
+        addr = (char *)lwp->end_heap + 1;
     }
-    else
-    {
-        size_t size = 0;
-        void *va = RT_NULL;
 
-        if ((size_t)addr <= USER_HEAP_VEND)
+    if ((size_t)addr <= lwp->end_heap && (size_t)addr > USER_HEAP_VADDR)
+    {
+        ret = (size_t)addr;
+    }
+    else if ((size_t)addr <= USER_HEAP_VEND)
+    {
+        size = RT_ALIGN((size_t)addr - lwp->end_heap, ARCH_PAGE_SIZE);
+        varea = lwp_map_user_varea_ext(lwp, (void *)lwp->end_heap, size, LWP_MAP_FLAG_PREFETCH);
+        if (varea)
         {
-            size = (((size_t)addr - lwp->end_heap) + ARCH_PAGE_SIZE - 1) &
-                   ~ARCH_PAGE_MASK;
-            va = lwp_map_user(lwp, (void *)lwp->end_heap, size, 0);
-        }
-        if (va)
-        {
-            lwp->end_heap += size;
+            lwp->end_heap = (long)(varea->start + varea->size);
             ret = lwp->end_heap;
         }
     }
-    rt_mm_unlock();
+
     return ret;
 }
 

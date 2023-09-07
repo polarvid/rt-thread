@@ -27,6 +27,8 @@ extern "C" {
 
 #define LWP_MAP_FLAG_NONE       0x0000
 #define LWP_MAP_FLAG_NOCACHE    0x0001
+#define LWP_MAP_FLAG_MAP_FIXED  0x000100000000ul
+#define LWP_MAP_FLAG_PREFETCH   0x000200000000ul
 
 /**
  * @brief Map files or devices into memory

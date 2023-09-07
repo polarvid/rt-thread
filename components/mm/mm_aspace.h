@@ -147,8 +147,8 @@ enum rt_mmu_cntl
 /* FIXME: fix rd_lock */
 #define RD_LOCK(aspace)   WR_LOCK(aspace)
 #define RD_UNLOCK(aspace) WR_UNLOCK(aspace)
-#define RDWR_LOCK(aspace)
-#define RDWR_UNLOCK(aspace)
+#define RDWR_LOCK(aspace)   ((void)aspace)
+#define RDWR_UNLOCK(aspace) ((void)aspace)
 
 rt_aspace_t rt_aspace_create(void *start, rt_size_t length, void *pgtbl);
 
