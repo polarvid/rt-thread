@@ -153,6 +153,9 @@ struct process_aux *lwp_argscopy(struct rt_lwp *lwp, int argc, char **argv, char
     int len;
     size_t *args_k;
     struct process_aux *aux;
+    size_t prot = PROT_READ | PROT_WRITE;
+    size_t flags = MAP_FIXED | MAP_PRIVATE;
+    size_t zero = 0;
 
     for (i = 0; i < argc; i++)
     {
@@ -179,9 +182,8 @@ struct process_aux *lwp_argscopy(struct rt_lwp *lwp, int argc, char **argv, char
         return RT_NULL;
     }
 
-    /* args = (int *)lwp_map_user(lwp, 0, size); */
-    args = (int *)lwp_map_user(lwp, (void *)(USER_STACK_VEND), size, 0);
-    if (args == RT_NULL)
+    args = lwp_mmap2(lwp, (void *)(USER_STACK_VEND), size, prot, flags, -1, 0);
+    if (args == RT_NULL || lwp_data_put(lwp, args, &zero, sizeof(zero)) != sizeof(zero))
     {
         return RT_NULL;
     }
