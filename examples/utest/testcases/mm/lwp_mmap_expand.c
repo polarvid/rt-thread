@@ -17,8 +17,6 @@ static long fd = -1;
 static long pgoffset = 0;
 static size_t flags = MAP_FIXED | MAP_ANONYMOUS;
 static size_t prot1 = PROT_READ | PROT_WRITE;
-static size_t prot2 = PROT_NONE;
-static size_t prot3 = PROT_READ;
 
 static char *ex_vaddr = (void *)0x100000000;
 static size_t map_size = 0x3000;

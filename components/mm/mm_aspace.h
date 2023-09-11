@@ -201,6 +201,10 @@ int rt_aspace_map_phy_static(rt_aspace_t aspace, rt_varea_t varea,
                              rt_mm_va_hint_t hint, rt_size_t attr, rt_size_t pa_off,
                              void **ret_va);
 
+/** map a private memory region to aspace */
+int rt_aspace_map_private(rt_aspace_t aspace, void **addr, rt_size_t length,
+                          rt_size_t attr, mm_flag_t flags);
+
 /**
  * @brief Remove mappings containing address specified by addr
  *
@@ -330,13 +334,15 @@ rt_inline rt_mem_obj_t rt_mem_obj_create(rt_mem_obj_t source)
     return target;
 }
 
-rt_ubase_t rt_kmem_pvoff(void);
+const rt_ubase_t rt_kmem_pvoff(void);
 
 void rt_kmem_pvoff_set(rt_ubase_t pvoff);
 
 int rt_kmem_map_phy(void *va, void *pa, rt_size_t length, rt_size_t attr);
 
 void *rt_kmem_v2p(void *vaddr);
+
+void *rt_kmem_p2v(void *paddr);
 
 void rt_kmem_list(void);
 
