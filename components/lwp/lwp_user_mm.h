@@ -65,7 +65,6 @@ int lwp_munmap(void *addr);
  */
 int lwp_user_accessible_ext(struct rt_lwp *lwp, void *addr, size_t size);
 
-<<<<<<< HEAD
 /**
  * @brief Test if address from user is accessible address by user
  *        Same as lwp_user_accessible_ext except that lwp is current lwp
@@ -148,6 +147,9 @@ void lwp_unmap_user_space(struct rt_lwp *lwp);
 int lwp_unmap_user(struct rt_lwp *lwp, void *va);
 void *lwp_map_user(struct rt_lwp *lwp, void *map_va, size_t map_size, rt_bool_t text);
 
+void lwp_free_command_line_args(char** argv);
+char** lwp_get_command_line_args(struct rt_lwp *lwp);
+
 rt_varea_t lwp_map_user_varea(struct rt_lwp *lwp, void *map_va, size_t map_size);
 
 /* check LWP_MAP_FLAG_* */
@@ -158,15 +160,9 @@ int lwp_unmap_user_phy(struct rt_lwp *lwp, void *va);
 
 rt_base_t lwp_brk(void *addr);
 
-=======
-/* like a memcpy(dst,src,size) from address in lwp aspace to kernel space buffer */
-size_t lwp_data_get(struct rt_lwp *lwp, void *dst, void *src, size_t size);
-/* like a memcpy(dst,src,size) from kernel space buffer to address in lwp aspace  */
-size_t lwp_data_put(struct rt_lwp *lwp, void *dst, void *src, size_t size);
-/* like a memset(dst,c,size) to address in lwp aspace */
-size_t lwp_data_set(struct rt_lwp *lwp, void *dst, int c, size_t size);
+size_t lwp_user_strlen(const char *s);
+size_t lwp_user_strlen_ext(struct rt_lwp *lwp, const char *s);
 
->>>>>>> ebd015ba31 ([smart] support lwp_data_get()/set()/put())
 void lwp_data_cache_flush(struct rt_lwp *lwp, void *vaddr, size_t size);
 
 static inline void *_lwp_v2p(struct rt_lwp *lwp, void *vaddr)
@@ -180,6 +176,37 @@ static inline void *lwp_v2p(struct rt_lwp *lwp, void *vaddr)
     void *paddr = _lwp_v2p(lwp, vaddr);
     RD_UNLOCK(lwp->aspace);
     return paddr;
+}
+
+rt_inline rt_size_t lwp_user_mm_flag_to_kernel(int flags)
+{
+    rt_size_t k_flags = 0;
+    if (flags & MAP_FIXED)
+        k_flags |= MMF_MAP_FIXED;
+    if (flags & (MAP_PRIVATE | MAP_ANON | MAP_ANONYMOUS))
+        k_flags |= MMF_MAP_PRIVATE;
+    if (flags & MAP_SHARED)
+        k_flags |= MMF_MAP_SHARED;
+    return k_flags;
+}
+
+rt_inline rt_size_t lwp_user_mm_attr_to_kernel(int prot)
+{
+    rt_size_t k_attr = 0;
+
+#ifdef IMPL_MPROTECT
+    if ((prot & PROT_EXEC) || (prot & PROT_WRITE) ||
+        ((prot & PROT_READ) && (prot & PROT_WRITE)))
+        k_attr = MMU_MAP_U_RWCB;
+    else if (prot == PROT_NONE)
+        k_attr = MMU_MAP_K_RWCB;
+    else
+        k_attr = MMU_MAP_U_ROCB;
+#else
+    k_attr = MMU_MAP_U_RWCB;
+#endif /* IMPL_MPROTECT */
+
+    return k_attr;
 }
 
 #ifdef __cplusplus
