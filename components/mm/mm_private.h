@@ -113,6 +113,8 @@ int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
 
 int rt_varea_map_with_msg(rt_varea_t varea, struct rt_aspace_fault_msg *msg);
 
+void _varea_uninstall_locked(rt_varea_t varea);
+
 int _mm_aspace_map(rt_aspace_t aspace, rt_varea_t *pvarea, void **addr,
                    rt_size_t length, rt_size_t attr, mm_flag_t flags,
                    rt_mem_obj_t mem_obj, rt_size_t offset);
@@ -125,5 +127,7 @@ rt_inline rt_bool_t rt_varea_is_private_locked(rt_varea_t varea)
         && (varea->aspace->private_object != varea->mem_obj)
     );
 }
+
+rt_err_t rt_aspace_anon_ref_dec(rt_mem_obj_t aobj);
 
 #endif /* __MM_PRIVATE_H__ */

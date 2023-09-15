@@ -8,6 +8,7 @@
  * 2023-08-19     Shell        Support PRIVATE mapping and COW
  */
 
+#include "mm_flag.h"
 #define DBG_TAG "mm.anon"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
@@ -21,18 +22,92 @@
  * aspace. Their only backup is in the aspace->pgtbl.
  */
 
-typedef struct rt_private_obj {
+typedef struct rt_private_ctx {
     struct rt_mem_obj mem_obj;
     rt_aspace_t backup_aspace;
-} *rt_private_obj_t;
+    /* both varea and aspace can holds a reference */
+    rt_atomic_t reference;
+    /* readonly `private` is shared object */
+    long readonly;
+} *rt_private_ctx_t;
 
-rt_inline rt_aspace_t _aono_obj_get_backup(rt_mem_obj_t mem_obj)
+rt_inline rt_aspace_t _anon_obj_get_backup(rt_mem_obj_t mobj)
 {
-    rt_private_obj_t priv_obj;
+    rt_private_ctx_t pctx;
     rt_aspace_t backup;
-    priv_obj = rt_container_of(mem_obj, struct rt_private_obj, mem_obj);
-    backup = priv_obj->backup_aspace;
+    pctx = rt_container_of(mobj, struct rt_private_ctx, mem_obj);
+    backup = pctx->backup_aspace;
     return backup;
+}
+
+rt_inline rt_atomic_t *_anon_obj_get_reference(rt_mem_obj_t mobj)
+{
+    rt_private_ctx_t pctx;
+    pctx = rt_container_of(mobj, struct rt_private_ctx, mem_obj);
+    return &pctx->reference;
+}
+
+rt_inline rt_private_ctx_t _anon_mobj_to_pctx(rt_mem_obj_t mobj)
+{
+    return rt_container_of(mobj, struct rt_private_ctx, mem_obj);
+}
+
+static long rt_aspace_anon_ref_inc(rt_mem_obj_t aobj)
+{
+    long rc;
+    if (aobj)
+    {
+        rc = rt_atomic_add(_anon_obj_get_reference(aobj), 1);
+        LOG_D("%s(aobj=%p) Cur %ld", __func__, aobj, rc + 1);
+    }
+    else
+        rc = -1;
+    return rc;
+}
+
+rt_err_t rt_aspace_anon_ref_dec(rt_mem_obj_t aobj)
+{
+    rt_err_t rc;
+    rt_aspace_t aspace;
+    rt_private_ctx_t pctx;
+    long former_reference;
+
+    if (aobj)
+    {
+        pctx = _anon_mobj_to_pctx(aobj);
+        RT_ASSERT(pctx);
+
+        former_reference = rt_atomic_add(_anon_obj_get_reference(aobj), -1);
+        LOG_D("%s(aobj=%p) Cur %ld", __func__, aobj, former_reference - 1);
+        if (pctx->readonly)
+        {
+            if (former_reference - 1 <= pctx->readonly)
+            {
+                void *pgtbl;
+                RT_ASSERT(former_reference - 1 == pctx->readonly);
+                aspace = _anon_obj_get_backup(aobj);
+
+                pctx->readonly = 0;
+                pgtbl = aspace->page_table;
+                rt_aspace_delete(aspace);
+                rt_hw_mmu_pgtbl_delete(pgtbl);
+            }
+        }
+        else if (former_reference < 2)
+        {
+            aspace = _anon_obj_get_backup(aobj);
+            aspace->private_object = RT_NULL;
+
+            rt_free(pctx);
+        }
+        rc = RT_EOK;
+    }
+    else
+    {
+        rc = -RT_EINVAL;
+    }
+
+    return rc;
 }
 
 static const char *_anon_get_name(rt_varea_t varea)
@@ -42,12 +117,15 @@ static const char *_anon_get_name(rt_varea_t varea)
 
 static void _anon_varea_open(struct rt_varea *varea)
 {
+    rt_aspace_anon_ref_inc(varea->mem_obj);
+
     varea->offset = MM_PA_TO_OFF(varea->start);
     varea->data = NULL;
 }
 
 static void _anon_varea_close(struct rt_varea *varea)
 {
+    rt_aspace_anon_ref_dec(varea->mem_obj);
 }
 
 static rt_err_t _anon_varea_expand(struct rt_varea *varea, void *new_vaddr, rt_size_t size)
@@ -79,7 +157,7 @@ static void _anon_page_fault(struct rt_varea *varea, struct rt_aspace_fault_msg 
     struct rt_aspace_io_msg iomsg;
     rt_mm_dummy_mapper.on_page_fault(varea, msg);
     if (msg->response.status != MM_FAULT_STATUS_UNRECOVERABLE
-        && varea->aspace != _aono_obj_get_backup(varea->mem_obj))
+        && varea->aspace != _anon_obj_get_backup(varea->mem_obj))
     {
         /* copy data from backup aspace */
         rt_mm_io_msg_init(&iomsg, msg->off, msg->fault_vaddr, msg->response.vaddr);
@@ -109,7 +187,7 @@ static void read_by_mte(rt_aspace_t aspace, struct rt_aspace_io_msg *iomsg)
 static void _anon_page_read(struct rt_varea *varea, struct rt_aspace_io_msg *iomsg)
 {
     rt_err_t error;
-    rt_aspace_t backup = _aono_obj_get_backup(varea->mem_obj);
+    rt_aspace_t backup = _anon_obj_get_backup(varea->mem_obj);
 
     LOG_D("%s:%d", __FILE__, __LINE__);
     if (rt_hw_mmu_v2p(backup, iomsg->fault_vaddr) == ARCH_MAP_FAILED)
@@ -161,7 +239,7 @@ static void write_by_mte(rt_aspace_t aspace, struct rt_aspace_io_msg *iomsg)
 static void _anon_page_write(struct rt_varea *varea, struct rt_aspace_io_msg *iomsg)
 {
     rt_err_t error;
-    rt_aspace_t backup = _aono_obj_get_backup(varea->mem_obj);
+    rt_aspace_t backup = _anon_obj_get_backup(varea->mem_obj);
     RT_ASSERT(backup == varea->aspace); /* write is only allowed from backup aspace */
 
     LOG_D("%s:%d", __FILE__, __LINE__);
@@ -191,7 +269,7 @@ static void _anon_page_write(struct rt_varea *varea, struct rt_aspace_io_msg *io
     RDWR_UNLOCK(backup);
 }
 
-static struct rt_private_obj _priv_obj = {
+static struct rt_private_ctx _priv_obj = {
     .mem_obj.get_name = _anon_get_name,
     .mem_obj.on_page_fault = _anon_page_fault,
     .mem_obj.hint_free = NULL,
@@ -205,14 +283,18 @@ static struct rt_private_obj _priv_obj = {
     .mem_obj.page_write = _anon_page_write,
 };
 
-rt_inline rt_private_obj_t rt_private_obj_create_n_bind(rt_aspace_t aspace)
+rt_inline rt_private_ctx_t rt_private_obj_create_n_bind(rt_aspace_t aspace)
 {
-    rt_private_obj_t private_object;
-    private_object = rt_malloc(sizeof(struct rt_private_obj));
+    rt_private_ctx_t private_object;
+    private_object = rt_malloc(sizeof(struct rt_private_ctx));
     if (private_object)
     {
         memcpy(&private_object->mem_obj, &_priv_obj, sizeof(_priv_obj));
 
+        /* hold a init ref from backup aspace */
+        rt_atomic_store(&private_object->reference, 1);
+
+        private_object->readonly = RT_FALSE;
         private_object->backup_aspace = aspace;
         aspace->private_object = &private_object->mem_obj;
     }
@@ -222,7 +304,7 @@ rt_inline rt_private_obj_t rt_private_obj_create_n_bind(rt_aspace_t aspace)
 
 rt_inline rt_mem_obj_t _get_private_obj(rt_aspace_t aspace)
 {
-    rt_private_obj_t priv;
+    rt_private_ctx_t priv;
     rt_mem_obj_t rc;
     rc = aspace->private_object;
     if (!aspace->private_object)
@@ -231,6 +313,7 @@ rt_inline rt_mem_obj_t _get_private_obj(rt_aspace_t aspace)
         if (priv)
         {
             rc = &priv->mem_obj;
+            aspace->private_object = rc;
         }
     }
     return rc;
@@ -239,7 +322,7 @@ rt_inline rt_mem_obj_t _get_private_obj(rt_aspace_t aspace)
 static int _override_map(rt_varea_t varea, rt_aspace_t aspace, void *fault_vaddr, struct rt_aspace_fault_msg *msg, void *page)
 {
     int rc = MM_FAULT_FIXABLE_FALSE;
-    rt_private_obj_t private_object;
+    rt_mem_obj_t private_object;
     rt_varea_t map_varea = RT_NULL;
     rt_err_t error;
     rt_size_t flags;
@@ -247,29 +330,21 @@ static int _override_map(rt_varea_t varea, rt_aspace_t aspace, void *fault_vaddr
 
     LOG_D("%s", __func__);
 
-    private_object = rt_container_of(aspace->private_object, struct rt_private_obj, mem_obj);
-    if (!private_object)
-        private_object = rt_private_obj_create_n_bind(aspace);
+    private_object = _get_private_obj(aspace);
 
     if (private_object)
     {
+        rt_hw_mmu_unmap(aspace, fault_vaddr, ARCH_PAGE_SIZE);
+
         flags = varea->flag | MMF_MAP_FIXED;
         /* don't prefetch and do it latter */
         flags &= ~MMF_PREFETCH;
         attr = rt_hw_mmu_attr_add_perm(varea->attr, RT_HW_MMU_PROT_USER | RT_HW_MMU_PROT_WRITE);
 
-        rt_size_t ex_vsz = rt_aspace_count_vsz(aspace);
         /* override existing mapping at fault_vaddr */
         error = _mm_aspace_map(
             aspace, &map_varea, &fault_vaddr, ARCH_PAGE_SIZE, attr,
-            flags, &private_object->mem_obj, MM_PA_TO_OFF(fault_vaddr));
-
-        if (ex_vsz != rt_aspace_count_vsz(aspace))
-        {
-            LOG_E("%s: fault_va=%p,(priv_va=%p,priv_sz=0x%lx) at %s", __func__, msg->fault_vaddr, map_varea->start, map_varea->size, VAREA_NAME(map_varea));
-            RT_ASSERT((rt_aspace_print_all(aspace), 1));
-            RT_ASSERT(0 && "vsz changed");
-        }
+            flags, private_object, MM_PA_TO_OFF(fault_vaddr));
 
         if (error == RT_EOK)
         {
@@ -344,9 +419,9 @@ int rt_varea_fix_private_locked(rt_varea_t ex_varea, void *pa,
                     rt_mm_io_msg_init(&io_msg, msg->off, msg->fault_vaddr, page);
                     ex_obj->page_read(ex_varea, &io_msg);
                     /**
-                    * Note: if ex_obj have mapped into varea, it's still okay since
-                    * we will override it latter
-                    */
+                     * Note: if ex_obj have mapped into varea, it's still okay since
+                     * we will override it latter
+                     */
                     if (io_msg.response.status != MM_FAULT_STATUS_UNRECOVERABLE)
                     {
                         rc = _override_map(ex_varea, aspace, fault_vaddr, msg, page);
@@ -381,15 +456,105 @@ int rt_aspace_map_private(rt_aspace_t aspace, void **addr, rt_size_t length,
     int rc;
     rt_mem_obj_t priv_obj;
 
-    priv_obj = _get_private_obj(aspace);
-    if (priv_obj)
+    if (flags & MMF_STATIC_ALLOC)
     {
-        flags |= MMF_MAP_PRIVATE;
-        rc = rt_aspace_map(aspace, addr, length, attr, flags, priv_obj, 0);
+        rc = -RT_EINVAL;
+    }
+    else
+    {
+        priv_obj = _get_private_obj(aspace);
+        if (priv_obj)
+        {
+            flags |= MMF_MAP_PRIVATE;
+            flags &= ~MMF_PREFETCH;
+            rc = rt_aspace_map(aspace, addr, length, attr, flags, priv_obj, 0);
+        }
+        else
+        {
+            rc = -RT_ENOMEM;
+        }
+    }
+    return rc;
+}
+
+static int _release_shared(rt_varea_t varea, void *arg)
+{
+    rt_aspace_t src = varea->aspace;
+    rt_mem_obj_t mem_obj = varea->mem_obj;
+
+    if (mem_obj != _get_private_obj(src))
+    {
+        _varea_uninstall_locked(varea);
+        if (VAREA_NOT_STATIC(varea))
+        {
+            rt_free(varea);
+        }
+    }
+
+    return 0;
+}
+
+static rt_err_t _convert_readonly(rt_aspace_t aspace, long base_reference)
+{
+    rt_mem_obj_t aobj;
+    rt_private_ctx_t pctx;
+    aobj = _get_private_obj(aspace);
+    pctx = _anon_mobj_to_pctx(aobj);
+
+    LOG_D("Ref(cur=%d,base=%d)", pctx->reference, base_reference);
+    rt_aspace_traversal(aspace, _release_shared, 0);
+    pctx->readonly = base_reference;
+    return 0;
+}
+
+rt_inline void _switch_aspace(rt_aspace_t *pa, rt_aspace_t *pb)
+{
+    rt_aspace_t temp;
+    temp = *pa;
+    *pa = *pb;
+    *pb = temp;
+}
+
+rt_err_t rt_aspace_fork(rt_aspace_t *psrc, rt_aspace_t *pdst)
+{
+    rt_err_t rc;
+    void *pgtbl;
+    rt_aspace_t backup;
+    rt_aspace_t src = *psrc;
+    rt_aspace_t dst = *pdst;
+    long base_reference;
+
+    pgtbl = rt_hw_mmu_pgtbl_create();
+    if (pgtbl)
+    {
+        backup = rt_aspace_create(src->start, src->size, pgtbl);
+        if (backup)
+        {
+            WR_LOCK(src);
+            base_reference = rt_atomic_load(_anon_obj_get_reference(src->private_object));
+            rc = rt_aspace_duplicate_locked(src, dst);
+            WR_UNLOCK(src);
+
+            if (!rc)
+            {
+                /* WR_LOCK(dst) is not necessary since dst is not available currently */
+                rc = rt_aspace_duplicate_locked(dst, backup);
+                if (!rc)
+                {
+                    _switch_aspace(psrc, &backup);
+                    _convert_readonly(backup, base_reference);
+                }
+            }
+        }
+        else
+        {
+            rc = -RT_ENOMEM;
+        }
     }
     else
     {
         rc = -RT_ENOMEM;
     }
+
     return rc;
 }

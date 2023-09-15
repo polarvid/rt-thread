@@ -35,7 +35,6 @@
 static void *_find_free(rt_aspace_t aspace, void *prefer, rt_size_t req_size,
                         void *limit_start, rt_size_t limit_size,
                         mm_flag_t flags);
-static void _varea_uninstall_locked(rt_varea_t varea);
 static int _unmap_range_locked(rt_aspace_t aspace, void *addr, size_t length);
 
 struct rt_aspace rt_kernel_space;
@@ -122,11 +121,7 @@ void rt_aspace_detach(rt_aspace_t aspace)
     }
     WR_UNLOCK(aspace);
 
-    if (aspace->private_object)
-    {
-        rt_free(aspace->private_object);
-        aspace->private_object = RT_NULL;
-    }
+    rt_aspace_anon_ref_dec(aspace->private_object);
 
     rt_mutex_detach(&aspace->bst_lock);
 }
@@ -566,7 +561,7 @@ static int _varea_install(rt_aspace_t aspace, rt_varea_t *pvarea,
 /**
  * restore context modified by varea install
  */
-static void _varea_uninstall_locked(rt_varea_t varea)
+void _varea_uninstall_locked(rt_varea_t varea)
 {
     rt_aspace_t aspace = varea->aspace;
 
@@ -1431,6 +1426,135 @@ rt_base_t rt_aspace_count_vsz(rt_aspace_t aspace)
     return vsz;
 }
 
+static int _dup_varea(rt_varea_t src_varea, void *arg)
+{
+    int err;
+    rt_aspace_t dst = arg;
+    rt_aspace_t src = src_varea->aspace;
+
+    void *pa = RT_NULL;
+    void *va = RT_NULL;
+    rt_mem_obj_t mem_obj = src_varea->mem_obj;
+
+    if (!mem_obj)
+    {
+        /* duplicate a physical mapping */
+        pa = rt_hw_mmu_v2p(src, (void *)src_varea->start);
+        RT_ASSERT(pa != ARCH_MAP_FAILED);
+        struct rt_mm_va_hint hint = {.flags = src_varea->flag,
+                                     .limit_range_size = dst->size,
+                                     .limit_start = dst->start,
+                                     .prefer = src_varea->start,
+                                     .map_size = src_varea->size};
+        err = rt_aspace_map_phy(dst, &hint, src_varea->attr,
+                                MM_PA_TO_OFF(pa), &va);
+        if (err != RT_EOK)
+        {
+            LOG_W("%s: aspace map failed at %p with size %p", __func__,
+                  src_varea->start, src_varea->size);
+        }
+    }
+    else
+    {
+        /* duplicate a mem_obj backing mapping */
+        rt_base_t flags = src_varea->flag | MMF_MAP_FIXED;
+        flags &= ~MMF_STATIC_ALLOC;
+        flags &= ~MMF_PREFETCH;
+        va = src_varea->start;
+
+        err = rt_aspace_map(dst, &va, src_varea->size, src_varea->attr,
+                            flags, mem_obj, src_varea->offset);
+        if (err != RT_EOK)
+        {
+            LOG_W("%s: aspace map failed at %p with size %p", __func__,
+                  src_varea->start, src_varea->size);
+        }
+    }
+
+    if (va != (void *)src_varea->start)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+struct _compare_param {
+    rt_aspace_t dst;
+    int rc;
+};
+
+rt_err_t rt_aspace_duplicate_locked(rt_aspace_t src, rt_aspace_t dst)
+{
+    return rt_aspace_traversal(src, _dup_varea, dst);
+}
+
+rt_inline int _varea_same(rt_varea_t a, rt_varea_t b)
+{
+    return a->attr == b->attr && a->flag == b->flag && a->mem_obj == b->mem_obj;
+}
+
+rt_inline void _dump_varea(rt_varea_t varea)
+{
+    LOG_W("%s(attr=0x%lx, flags=0x%lx, start=0x%lx, size=0x%lx, mem_obj=%p)", VAREA_NAME(varea), varea->attr, varea->flag, varea->start, varea->size, varea->mem_obj);
+}
+
+static int _compare_varea(rt_varea_t src_varea, void *arg)
+{
+    struct _compare_param *param = arg;
+    rt_varea_t dst_varea;
+    rt_aspace_t dst = param->dst;
+    rt_aspace_t src = src_varea->aspace;
+
+    dst_varea = _aspace_bst_search(dst, src_varea->start);
+    if (_varea_same(src_varea, dst_varea) == RT_FALSE)
+    {
+        LOG_E("%s(a_varea=%s, b_varea=%s)", __func__, VAREA_NAME(src_varea), VAREA_NAME(dst_varea));
+        _dump_varea(src_varea);
+        _dump_varea(dst_varea);
+        param->rc = -RT_ERROR;
+    }
+    else
+    {
+        if (dst_varea)
+        {
+            char *buf1 = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+            char *buf2 = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+            char *vend = src_varea->start + src_varea->size;
+            for (char *i = src_varea->start; i < vend; i += ARCH_PAGE_SIZE)
+            {
+                int rc;
+                rt_aspace_page_get(src, i, buf1);
+                rt_aspace_page_get(dst, i, buf2);
+                rc = memcmp(buf1, buf2, ARCH_PAGE_SIZE);
+                if (rc)
+                {
+                    if (param->rc == 0)
+                        param->rc = rc;
+                    LOG_E("%s(a_varea=%s, b_varea=%s)", __func__, VAREA_NAME(src_varea), VAREA_NAME(dst_varea));
+                    _dump_varea(src_varea);
+                    _dump_varea(dst_varea);
+                    RT_ASSERT(0);
+                }
+            }
+
+            rt_pages_free(buf1, 0);
+            rt_pages_free(buf2, 0);
+        }
+        else
+        {
+            param->rc = -RT_ENOENT;
+        }
+    }
+    return 0;
+}
+
+rt_err_t rt_aspace_compare(rt_aspace_t src, rt_aspace_t dst)
+{
+    struct _compare_param param = {.rc = 0, .dst = dst};
+    rt_aspace_traversal(src, _compare_varea, &param);
+    return param.rc;
+}
+
 /* dst are page aligned */
 rt_inline rt_err_t _page_put(rt_varea_t varea, void *page_va, void *buffer)
 {
@@ -1468,6 +1592,7 @@ rt_err_t rt_aspace_page_put(rt_aspace_t aspace, void *page_va, void *buffer)
     rt_err_t rc = -RT_ERROR;
     rt_varea_t varea;
 
+    RT_ASSERT(aspace);
     RD_LOCK(aspace);
     varea = _aspace_bst_search(aspace, page_va);
     if (varea && ALIGNED(page_va))
@@ -1517,6 +1642,7 @@ rt_err_t rt_aspace_page_get(rt_aspace_t aspace, void *page_va, void *buffer)
     rt_varea_t varea;
 
     /* TODO: cache the last search item */
+    RT_ASSERT(aspace);
     RD_LOCK(aspace);
     varea = _aspace_bst_search(aspace, page_va);
     if (varea && ALIGNED(page_va))

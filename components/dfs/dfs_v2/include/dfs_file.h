@@ -93,6 +93,8 @@ struct dfs_file
     struct dfs_dentry *dentry;  /* dentry of this file */
     struct dfs_vnode *vnode;    /* vnode of this file */
 
+    void *mmap_context;         /* used by mmap routine */
+
     void *data;
 };
 

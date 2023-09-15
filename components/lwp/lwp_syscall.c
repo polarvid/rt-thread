@@ -1946,17 +1946,6 @@ rt_weak long sys_clone(void *arg[])
     return _sys_clone(arg);
 }
 
-int lwp_dup_user(rt_varea_t varea, void *arg);
-
-static int _copy_process(struct rt_lwp *dest_lwp, struct rt_lwp *src_lwp)
-{
-    int err;
-    dest_lwp->lwp_obj->source = src_lwp->aspace;
-    err = rt_aspace_traversal(src_lwp->aspace, lwp_dup_user, dest_lwp);
-    dest_lwp->lwp_obj->source = NULL;
-    return err;
-}
-
 static void lwp_struct_copy(struct rt_lwp *dst, struct rt_lwp *src)
 {
 #ifdef ARCH_MM_MMU
@@ -2053,8 +2042,8 @@ sysret_t _sys_fork(void)
 
     self_lwp = lwp_self();
 
-    /* copy address space of process */
-    if (_copy_process(lwp, self_lwp) != 0)
+    /* copy address space of process from this proc to forked one */
+    if (lwp_fork_aspace(lwp, self_lwp) != 0)
     {
         SET_ERRNO(ENOMEM);
         goto fail;
@@ -2632,15 +2621,7 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
     }
 
     /* alloc new lwp to operation */
-    new_lwp = (struct rt_lwp *)rt_malloc(sizeof(struct rt_lwp));
-    if (!new_lwp)
-    {
-        SET_ERRNO(ENOMEM);
-        goto quit;
-    }
-    rt_memset(new_lwp, 0, sizeof(struct rt_lwp));
-    new_lwp->ref = 1;
-    lwp_user_object_lock_init(new_lwp);
+    new_lwp = lwp_create();
     ret = lwp_user_space_init(new_lwp, 0);
     if (ret != 0)
     {
@@ -2734,10 +2715,6 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
         lwp_aspace_switch(thread);
 
         rt_hw_interrupt_enable(level);
-
-        /* setup the signal, timer_list for the dummy lwp, so that is can be smoothly recycled */
-        lwp_signal_init(&new_lwp->signal);
-        rt_list_init(&new_lwp->timer);
 
         lwp_ref_dec(new_lwp);
         arch_start_umode(lwp->args,

@@ -43,7 +43,7 @@ extern "C" {
  * @param pgoffset offset to fd in 4096 bytes unit
  * @return void* the address is successful, otherwise return MAP_FAILED
  */
-void* lwp_mmap2(void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
+void* lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
 
 /**
  * @brief Unmap memory region in user space
@@ -53,7 +53,7 @@ void* lwp_mmap2(void *addr, size_t length, int prot, int flags, int fd, off_t pg
  * @param length length in bytes of unmapping
  * @return int errno
  */
-int lwp_munmap(void *addr);
+int lwp_munmap(struct rt_lwp *lwp, void *addr, size_t length);
 
 /**
  * @brief Test if address from user is accessible address by user
@@ -162,6 +162,8 @@ rt_base_t lwp_brk(void *addr);
 
 size_t lwp_user_strlen(const char *s);
 size_t lwp_user_strlen_ext(struct rt_lwp *lwp, const char *s);
+
+int lwp_fork_aspace(struct rt_lwp *dest_lwp, struct rt_lwp *src_lwp);
 
 void lwp_data_cache_flush(struct rt_lwp *lwp, void *vaddr, size_t size);
 

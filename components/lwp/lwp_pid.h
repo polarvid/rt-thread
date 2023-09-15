@@ -22,6 +22,7 @@ struct rt_lwp;
 struct lwp_avl_struct *lwp_get_pid_ary(void);
 
 struct rt_lwp* lwp_new(void);
+struct rt_lwp* lwp_create(void);
 void lwp_free(struct rt_lwp* lwp);
 
 int lwp_ref_inc(struct rt_lwp *lwp);

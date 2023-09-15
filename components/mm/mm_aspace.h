@@ -265,6 +265,10 @@ rt_base_t rt_aspace_count_vsz(rt_aspace_t aspace);
 
 rt_varea_t rt_aspace_query(rt_aspace_t aspace, void *vaddr);
 
+rt_err_t rt_aspace_duplicate_locked(rt_aspace_t src, rt_aspace_t dst);
+rt_err_t rt_aspace_fork(rt_aspace_t *psrc, rt_aspace_t *pdst);
+rt_err_t rt_aspace_compare(rt_aspace_t src, rt_aspace_t dst);
+
 /**
  * @brief Map one page to varea
  *

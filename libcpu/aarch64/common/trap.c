@@ -331,9 +331,15 @@ void rt_hw_trap_exception(struct rt_hw_exp_stack *regs)
      * Note: check_user_stack will take lock and it will possibly be a dead-lock
      * if exception comes from kernel.
      */
-    if ((regs->cpsr & 0x1f) == 0 && check_user_stack(esr, regs))
+    if ((regs->cpsr & 0x1f) == 0)
     {
-        return;
+        if (check_user_stack(esr, regs))
+            return;
+    }
+    else
+    {
+        if (check_user_stack(esr, regs))
+            return;
     }
 #endif
     process_exception(esr, regs->pc);

@@ -44,13 +44,83 @@
 
 #include <stdlib.h>
 
+#define STACK_OBJ _null_object
+
 static void _init_lwp_objs(struct rt_lwp_objs *lwp_objs, rt_aspace_t aspace);
+
+static const char *_null_get_name(rt_varea_t varea)
+{
+    return "null";
+}
+
+static void _null_page_fault(struct rt_varea *varea,
+                             struct rt_aspace_fault_msg *msg)
+{
+    static void *null_page;
+
+    if (!null_page)
+    {
+        null_page = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
+        if (null_page)
+            memset(null_page, 0, ARCH_PAGE_SIZE);
+        else
+            return;
+    }
+
+    msg->response.status = MM_FAULT_STATUS_OK;
+    msg->response.size = ARCH_PAGE_SIZE;
+    msg->response.vaddr = null_page;
+}
+
+static rt_err_t _null_shrink(rt_varea_t varea, void *new_start, rt_size_t size)
+{
+    return RT_EOK;
+}
+
+static rt_err_t _null_split(struct rt_varea *existed, void *unmap_start, rt_size_t unmap_len, struct rt_varea *subset)
+{
+    return RT_EOK;
+}
+
+static rt_err_t _null_expand(struct rt_varea *varea, void *new_vaddr, rt_size_t size)
+{
+    return RT_EOK;
+}
+
+static void _null_page_read(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
+{
+    void *dest = msg->buffer_vaddr;
+    memset(dest, 0, ARCH_PAGE_SIZE);
+
+    msg->response.status = MM_FAULT_STATUS_OK;
+    return ;
+}
+
+static void _null_page_write(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
+{
+    /* write operation is not allowed */
+    msg->response.status = MM_FAULT_STATUS_UNRECOVERABLE;
+    return ;
+}
+
+static struct rt_mem_obj _null_object = {
+    .get_name = _null_get_name,
+    .hint_free = RT_NULL,
+    .on_page_fault = _null_page_fault,
+
+    .page_read = _null_page_read,
+    .page_write = _null_page_write,
+
+    .on_varea_expand = _null_expand,
+    .on_varea_shrink = _null_shrink,
+    .on_varea_split = _null_split,
+};
 
 int lwp_user_space_init(struct rt_lwp *lwp, rt_bool_t is_fork)
 {
     void *stk_addr;
     int err = -RT_ENOMEM;
-    const size_t flags = 0;
+    const size_t flags = MMF_MAP_PRIVATE;
 
     lwp->lwp_obj = rt_malloc(sizeof(struct rt_lwp_objs));
     if (lwp->lwp_obj)
@@ -62,10 +132,9 @@ int lwp_user_space_init(struct rt_lwp *lwp, rt_bool_t is_fork)
             if (!is_fork)
             {
                 stk_addr = (void *)USER_STACK_VSTART;
-                /* TODO: add stack object */
                 err = rt_aspace_map(lwp->aspace, &stk_addr,
                                     USER_STACK_VEND - USER_STACK_VSTART,
-                                    MMU_MAP_U_RWCB, flags, &lwp->lwp_obj->mem_obj, 0);
+                                    MMU_MAP_U_RWCB, flags, &STACK_OBJ, 0);
             }
         }
     }
@@ -199,74 +268,6 @@ static void _init_lwp_objs(struct rt_lwp_objs *lwp_objs, rt_aspace_t aspace)
     }
 }
 
-static const char *_null_get_name(rt_varea_t varea)
-{
-    return "null";
-}
-
-static void _null_page_fault(struct rt_varea *varea,
-                             struct rt_aspace_fault_msg *msg)
-{
-    static void *null_page;
-
-    if (!null_page)
-    {
-        null_page = rt_pages_alloc_ext(0, PAGE_ANY_AVAILABLE);
-        if (null_page)
-            memset(null_page, 0, ARCH_PAGE_SIZE);
-        else
-            return;
-    }
-
-    msg->response.status = MM_FAULT_STATUS_OK;
-    msg->response.size = ARCH_PAGE_SIZE;
-    msg->response.vaddr = null_page;
-}
-
-static rt_err_t _null_shrink(rt_varea_t varea, void *new_start, rt_size_t size)
-{
-    return RT_EOK;
-}
-
-static rt_err_t _null_split(struct rt_varea *existed, void *unmap_start, rt_size_t unmap_len, struct rt_varea *subset)
-{
-    return RT_EOK;
-}
-
-static rt_err_t _null_expand(struct rt_varea *varea, void *new_vaddr, rt_size_t size)
-{
-    return RT_EOK;
-}
-
-static void _null_page_read(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
-{
-    void *dest = msg->buffer_vaddr;
-    memset(dest, 0, ARCH_PAGE_SIZE);
-
-    msg->response.status = MM_FAULT_STATUS_OK;
-    return ;
-}
-
-static void _null_page_write(struct rt_varea *varea, struct rt_aspace_io_msg *msg)
-{
-    /* write operation is not allowed */
-    msg->response.status = MM_FAULT_STATUS_UNRECOVERABLE;
-    return ;
-}
-
-static struct rt_mem_obj _null_object = {
-    .get_name = _null_get_name,
-    .hint_free = RT_NULL,
-    .on_page_fault = _null_page_fault,
-
-    .page_read = _null_page_read,
-    .page_write = _null_page_write,
-
-    .on_varea_expand = _null_expand,
-    .on_varea_shrink = _null_shrink,
-    .on_varea_split = _null_split,
-};
-
 static void *_lwp_map_user(struct rt_lwp *lwp, void *map_va, size_t map_size,
                            int text)
 {
@@ -297,98 +298,17 @@ int lwp_unmap_user(struct rt_lwp *lwp, void *va)
     return err;
 }
 
-static void _dup_varea(rt_varea_t varea, struct rt_lwp *src_lwp,
-                       rt_aspace_t dst)
-{
-    char *vaddr = varea->start;
-    char *vend = vaddr + varea->size;
-    if (vaddr < (char *)USER_STACK_VSTART || vaddr >= (char *)USER_STACK_VEND)
-    {
-        while (vaddr != vend)
-        {
-            void *paddr;
-            paddr = lwp_v2p(src_lwp, vaddr);
-            if (paddr != ARCH_MAP_FAILED)
-            {
-                rt_aspace_load_page(dst, vaddr, 1);
-            }
-            vaddr += ARCH_PAGE_SIZE;
-        }
-    }
-    else
-    {
-        while (vaddr != vend)
-        {
-            vend -= ARCH_PAGE_SIZE;
-            void *paddr;
-            paddr = lwp_v2p(src_lwp, vend);
-            if (paddr != ARCH_MAP_FAILED)
-            {
-                rt_aspace_load_page(dst, vend, 1);
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-}
-
-int lwp_dup_user(rt_varea_t varea, void *arg)
+/** fork the src_lwp->aspace in current */
+int lwp_fork_aspace(struct rt_lwp *dest_lwp, struct rt_lwp *src_lwp)
 {
     int err;
-    struct rt_lwp *self_lwp = lwp_self();
-    struct rt_lwp *new_lwp = (struct rt_lwp *)arg;
-
-    void *pa = RT_NULL;
-    void *va = RT_NULL;
-    rt_mem_obj_t mem_obj = varea->mem_obj;
-
-    if (!mem_obj)
+    err = rt_aspace_fork(&src_lwp->aspace, &dest_lwp->aspace);
+    if (!err)
     {
-        /* duplicate a physical mapping */
-        pa = lwp_v2p(self_lwp, (void *)varea->start);
-        RT_ASSERT(pa != ARCH_MAP_FAILED);
-        struct rt_mm_va_hint hint = {.flags = MMF_MAP_FIXED,
-                                     .limit_range_size = new_lwp->aspace->size,
-                                     .limit_start = new_lwp->aspace->start,
-                                     .prefer = varea->start,
-                                     .map_size = varea->size};
-        err = rt_aspace_map_phy(new_lwp->aspace, &hint, varea->attr,
-                                MM_PA_TO_OFF(pa), &va);
-        if (err != RT_EOK)
-        {
-            LOG_W("%s: aspace map failed at %p with size %p", __func__,
-                  varea->start, varea->size);
-        }
+        /* do a explicit aspace switch if the page table is changed */
+        rt_hw_aspace_switch(lwp_self()->aspace);
     }
-    else
-    {
-        /* duplicate a mem_obj backing mapping */
-        va = varea->start;
-        err = rt_aspace_map(new_lwp->aspace, &va, varea->size, varea->attr,
-                            varea->flag, &new_lwp->lwp_obj->mem_obj,
-                            varea->offset);
-        if (err != RT_EOK)
-        {
-            LOG_W("%s: aspace map failed at %p with size %p", __func__,
-                  varea->start, varea->size);
-        }
-        else
-        {
-            /* loading page frames for !MMF_PREFETCH varea */
-            if (!(varea->flag & MMF_PREFETCH))
-            {
-                _dup_varea(varea, self_lwp, new_lwp->aspace);
-            }
-        }
-    }
-
-    if (va != (void *)varea->start)
-    {
-        return -1;
-    }
-    return 0;
+    return err;
 }
 
 int lwp_unmap_user_phy(struct rt_lwp *lwp, void *va)
@@ -706,9 +626,6 @@ size_t lwp_get_from_user(void *dst, void *src, size_t size)
     return lwp_data_get(lwp, dst, src, size);
 }
 
-/**
- * todo: support .page_write()
- */
 size_t lwp_put_to_user(void *dst, void *src, size_t size)
 {
     struct rt_lwp *lwp = RT_NULL;

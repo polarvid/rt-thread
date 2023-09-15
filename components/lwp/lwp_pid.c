@@ -314,31 +314,34 @@ void lwp_user_object_dup(struct rt_lwp *dst_lwp, struct rt_lwp *src_lwp)
     lwp_user_object_unlock(src_lwp);
 }
 
+struct rt_lwp* lwp_create(void)
+{
+    rt_lwp_t new_lwp = rt_calloc(1, sizeof(struct rt_lwp));
+    if (new_lwp)
+    {
+        new_lwp->session = -1;
+        new_lwp->ref = 1;
+        rt_list_init(&new_lwp->wait_list);
+        rt_list_init(&new_lwp->t_grp);
+        rt_list_init(&new_lwp->timer);
+        lwp_user_object_lock_init(new_lwp);
+        rt_wqueue_init(&new_lwp->wait_queue);
+        lwp_signal_init(&new_lwp->signal);
+    }
+    return new_lwp;
+}
+
 struct rt_lwp* lwp_new(void)
 {
     pid_t pid;
     rt_base_t level;
     struct rt_lwp* lwp = RT_NULL;
 
-    lwp = (struct rt_lwp *)rt_malloc(sizeof(struct rt_lwp));
+    lwp = lwp_create();
     if (lwp == RT_NULL)
     {
         return lwp;
     }
-    memset(lwp, 0, sizeof(*lwp));
-    //lwp->tgroup_leader = RT_NULL;
-    rt_list_init(&lwp->wait_list);
-    lwp->leader = 0;
-    lwp->session = -1;
-    lwp->tty = RT_NULL;
-    rt_list_init(&lwp->t_grp);
-    rt_list_init(&lwp->timer);
-    lwp_user_object_lock_init(lwp);
-    lwp->address_search_head = RT_NULL;
-    rt_wqueue_init(&lwp->wait_queue);
-    lwp->ref = 1;
-
-    lwp_signal_init(&lwp->signal);
 
     level = rt_hw_interrupt_disable();
     pid = lwp_pid_get();
@@ -704,7 +707,7 @@ pid_t waitpid(pid_t pid, int *status, int options)
         /* delete from sibling list of its parent */
         struct rt_lwp **lwp_node;
 
-        *status = lwp->lwp_ret;
+        lwp_data_put(this_lwp, status, &lwp->lwp_ret, sizeof(status));
         lwp_node = &this_lwp->first_child;
         while (*lwp_node != lwp)
         {
