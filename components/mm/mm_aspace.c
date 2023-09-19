@@ -286,7 +286,7 @@ static rt_err_t _expand_varea(rt_varea_t varea, void *new_va, rt_size_t size)
     rt_aspace_t aspace;
     void *old_va;
 
-    if (varea->mem_obj && varea->mem_obj->on_varea_shrink)
+    if (varea->mem_obj && varea->mem_obj->on_varea_expand)
         error = varea->mem_obj->on_varea_expand(varea, new_va, size);
     else
         error = -RT_EPERM;
@@ -295,11 +295,12 @@ static rt_err_t _expand_varea(rt_varea_t varea, void *new_va, rt_size_t size)
     {
         aspace = varea->aspace;
         old_va = varea->start;
-        varea->start = new_va;
         varea->size = size;
 
         if (old_va != new_va)
         {
+            varea->start = new_va;
+            varea->offset += ((long)new_va - (long)old_va) >> MM_PAGE_SHIFT;
             _aspace_bst_remove(aspace, varea);
             _aspace_bst_insert(aspace, varea);
         }
@@ -699,6 +700,8 @@ int rt_aspace_map(rt_aspace_t aspace, void **addr, rt_size_t length,
     }
     else
     {
+        RT_ASSERT((length & ARCH_PAGE_MASK) == 0);
+        RT_ASSERT(((long)*addr & ARCH_PAGE_MASK) == 0);
         err = _mm_aspace_map(aspace, &varea, addr, length, attr, flags, mem_obj, offset);
     }
 
@@ -931,7 +934,7 @@ static rt_err_t _shrink_varea(rt_varea_t varea, void *new_va, rt_size_t size)
         if (old_va != new_va)
         {
             varea->start = new_va;
-            varea->offset += ((char *)new_va - (char *)old_va) >> MM_PAGE_SHIFT;
+            varea->offset += ((long)new_va - (long)old_va) >> MM_PAGE_SHIFT;
             _aspace_bst_remove(aspace, varea);
             _aspace_bst_insert(aspace, varea);
         }
@@ -1561,7 +1564,7 @@ rt_inline rt_err_t _page_put(rt_varea_t varea, void *page_va, void *buffer)
     struct rt_aspace_io_msg iomsg;
     rt_err_t rc;
 
-    rt_mm_io_msg_init(&iomsg, MM_PA_TO_OFF((char *)page_va - (char *)varea->start), page_va, buffer);
+    rt_mm_io_msg_init(&iomsg, VAREA_VA_TO_OFFSET(varea, page_va), page_va, buffer);
     varea->mem_obj->page_write(varea, &iomsg);
 
     if (iomsg.response.status == MM_FAULT_STATUS_UNRECOVERABLE)
@@ -1577,7 +1580,7 @@ rt_inline rt_err_t _page_get(rt_varea_t varea, void *page_va, void *buffer)
     struct rt_aspace_io_msg iomsg;
     rt_err_t rc;
 
-    rt_mm_io_msg_init(&iomsg, MM_PA_TO_OFF((char *)page_va - (char *)varea->start), page_va, buffer);
+    rt_mm_io_msg_init(&iomsg, VAREA_VA_TO_OFFSET(varea, page_va), page_va, buffer);
     varea->mem_obj->page_read(varea, &iomsg);
 
     if (iomsg.response.status == MM_FAULT_STATUS_UNRECOVERABLE)

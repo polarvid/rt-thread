@@ -128,8 +128,8 @@ int rt_aspace_fault_try_fix(rt_aspace_t aspace, struct rt_aspace_fault_msg *msg)
             }
             else
             {
-                LOG_D("%s(varea=%s,fault=%p,phy=%p)", __func__, VAREA_NAME(varea), msg->fault_vaddr, pa);
-                msg->off = ((char *)msg->fault_vaddr - (char *)varea->start) >> ARCH_PAGE_SHIFT;
+                LOG_D("%s(varea=%s,fault=%p,fault_op=%d,phy=%p)", __func__, VAREA_NAME(varea), msg->fault_vaddr, msg->fault_op, pa);
+                msg->off = varea->offset + ((long)msg->fault_vaddr - (long)varea->start) / ARCH_PAGE_SIZE;
 
                 /* permission checked by fault op */
                 switch (msg->fault_op)

@@ -539,7 +539,7 @@ static rt_page_t *_flag_to_page_list(size_t flags)
     return page_list;
 }
 
-static __attribute__((always_inline)) void *_do_pages_alloc(rt_uint32_t size_bits, size_t flags)
+rt_inline void *_do_pages_alloc(rt_uint32_t size_bits, size_t flags)
 {
     void *alloc_buf = RT_NULL;
     struct rt_page *p;

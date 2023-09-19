@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2019-10-28     Jesven       first version
  * 2021-02-12     lizhirui     add 64-bit support for lwp_brk
+ * 2023-09-19     Shell        add lwp_user_memory_remap_to_kernel
  */
 #ifndef  __LWP_USER_MM_H__
 #define  __LWP_USER_MM_H__
@@ -179,6 +180,18 @@ static inline void *lwp_v2p(struct rt_lwp *lwp, void *vaddr)
     RD_UNLOCK(lwp->aspace);
     return paddr;
 }
+
+/**
+ * @brief Remapping user space memory region to kernel
+ *
+ * @warning the remapped region in kernel should be unmapped after usage
+ *
+ * @param lwp target process
+ * @param uaddr user space address where the data writes to
+ * @param length the bytes to redirect
+ * @return void * the redirection address in kernel space
+ */
+void *lwp_user_memory_remap_to_kernel(rt_lwp_t lwp, void *uaddr, size_t length);
 
 rt_inline rt_size_t lwp_user_mm_flag_to_kernel(int flags)
 {

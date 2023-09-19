@@ -41,6 +41,8 @@
 #define VAREA_IS_WRITABLE(varea)                                               \
   (rt_hw_mmu_attr_test_perm(varea->attr,                                       \
                             RT_HW_MMU_PROT_USER | RT_HW_MMU_PROT_WRITE))
+#define VAREA_VA_TO_OFFSET(varea, va)                                          \
+    ((varea)->offset + MM_PA_TO_OFF((long)(va) - (long)(varea)->start))
 
 struct _mm_range
 {

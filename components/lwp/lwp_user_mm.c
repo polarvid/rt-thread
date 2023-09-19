@@ -14,6 +14,7 @@
  * 2023-08-12     Shell        Fix parameter passing of lwp_mmap()/lwp_munmap()
  * 2023-08-29     Shell        Add API accessible()/data_get()/data_set()/data_put()
  * 2023-09-13     Shell        Add lwp_memcpy and support run-time choice of memcpy base on memory attr
+ * 2023-09-19     Shell        add lwp_user_memory_remap_to_kernel
  */
 
 #include <rtthread.h>
@@ -306,7 +307,7 @@ int lwp_fork_aspace(struct rt_lwp *dest_lwp, struct rt_lwp *src_lwp)
     if (!err)
     {
         /* do a explicit aspace switch if the page table is changed */
-        rt_hw_aspace_switch(lwp_self()->aspace);
+        lwp_aspace_switch(rt_thread_self());
     }
     return err;
 }
@@ -370,7 +371,7 @@ static rt_varea_t _lwp_map_user_varea(struct rt_lwp *lwp, void *map_va, size_t m
 {
     void *va = map_va;
     int ret = 0;
-    rt_varea_t varea;
+    rt_varea_t varea = RT_NULL;
     mm_flag_t mm_flags;
     size_t attr;
 
@@ -394,7 +395,6 @@ static rt_varea_t _lwp_map_user_varea(struct rt_lwp *lwp, void *map_va, size_t m
 
 static rt_varea_t _map_user_varea_ext(struct rt_lwp *lwp, void *map_va, size_t map_size, size_t flags)
 {
-    rt_varea_t varea = RT_NULL;
     size_t offset = 0;
 
     if (!map_size)
@@ -406,9 +406,7 @@ static rt_varea_t _map_user_varea_ext(struct rt_lwp *lwp, void *map_va, size_t m
     map_size &= ~ARCH_PAGE_MASK;
     map_va = (void *)((size_t)map_va & ~ARCH_PAGE_MASK);
 
-    varea = _lwp_map_user_varea(lwp, map_va, map_size, flags);
-
-    return varea;
+    return _lwp_map_user_varea(lwp, map_va, map_size, flags);
 }
 
 rt_varea_t lwp_map_user_varea_ext(struct rt_lwp *lwp, void *map_va, size_t map_size, size_t flags)
@@ -520,6 +518,75 @@ rt_inline rt_bool_t _memory_threshold_ok(void)
     }
 
     return RT_TRUE;
+}
+
+rt_inline long _uflag_to_kernel(long flag)
+{
+    flag &= ~MMF_MAP_FIXED;
+    flag &= ~MMF_MAP_PRIVATE;
+    flag &= ~MMF_MAP_PRIVATE_DONT_SYNC;
+    return flag;
+}
+
+rt_inline long _uattr_to_kernel(long attr)
+{
+    /* Warning: be careful with the case if user attribution is unwritable */
+    return attr;
+}
+
+static void _prefetch_mmap(rt_aspace_t aspace, void *addr, long size)
+{
+    struct rt_aspace_fault_msg msg;
+
+    msg.fault_op = MM_FAULT_OP_WRITE;
+    msg.fault_type = MM_FAULT_TYPE_PAGE_FAULT;
+
+    for (char *base = addr; size > 0; base += ARCH_PAGE_SIZE, size -= ARCH_PAGE_SIZE)
+    {
+        msg.fault_vaddr = base;
+        msg.off = (long)base >> MM_PAGE_SHIFT;
+        rt_aspace_fault_try_fix(aspace, &msg);
+    }
+    return ;
+}
+
+void *lwp_user_memory_remap_to_kernel(rt_lwp_t lwp, void *uaddr, size_t length)
+{
+    long kattr;
+    long kflag;
+    long offset_in_mobj;
+    long offset_in_page;
+    rt_err_t error;
+    rt_varea_t uarea;
+    rt_mem_obj_t mobj;
+    void *kaddr = 0;
+
+    uarea = rt_aspace_query(lwp->aspace, uaddr);
+    if (uarea)
+    {
+        /* setup the identical mapping, and align up for address & length */
+        kattr = _uattr_to_kernel(uarea->attr);
+        kflag = _uflag_to_kernel(uarea->flag);
+        offset_in_mobj = uarea->offset + ((long)uaddr - (long)uarea->start) / ARCH_PAGE_SIZE;
+        mobj = uarea->mem_obj;
+        offset_in_page = (long)uaddr & ARCH_PAGE_MASK;
+        length = RT_ALIGN(length + offset_in_page, ARCH_PAGE_SIZE);
+        error = rt_aspace_map(&rt_kernel_space, &kaddr, length, kattr, kflag, mobj, offset_in_mobj);
+        if (error)
+        {
+            LOG_I("%s(length=0x%lx,attr=0x%lx,flags=0x%lx): do map failed", __func__, length, kattr, kflag);
+            kaddr = 0;
+        }
+        else
+        {
+            /* TODO: {make a memory lock?} */
+            LOG_D("%s(length=0x%lx,attr=0x%lx,flags=0x%lx,offset=0x%lx) => %p", __func__, length, kattr, kflag, offset_in_mobj, kaddr);
+            _prefetch_mmap(&rt_kernel_space, kaddr, length);
+            kaddr += offset_in_page;
+        }
+    }
+
+    return kaddr;
 }
 
 void *lwp_mmap2(struct rt_lwp *lwp, void *addr, size_t length, int prot,

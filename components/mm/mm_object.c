@@ -30,7 +30,6 @@ static const char *get_name(rt_varea_t varea)
     return "dummy-mapper";
 }
 
-#ifdef RT_USING_DEBUG
 static rt_bool_t _varea_pgmgr_frame_is_member(rt_varea_t varea, rt_page_t frame)
 {
     rt_page_t iter;
@@ -52,7 +51,6 @@ static rt_bool_t _varea_pgmgr_frame_is_member(rt_varea_t varea, rt_page_t frame)
 
     return rc;
 }
-#endif
 
 void rt_varea_pgmgr_insert(rt_varea_t varea, void *page_addr)
 {
@@ -171,8 +169,9 @@ static rt_err_t on_varea_shrink(rt_varea_t varea, void *new_start, rt_size_t siz
         rm_start = varea_start + size;
         rm_end = varea_start + varea->size;
     }
-    else if (varea_start < (char *)new_start)
+    else /* if (varea_start < (char *)new_start) */
     {
+        RT_ASSERT(varea_start < (char *)new_start);
         rm_start = varea_start;
         rm_end = new_start;
     }
@@ -197,11 +196,19 @@ static rt_err_t on_varea_split(struct rt_varea *existed, void *unmap_start, rt_s
 
         if (page_va != ARCH_MAP_FAILED)
         {
-            page_va -= PV_OFFSET;
-            LOG_D("%s: free page %p", __func__, page_va);
-            rt_page_ref_inc(page_va, 0);
-            rt_varea_pgmgr_pop(existed, page_va, ARCH_PAGE_SIZE);
-            rt_varea_pgmgr_insert(subset, page_va);
+            rt_page_t frame;
+            page_va = rt_kmem_p2v(page_va);
+            if (page_va)
+            {
+                frame = rt_page_addr2page(page_va);
+                if (frame && _varea_pgmgr_frame_is_member(existed, frame))
+                {
+                    LOG_D("%s: free page %p", __func__, page_va);
+                    rt_page_ref_inc(page_va, 0);
+                    rt_varea_pgmgr_pop(existed, page_va, ARCH_PAGE_SIZE);
+                    rt_varea_pgmgr_insert(subset, page_va);
+                }
+            }
         }
         sub_start += ARCH_PAGE_SIZE;
     }
