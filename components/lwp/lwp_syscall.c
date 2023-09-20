@@ -193,6 +193,19 @@ void lwp_cleanup(struct rt_thread *tid);
                 case INTF_SO_NO_CHECK:
                     *optname = IMPL_SO_NO_CHECK;
                     break;
+                /* LWIPPTP_SWREQ_0038 */
+                case INTF_SO_BINDTODEVICE:
+                    *optname = IMPL_SO_BINDTODEVICE;
+                    break;
+                case INTF_SO_TIMESTAMPNS:
+                    *optname = IMPL_SO_TIMESTAMPNS;
+                    break;
+                case INTF_SO_TIMESTAMPING:
+                    *optname = IMPL_SO_TIMESTAMPING;
+                    break;
+                case INTF_SO_SELECT_ERR_QUEUE:
+                    *optname = IMPL_SO_SELECT_ERR_QUEUE;
+                    break;
 
                 /*
                 * SO_DONTLINGER (*level = ((int)(~SO_LINGER))),
@@ -1352,12 +1365,37 @@ sysret_t sys_madvise(void *addr, size_t len, int behav)
 
 rt_event_t sys_event_create(const char *name, rt_uint8_t flag)
 {
-    rt_event_t event = rt_event_create(name, flag);
+    int len = 0;
+    rt_event_t event = RT_NULL;
+    char *kname = RT_NULL;
+
+    len = lwp_user_strlen(name);
+    if (len <= 0)
+    {
+        return RT_NULL;
+    }
+
+    kname = (char *)kmem_get(len + 1);
+    if (!kname)
+    {
+        return RT_NULL;
+    }
+
+    if (lwp_get_from_user(kname, (void *)name, len + 1) <= 0)
+    {
+        kmem_put(kname);
+        return RT_NULL;
+    }
+
+    event = rt_event_create(kname, flag);
     if (lwp_user_object_add(lwp_self(), (rt_object_t)event) != 0)
     {
         rt_event_delete(event);
         event = NULL;
     }
+
+    kmem_put(kname);
+
     return event;
 }
 
@@ -1377,21 +1415,56 @@ sysret_t sys_event_recv(rt_event_t   event,
                        rt_int32_t   timeout,
                        rt_uint32_t *recved)
 {
+    int ret = 0;
+    rt_uint32_t krecved;
+
     if ((recved != NULL) && !lwp_user_accessable((void *)recved, sizeof(rt_uint32_t *)))
     {
         return -EFAULT;
     }
-    return rt_event_recv(event, set, opt, timeout, recved);
+
+    ret = rt_event_recv(event, set, opt, timeout, &krecved);
+    if ((ret == RT_EOK) && recved)
+    {
+        lwp_put_to_user((void *)recved, &krecved, sizeof(rt_uint32_t *));
+    }
+
+    return ret;
 }
 
 rt_mailbox_t sys_mb_create(const char *name, rt_size_t size, rt_uint8_t flag)
 {
-    rt_mailbox_t mb = rt_mb_create(name, size, flag);
+    int len = 0;
+    rt_mailbox_t mb = RT_NULL;
+    char *kname = RT_NULL;
+
+    len = lwp_user_strlen(name);
+    if (len <= 0)
+    {
+        return RT_NULL;
+    }
+
+    kname = (char *)kmem_get(len + 1);
+    if (!kname)
+    {
+        return RT_NULL;
+    }
+
+    if (lwp_get_from_user(kname, (void *)name, len + 1) <= 0)
+    {
+        kmem_put(kname);
+        return RT_NULL;
+    }
+
+    mb = rt_mb_create(kname, size, flag);
     if (lwp_user_object_add(lwp_self(), (rt_object_t)mb) != 0)
     {
         rt_mb_delete(mb);
         mb = NULL;
     }
+
+    kmem_put(kname);
+
     return mb;
 }
 
@@ -1414,11 +1487,29 @@ sysret_t sys_mb_send_wait(rt_mailbox_t mb,
 
 sysret_t sys_mb_recv(rt_mailbox_t mb, rt_ubase_t *value, rt_int32_t timeout)
 {
+    int ret = 0;
+    rt_ubase_t *kvalue;
+
     if (!lwp_user_accessable((void *)value, sizeof(rt_ubase_t *)))
     {
         return -EFAULT;
     }
-    return rt_mb_recv(mb, (rt_ubase_t *)value, timeout);
+
+    kvalue = kmem_get(sizeof(rt_ubase_t *));
+    if (kvalue == RT_NULL)
+    {
+        return -ENOMEM;
+    }
+
+    ret = rt_mb_recv(mb, (rt_ubase_t *)kvalue, timeout);
+    if (ret == RT_EOK)
+    {
+        lwp_put_to_user(value, kvalue, sizeof(rt_ubase_t *));
+    }
+
+    kmem_put(kvalue);
+
+    return ret;
 }
 
 rt_mq_t sys_mq_create(const char *name,
@@ -3467,7 +3558,215 @@ static int netflags_muslc_2_lwip(int flags)
     {
         flgs |= MSG_MORE;
     }
+    /* LWIPPTP_SWREQ_0038 */
+    if (flags & MSG_ERRQUEUE)
+    {
+        flgs |= MSG_ERRQUEUE;
+    }
     return flgs;
+}
+
+#ifdef ARCH_MM_MMU
+/* LWIPPTP_SWREQ_0039 */
+static int copy_msghdr_from_user(struct msghdr *kmsg, struct msghdr *umsg,
+        struct iovec **out_iov, void **out_msg_control)
+{
+    size_t iovs_size;
+    struct iovec *uiov, *kiov;
+    size_t iovs_buffer_size = 0;
+    void *iovs_buffer;
+
+    if (!lwp_user_accessable(umsg, sizeof(*umsg)))
+    {
+        return -EFAULT;
+    }
+
+    lwp_get_from_user(kmsg, umsg, sizeof(*kmsg));
+
+    iovs_size = sizeof(*kmsg->msg_iov) * kmsg->msg_iovlen;
+    if (!lwp_user_accessable(kmsg->msg_iov, iovs_size))
+    {
+        return -EFAULT;
+    }
+
+    /* user and kernel */
+    kiov = kmem_get(iovs_size * 2);
+    if (!kiov)
+    {
+        return -ENOMEM;
+    }
+
+    uiov = (void *)kiov + iovs_size;
+    lwp_get_from_user(uiov, kmsg->msg_iov, iovs_size);
+
+    if (out_iov)
+    {
+        *out_iov = uiov;
+    }
+    kmsg->msg_iov = kiov;
+
+    for (int i = 0; i < kmsg->msg_iovlen; ++i)
+    {
+        /*
+         * We MUST check we can copy data to user after socket done in uiov
+         * otherwise we will be lost the messages from the network!
+         */
+        if (!lwp_user_accessable(uiov->iov_base, uiov->iov_len))
+        {
+            kmem_put(kmsg->msg_iov);
+
+            return -EPERM;
+        }
+
+        iovs_buffer_size += uiov->iov_len;
+        kiov->iov_len = uiov->iov_len;
+
+        ++kiov;
+        ++uiov;
+    }
+
+    /* msg_iov and msg_control */
+    iovs_buffer = kmem_get(iovs_buffer_size + kmsg->msg_controllen);
+
+    if (!iovs_buffer)
+    {
+        kmem_put(kmsg->msg_iov);
+
+        return -ENOMEM;
+    }
+
+    kiov = kmsg->msg_iov;
+
+    for (int i = 0; i < kmsg->msg_iovlen; ++i)
+    {
+        kiov->iov_base = iovs_buffer;
+        iovs_buffer += kiov->iov_len;
+        ++kiov;
+    }
+
+    *out_msg_control = kmsg->msg_control;
+    /* msg_control is the end of the iovs_buffer */
+    kmsg->msg_control = iovs_buffer;
+
+    return 0;
+}
+#endif /* ARCH_MM_MMU */
+
+/* LWIPPTP_SWREQ_0037 */
+sysret_t sys_sendmsg(int socket, const struct msghdr *msg, int flags)
+{
+    int flgs, ret = -1;
+    struct msghdr kmsg;
+#ifdef ARCH_MM_MMU
+    void *msg_control;
+    struct iovec *uiov, *kiov;
+#endif
+
+    if (!msg)
+    {
+        return -EPERM;
+    }
+
+    flgs = netflags_muslc_2_lwip(flags);
+
+#ifdef ARCH_MM_MMU
+    ret = copy_msghdr_from_user(&kmsg, (struct msghdr *)msg, &uiov, &msg_control);
+
+    if (!ret)
+    {
+        /* LWIPPTP_SWREQ_0039 */
+        kiov = kmsg.msg_iov;
+
+        for (int i = 0; i < kmsg.msg_iovlen; ++i)
+        {
+            lwp_get_from_user(kiov->iov_base, uiov->iov_base, kiov->iov_len);
+
+            ++kiov;
+            ++uiov;
+        }
+
+        lwp_get_from_user(kmsg.msg_control, msg_control, kmsg.msg_controllen);
+
+        /* LWIPPTP_SWREQ_0036 */
+        ret = sendmsg(socket, &kmsg, flgs);
+
+        kmem_put(kmsg.msg_iov->iov_base);
+        kmem_put(kmsg.msg_iov);
+    }
+#else
+    rt_memcpy(&kmsg, msg, sizeof(kmsg));
+
+    ret = sendmsg(socket, &kmsg, flgs);
+
+    if (!ret)
+    {
+        msg->msg_flags = kmsg.msg_flags;
+    }
+#endif /* ARCH_MM_MMU */
+
+    return (ret < 0 ? GET_ERRNO() : ret);
+}
+
+/* LWIPPTP_SWREQ_0037 */
+sysret_t sys_recvmsg(int socket, struct msghdr *msg, int flags)
+{
+    int flgs, ret = -1;
+    struct msghdr kmsg;
+#ifdef ARCH_MM_MMU
+    void *msg_control;
+    struct iovec *uiov, *kiov;
+#endif
+
+    if (!msg)
+    {
+        return -EPERM;
+    }
+
+    flgs = netflags_muslc_2_lwip(flags);
+
+#ifdef ARCH_MM_MMU
+    ret = copy_msghdr_from_user(&kmsg, msg, &uiov, &msg_control);
+
+    if (!ret)
+    {
+        /* LWIPPTP_SWREQ_0036 */
+        ret = recvmsg(socket, &kmsg, flgs);
+
+        if (ret < 0)
+        {
+            goto _free_res;
+        }
+
+        /* LWIPPTP_SWREQ_0039 */
+        kiov = kmsg.msg_iov;
+
+        for (int i = 0; i < kmsg.msg_iovlen; ++i)
+        {
+            lwp_put_to_user(uiov->iov_base, kiov->iov_base, kiov->iov_len);
+
+            ++kiov;
+            ++uiov;
+        }
+
+        lwp_put_to_user(msg_control, kmsg.msg_control, kmsg.msg_controllen);
+        lwp_put_to_user(&msg->msg_flags, &kmsg.msg_flags, sizeof(kmsg.msg_flags));
+
+    _free_res:
+        kmem_put(kmsg.msg_iov->iov_base);
+        kmem_put(kmsg.msg_iov);
+    }
+#else
+    rt_memcpy(&kmsg, msg, sizeof(kmsg));
+
+    ret = recvmsg(socket, &kmsg, flgs);
+
+    if (!ret)
+    {
+        msg->msg_flags = kmsg.msg_flags;
+    }
+#endif /* ARCH_MM_MMU */
+
+    return (ret < 0 ? GET_ERRNO() : ret);
 }
 
 sysret_t sys_recvfrom(int socket, void *mem, size_t len, int flags,
@@ -4359,13 +4658,30 @@ __exit:
 
 char *sys_getcwd(char *buf, size_t size)
 {
+    char *tmp, *ret = RT_NULL;
+
     if (!lwp_user_accessable((void *)buf, size))
     {
-        return RT_NULL;
+        return ret;
     }
-    getcwd(buf, size);
 
-    return (char *)strlen(buf);
+    tmp = (char *)rt_malloc(size);
+    if (!tmp)
+    {
+        return ret;
+    }
+
+    if (getcwd(tmp, size) != RT_NULL)
+    {
+        if (lwp_put_to_user(buf, tmp, size) > 0)
+        {
+            ret = buf;
+        }
+    }
+
+    rt_free(tmp);
+
+    return ret;
 }
 
 sysret_t sys_chdir(const char *path)
@@ -6184,17 +6500,87 @@ ssize_t sys_pwrite64(int fd, void *buf, int size, off_t offset)
 
 sysret_t sys_timerfd_create(int clockid, int flags)
 {
-    return 0;
+    int ret;
+
+    ret = timerfd_create(clockid, flags);
+
+    return (ret < 0 ? GET_ERRNO() : ret);
 }
 
 sysret_t sys_timerfd_settime(int fd, int flags, const struct itimerspec *new, struct itimerspec *old)
 {
-    return 0;
+    int ret = 0;
+    struct itimerspec *knew = RT_NULL;
+    struct itimerspec *kold = RT_NULL;
+
+    if (new == RT_NULL)
+        return -EINVAL;
+
+    if (!lwp_user_accessable((void *)new, sizeof(struct itimerspec)))
+    {
+        return -EFAULT;
+    }
+
+    knew = kmem_get(sizeof(struct itimerspec));
+
+    if (knew)
+    {
+        lwp_get_from_user(knew, (void*)new, sizeof(struct itimerspec));
+
+        if (old)
+        {
+            if (!lwp_user_accessable((void *)old, sizeof(struct itimerspec)))
+            {
+                kmem_put(knew);
+                return -EFAULT;
+            }
+
+            kold = kmem_get(sizeof(struct itimerspec));
+            if (kold == RT_NULL)
+            {
+                kmem_put(knew);
+                return -ENOMEM;
+            }
+        }
+
+        ret = timerfd_settime(fd, flags, knew, kold);
+
+        if (old)
+        {
+            lwp_put_to_user(old, kold, sizeof(*kold));
+            kmem_put(kold);
+        }
+
+        kmem_put(knew);
+    }
+
+    return (ret < 0 ? GET_ERRNO() : ret); 
 }
 
 sysret_t sys_timerfd_gettime(int fd, struct itimerspec *cur)
 {
-    return 0;
+    int ret = 0;
+    struct itimerspec *kcur;
+
+    if (cur == RT_NULL)
+        return -EINVAL;
+
+    if (!lwp_user_accessable((void *)cur, sizeof(struct itimerspec)))
+    {
+        return -EFAULT;
+    }
+
+    kcur = kmem_get(sizeof(struct itimerspec));
+
+    if (kcur)
+    {
+        lwp_get_from_user(kcur, cur, sizeof(struct itimerspec));
+        ret = timerfd_gettime(fd, kcur);
+        lwp_put_to_user(cur, kcur, sizeof(struct itimerspec));
+        kmem_put(kcur);
+    }
+
+    return (ret < 0 ? GET_ERRNO() : ret);
 }
 
 sysret_t sys_signalfd(int fd, const sigset_t *mask, int flags)
@@ -6335,8 +6721,8 @@ const static struct rt_syscall_def func_table[] =
     SYSCALL_NET(SYSCALL_SIGN(sys_getaddrinfo)),
     SYSCALL_NET(SYSCALL_SIGN(sys_gethostbyname2_r)), /* 85 */
 
-    SYSCALL_SIGN(sys_notimpl),    //network,
-    SYSCALL_SIGN(sys_notimpl),    //network,
+    SYSCALL_NET(SYSCALL_SIGN(sys_sendmsg)),
+    SYSCALL_NET(SYSCALL_SIGN(sys_recvmsg)),
     SYSCALL_SIGN(sys_notimpl),    //network,
     SYSCALL_SIGN(sys_notimpl),    //network,
     SYSCALL_SIGN(sys_notimpl),    //network, /* 90 */

@@ -1003,4 +1003,134 @@ size_t lwp_data_set(struct rt_lwp *lwp, void *dst, int byte, size_t size)
     return copy_len;
 }
 
+size_t lwp_user_strlen_ext(struct rt_lwp *lwp, const char *s)
+{
+    int len = 0;
+    char *new_buf = RT_NULL;
+    void *addr_start = RT_NULL;
+    int size = 0;
+    int err = 0;
+
+    if (s == RT_NULL)
+        return 0;
+
+    addr_start = (void *)s;
+    new_buf = rt_malloc(ARCH_PAGE_SIZE);
+
+    if (lwp == RT_NULL)
+    {
+        LOG_W("%s: lwp is NULL", __func__);
+        return -1;
+    }
+
+    err = lwp_data_get(lwp, new_buf, addr_start, ARCH_PAGE_SIZE);
+    if (err <= 0)
+    {
+        rt_free(new_buf);
+        return -1;
+    }
+
+    while (new_buf[size] != '\0')
+    {
+        len ++;
+        if (size == (ARCH_PAGE_SIZE -1))
+        {
+            err = lwp_data_get(lwp, new_buf, addr_start + len, ARCH_PAGE_SIZE);
+            if (err <= 0)
+            {
+                rt_free(new_buf);
+                return -1;
+            }
+
+            size = 0;
+        }
+        else
+        {
+            size ++;
+        }
+    }
+
+    rt_free(new_buf);
+
+    return len;
+}
+
+size_t lwp_user_strlen(const char *s)
+{
+    struct rt_lwp *lwp = RT_NULL;
+
+    lwp = lwp_self();
+    RT_ASSERT(lwp != RT_NULL);
+
+    return lwp_user_strlen_ext(lwp, s);
+}
+
+
+char** lwp_get_command_line_args(struct rt_lwp *lwp)
+{
+    size_t argc = 0;
+    char** argv = NULL;
+    int ret;
+    size_t i;
+    size_t len;
+
+    if (lwp)
+    {
+        ret = lwp_data_get(lwp, &argc, lwp->args, sizeof(argc));
+        if (ret == 0)
+        {
+            return RT_NULL;
+        }
+        argv = (char**)rt_malloc((argc + 1) * sizeof(char*));
+
+        if (argv)
+        {
+            for (i = 0; i < argc; i++)
+            {
+                char *argvp = NULL;
+                ret = lwp_data_get(lwp, &argvp, &((char **)lwp->args)[1 + i], sizeof(argvp));
+                if (ret == 0)
+                {
+                    lwp_free_command_line_args(argv);
+                    return RT_NULL;
+                }
+                len = lwp_user_strlen_ext(lwp, argvp);
+
+                if (len > 0)
+                {
+                    argv[i] = (char*)rt_malloc(len + 1);
+                    ret = lwp_data_get(lwp, argv[i], argvp, len);
+                    if (ret == 0)
+                    {
+                        lwp_free_command_line_args(argv);
+                        return RT_NULL;
+                    }
+                    argv[i][len] = '\0';
+                }
+                else
+                {
+                    argv[i] = NULL;
+                }
+            }
+            argv[argc] = NULL;
+        }
+    }
+
+    return argv;
+}
+
+void lwp_free_command_line_args(char** argv)
+{
+    size_t i;
+
+    if (argv)
+    {
+        for (i = 0; argv[i]; i++)
+        {
+            rt_free(argv[i]);
+        }
+        rt_free(argv);
+    }
+}
+
 #endif
