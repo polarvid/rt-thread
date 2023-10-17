@@ -22,6 +22,7 @@
 #include <rthw.h>
 #include <board.h>
 
+#include <console.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -330,11 +331,9 @@ sysret_t sys_exit_group(int value)
     rt_thread_t tid, main_thread;
     struct rt_lwp *lwp;
 
-    LOG_D("process exit");
-
     tid = rt_thread_self();
     lwp = (struct rt_lwp *)tid->lwp;
-    LOG_I("thread/process(%p) exit.", lwp);
+    LOG_D("process(%p) exit.", lwp);
 
 #ifdef ARCH_MM_MMU
     if (tid->clear_child_tid)
@@ -349,7 +348,7 @@ sysret_t sys_exit_group(int value)
 
     LWP_LOCK(lwp);
     /**
-     * @brief if multiple threads call exit() with failure, exit code is the
+     * Brief: if multiple threads call exit() with failure, exit code is the
      *        first value which is not EXIT_SUCCESS
      */
     if (value != EXIT_SUCCESS && WEXITSTATUS(lwp->lwp_ret) == 0)
@@ -365,11 +364,12 @@ sysret_t sys_exit_group(int value)
     {
         lwp_wait_subthread_exit();
         lwp_pid_put(lwp);
+
         /**
-         * @brief Wakeup parent if it's waiting for this lwp, otherwise a signal
+         * Brief: Wakeup parent if it's waiting for this lwp, otherwise a signal
          *        will be sent to parent
          *
-         * @note Critical Section
+         * Note: Critical Section
          * - the parent lwp (RW.)
          */
         if (lwp->parent)
@@ -410,7 +410,7 @@ sysret_t sys_exit_group(int value)
 #endif /* ARCH_MM_MMU */
 
     /**
-     * @note the tid tree always hold a reference to thread, hence the tid must
+     * Note: the tid tree always hold a reference to thread, hence the tid must
      * be release before cleanup of thread
      */
     lwp_tid_put(tid->tid);
@@ -675,8 +675,6 @@ sysret_t sys_openat(int dirfd, const char *name, int flag, mode_t mode)
     return (ret < 0 ? GET_ERRNO() : ret);
 #endif
 }
-
-#include <console.h>
 
 /* syscall: "close" ret: "int" args: "int" */
 sysret_t sys_close(int fd)
@@ -1133,8 +1131,8 @@ sysret_t sys_kill(int pid, int signo)
     if (pid > 0)
     {
         /**
-         * @brief Match the pid and send signal to the lwp if found
-         * @note Critical Section
+         * Brief: Match the pid and send signal to the lwp if found
+         * Note: Critical Section
          * - pid tree (READ. since the lwp is fetch from the pid tree, it must stay there)
          */
         lwp_pid_lock_take();
@@ -1142,17 +1140,16 @@ sysret_t sys_kill(int pid, int signo)
         if (lwp)
         {
             lwp_ref_inc(lwp);
+            lwp_pid_lock_release();
+
+            kret = lwp_signal_kill(lwp, signo, SI_USER, 0);
+            lwp_ref_dec(lwp);
             kret = 0;
         }
         else
-            kret = -RT_ENOENT;
-        lwp_pid_lock_release();
-
-        /* lwp_signal_kill() can handle NULL lwp */
-        if (lwp)
         {
-            kret = lwp_signal_kill(lwp, signo, SI_USER, 0);
-            lwp_ref_dec(lwp);
+            lwp_pid_lock_release();
+            kret = -RT_ENOENT;
         }
     }
     else if (pid == 0)
@@ -2238,9 +2235,7 @@ sysret_t _sys_fork(void)
     /* duplicate user objects */
     lwp_user_object_dup(lwp, self_lwp);
 
-    /* useless */
     user_stack = arch_get_user_sp();
-
     arch_set_thread_context(arch_fork_exit,
             (void *)((char *)thread->stack_addr + thread->stack_size),
             user_stack, &thread->sp);
@@ -2830,9 +2825,10 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
             }
         }
 
-        /* load ok, now set thread name and swap the data of lwp and new_lwp */
         /**
-         * ??? seriously ???, if there is other thread, they should all be detroy
+         * Set thread name and swap the data of lwp and new_lwp.
+         * Since no other threads can access the lwp field, it't uneccessary to
+         * take a lock here
          */
 
         strncpy(thread->parent.name, run_name + last_backslash, RT_NAME_MAX);
@@ -2860,13 +2856,11 @@ sysret_t sys_execve(const char *path, char *const argv[], char *const envp[])
         lwp_signal_detach(&lwp->signal);
         lwp_signal_init(&lwp->signal);
 
-        /* to do: clsoe files with flag CLOEXEC */
+        /* to do: clsoe files with flag CLOEXEC, recy sub-thread */
 
         lwp_aspace_switch(thread);
 
-        lwp_pid_put(new_lwp);
         lwp_ref_dec(new_lwp);
-
         arch_start_umode(lwp->args,
                 lwp->text_entry,
                 (void*)USER_STACK_VEND,
@@ -4134,31 +4128,14 @@ sysret_t sys_tkill(int tid, int sig)
     sysret_t ret;
 
     /**
-     * @brief Match a tid and do the kill
+     * Brief: Match a tid and do the kill
      *
-     * @note Critical Section
+     * Note: Critical Section
      * - the thread (READ. may be released at the meantime; protected by locked)
      */
     thread = lwp_tid_get_thread_and_inc_ref(tid);
     ret = lwp_thread_signal_kill(thread, sig, SI_USER, 0);
     lwp_tid_dec_ref(thread);
-
-    switch (ret)
-    {
-        case RT_EOK:
-            ret = 0;
-            break;
-        case -RT_EINVAL:
-            ret = -EINVAL;
-            break;
-        case -RT_EPERM:
-            ret = -EPERM;
-            break;
-        /* Errors like insifficient memory in syscall */
-        default:
-            ret = -EAGAIN;
-            break;
-    }
 
     return ret;
 #else
@@ -4268,22 +4245,6 @@ sysret_t sys_waitpid(int32_t pid, int *status, int options)
     else
     {
         ret = lwp_waitpid(pid, status, options);
-    }
-
-    if (ret < 0)
-    {
-        switch (ret)
-        {
-            case -RT_EINTR:
-                ret = -EINTR;
-                break;
-            case -RT_ERROR:
-                ret = -ECHILD;
-                break;
-            default:
-                ret = -EINVAL;
-                break;
-        }
     }
 #else
     if (!lwp_user_accessable((void *)status, sizeof(int)))
@@ -5378,6 +5339,7 @@ sysret_t sys_getaffinity(const pid_t pid, size_t size, void *set)
     DEF_RETURN_CODE(rc);
     cpu_set_t mask;
     struct rt_lwp *lwp;
+    rt_bool_t need_release = RT_FALSE;
 
     if (size <= 0 || size > sizeof(cpu_set_t))
     {
@@ -5392,6 +5354,7 @@ sysret_t sys_getaffinity(const pid_t pid, size_t size, void *set)
         lwp = lwp_self();
     else
     {
+        need_release = RT_TRUE;
         lwp_pid_lock_take();
         lwp = lwp_from_pid_locked(pid);
     }
@@ -5422,7 +5385,7 @@ sysret_t sys_getaffinity(const pid_t pid, size_t size, void *set)
             rc = 0;
     }
 
-    if (pid != 0)
+    if (need_release)
         lwp_pid_lock_release();
 
     RETURN(rc);
@@ -5537,6 +5500,7 @@ sysret_t sys_sched_getparam(const pid_t pid, void *param)
     struct rt_lwp *lwp = NULL;
     rt_thread_t main_thread;
     int ret = -1;
+    rt_bool_t need_release = RT_FALSE;
 
     if (!lwp_user_accessable(param, sizeof(struct sched_param)))
     {
@@ -5551,6 +5515,7 @@ sysret_t sys_sched_getparam(const pid_t pid, void *param)
 
     if (pid > 0)
     {
+        need_release = RT_TRUE;
         lwp_pid_lock_take();
         lwp = lwp_from_pid_locked(pid);
     }
@@ -5558,10 +5523,11 @@ sysret_t sys_sched_getparam(const pid_t pid, void *param)
     {
         lwp = lwp_self();
     }
+
     if (lwp)
     {
         main_thread = rt_list_entry(lwp->t_grp.prev, struct rt_thread, sibling);
-        if (pid > 0)
+        if (need_release)
             lwp_pid_lock_release();
 
         sched_param->sched_priority = main_thread->current_priority;

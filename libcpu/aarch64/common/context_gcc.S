@@ -409,8 +409,7 @@ rt_hw_context_switch_interrupt:
 vector_fiq:
     B       .
 
-.globl vector_irq
-vector_irq:
+START_POINT(vector_irq)
     SAVE_CONTEXT
     STP     X0, X1, [SP, #-0x10]!   /* X0 is thread sp */
 

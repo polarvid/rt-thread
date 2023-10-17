@@ -21,7 +21,6 @@
 #include "lwp_ipc.h"
 #include "lwp_ipc_internal.h"
 
-#include <backtrace.h>
 #include <dfs_file.h>
 #include <poll.h>
 
@@ -162,7 +161,7 @@ rt_inline rt_err_t rt_channel_list_suspend(rt_list_t *list, struct rt_thread *th
 }
 
 
-static void _rt_channel_check_wq_wakup(rt_channel_t ch)
+static void _rt_channel_check_wq_wakup_locked(rt_channel_t ch)
 {
     if (rt_list_isempty(&ch->wait_msg))
     {
@@ -187,11 +186,11 @@ rt_channel_t rt_raw_channel_open(const char *name, int flags)
     RT_DEBUG_NOT_IN_INTERRUPT;
 
     /**
-     * @brief Match an existing channel from object list with the same name
+     * Brief: Match an existing channel from object list with the same name
      *        If no such channel found, it will create a new channel if O_CREAT
      *        is set in the flag
      *
-     * @note Critical Section
+     * Note: Critical Section
      * - Channel Object list (RW; this may write to a channel if needed, and
      *   the RCU operation of the routine should be atomic)
      */
@@ -260,9 +259,9 @@ rt_err_t rt_raw_channel_close(rt_channel_t ch)
     else
     {
         /**
-         * @brief Remove the channel from object list
+         * Brief: Remove the channel from object list
          *
-         * @note Critical Section
+         * Note: Critical Section
          * - the channel
          */
         rt_spin_lock(&ipc_ch_lock);
@@ -498,7 +497,7 @@ static rt_err_t _send_recv_timeout(rt_channel_t ch, rt_channel_msg_t data, int n
 
 static rt_err_t _do_send_recv_timeout(rt_channel_t ch, rt_channel_msg_t data, int need_reply, rt_channel_msg_t data_ret, rt_int32_t time, rt_ipc_msg_t msg)
 {
-    rt_err_t rc = UNINITIALIZED;
+    DEF_RETURN_CODE(rc);
     rt_thread_t thread_recv;
     rt_thread_t thread_send = 0;
     void (*old_timeout_func)(void *) = 0;
@@ -614,7 +613,7 @@ static rt_err_t _do_send_recv_timeout(rt_channel_t ch, rt_channel_msg_t data, in
     {
         if (ch->stat == RT_IPC_STAT_IDLE)
         {
-            _rt_channel_check_wq_wakup(ch);
+            _rt_channel_check_wq_wakup_locked(ch);
         }
         rt_spin_unlock(&ipc_ch_lock);
 
@@ -719,7 +718,7 @@ rt_err_t rt_raw_channel_reply(rt_channel_t ch, rt_channel_msg_t data)
                 ch->stat = RT_IPC_STAT_IDLE;
                 ch->reply = RT_NULL;
 
-                _rt_channel_check_wq_wakup(ch);
+                _rt_channel_check_wq_wakup_locked(ch);
                 rc = RT_EOK;
             }
         }
@@ -742,7 +741,7 @@ static rt_err_t wakeup_receiver(void *object, struct rt_thread *thread)
     ret = rt_channel_list_resume(&ch->parent.suspend_thread);
 
     rt_spin_lock(&ipc_ch_lock);
-    _rt_channel_check_wq_wakup(ch);
+    _rt_channel_check_wq_wakup_locked(ch);
     rt_spin_unlock(&ipc_ch_lock);
 
     return ret;
@@ -764,7 +763,7 @@ static void receiver_timeout(void *parameter)
     /* insert to schedule ready list */
     rt_schedule_insert_thread(thread);
 
-    _rt_channel_check_wq_wakup(ch);
+    _rt_channel_check_wq_wakup_locked(ch);
     rt_spin_unlock(&ipc_ch_lock);
 
     /* do schedule */

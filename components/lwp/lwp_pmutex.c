@@ -213,6 +213,7 @@ static int _pthread_mutex_init(void *umutex)
     }
     else
     {
+        lwp_mutex_take_safe(&_pmutex_lock, RT_WAITING_FOREVER, 1);
         if (pmutex->type == PMUTEX_NORMAL)
         {
             pmutex->lock.ksem->value = 1;
@@ -224,6 +225,7 @@ static int _pthread_mutex_init(void *umutex)
             pmutex->lock.kmutex->hold     = 0;
             pmutex->lock.kmutex->ceiling_priority = 0xFF;
         }
+        lwp_mutex_release_safe(&_pmutex_lock);
     }
 
     rt_mutex_release(&_pmutex_lock);

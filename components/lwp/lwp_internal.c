@@ -12,8 +12,8 @@
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
-#include <stdlib.h>
 #include "lwp_internal.h"
+#include <stdlib.h>
 
 static rt_err_t _mutex_take_safe(rt_mutex_t mtx, rt_int32_t timeout, rt_bool_t interruptable)
 {

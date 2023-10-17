@@ -94,27 +94,6 @@ arch_crt_start_umode:
     msr elr_el1, x1
     eret
 
-/**
- * @brief entry point of the new thread in fork and clone routine
- * void
- * arch_set_thread_context(
- *    void *exit_addr, void *new_thread_stack, void *user_stack, void **thread_sp);
- */
-#if 0
-.global arch_set_thread_context
-arch_set_thread_context:
-    and x1, x1, #~0x10
-    sub x1, x1, #CONTEXT_SIZE
-    str x2, [x1, #CONTEXT_OFFSET_SP_EL0]
-    sub x1, x1, #CONTEXT_SIZE
-    str xzr, [x1, #CONTEXT_OFFSET_X0]       /* new thread return 0 */
-    mov x4, #((3 << 6) | 0x4 | 0x1)         /* el1h, disable interrupt */
-    str x4, [x1, #CONTEXT_OFFSET_SPSR_EL1]
-    str x0, [x1, #CONTEXT_OFFSET_ELR_EL1]
-    str x1, [x3]
-    ret
-#endif
-
 .global arch_get_user_sp
 arch_get_user_sp:
     mrs x0, sp_el0
@@ -201,7 +180,7 @@ arch_syscall_exit:
     add sp, sp, #0x40
     RESTORE_FPU sp
 
-/* the sp is reset to the outer most level, irq and fiq is disabled */
+/* the sp is reset to the outer most level, irq and fiq are disabled */
 START_POINT(arch_ret_to_user)
     msr daifset, #3
     /* save exception frame */
@@ -255,7 +234,7 @@ START_POINT(arch_ret_to_user)
 
     /**
      * push 2 dummy words to simulate a exception frame of interrupt
-     * @note in kernel state, the context switch dont saved the context
+     * Note: in kernel state, the context switch dont saved the context
      */
     mrs x0, spsr_el1
     mrs x1, elr_el1
@@ -414,7 +393,7 @@ arch_signal_quit:
     msr sp_el0, x0
 
     /**
-     * @note Since we will reset spsr, but the reschedule will
+     * Note: Since we will reset spsr, but the reschedule will
      * corrupt the spsr, we diable irq for a short period here
      */
     msr daifset, #3
@@ -484,14 +463,14 @@ arch_thread_signal_enter:
     dsb sy
 
     /**
-     * @brief Prepare the environment for signal handler
+     * Brief: Prepare the environment for signal handler
      */
 
-    /** 
+    /**
      * reset the cpsr
      * and drop exp frame on kernel stack, reset kernel sp
      *
-     * @note Since we will reset spsr, but the reschedule will
+     * Note: Since we will reset spsr, but the reschedule will
      * corrupt the spsr, we diable irq for a short period here
      */
     msr daifset, #3

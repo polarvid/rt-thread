@@ -258,7 +258,7 @@ static void _init_lwp_objs(struct rt_lwp_objs *lwp_objs, rt_aspace_t aspace)
     if (lwp_objs)
     {
         /**
-         * @brief one lwp_obj represent an base layout of page based memory in user space
+         * Brief: one lwp_obj represent an base layout of page based memory in user space
          * This is useful on duplication. Where we only have a (lwp_objs and offset) to
          * provide identical memory. This is implemented by lwp_objs->source.
          */

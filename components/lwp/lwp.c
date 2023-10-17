@@ -14,7 +14,7 @@
  */
 
 #define DBG_TAG "lwp"
-#define DBG_LVL DBG_LOG
+#define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
 
 #include <rthw.h>
@@ -72,9 +72,11 @@ int lwp_component_init(void)
     int rc;
     if ((rc = lwp_tid_init()) != RT_EOK)
     {
+        LOG_E("%s: lwp_component_init() failed", __func__);
     }
     else if ((rc = lwp_pid_init()) != RT_EOK)
     {
+        LOG_E("%s: lwp_pid_init() failed", __func__);
     }
     return rc;
 }
@@ -855,7 +857,7 @@ static int load_elf(int fd, int len, struct rt_lwp *lwp, uint8_t *load_addr, str
                 {
                     pa = lwp_v2p(lwp, va);
                     va_self = (void *)((char *)pa - PV_OFFSET);
-                    // LOG_D("va_self = %p pa = %p", va_self, pa);
+                    LOG_D("va_self = %p pa = %p", va_self, pa);
                     tmp_len = (size < ARCH_PAGE_SIZE) ? size : ARCH_PAGE_SIZE;
                     tmp_len = load_fread(va_self, 1, tmp_len, fd);
                     rt_hw_cpu_dcache_ops(RT_HW_CACHE_FLUSH, va_self, tmp_len);
@@ -1042,7 +1044,7 @@ out:
     return ret;
 }
 
-/* lwp thread clean up */
+/* lwp-thread clean up routine */
 void lwp_cleanup(struct rt_thread *tid)
 {
     struct rt_lwp *lwp;
@@ -1056,11 +1058,11 @@ void lwp_cleanup(struct rt_thread *tid)
         LOG_D("cleanup thread: %s, stack_addr: 0x%x", tid->parent.name, tid->stack_addr);
 
     /**
-     * @brief lwp thread cleanup
+     * Brief: lwp thread cleanup
      *
-     * @note Critical Section
-     * - thread control block (RW. It's ensure that no one else can access tcb
-     *   other than itself, because the thread)
+     * Note: Critical Section
+     * - thread control block (RW. It's ensured that no one else can access tcb
+     *   other than itself)
      */
     lwp = (struct rt_lwp *)tid->lwp;
     lwp_thread_signal_detach(&tid->signal);
@@ -1167,6 +1169,7 @@ rt_err_t lwp_children_unregister(struct rt_lwp *parent, struct rt_lwp *child)
     struct rt_lwp **lwp_node;
 
     LWP_LOCK(parent);
+    /* detach from children link */
     lwp_node = &parent->first_child;
     while (*lwp_node != child)
     {

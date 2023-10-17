@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021, RT-Thread Development Team
+ * Copyright (c) 2006-2023, RT-Thread Development Team
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,8 +17,8 @@
 #include <rthw.h>
 #include <rtthread.h>
 
-#define DBG_TAG    "lwp.pid"
-#define DBG_LVL    DBG_LOG
+#define DBG_TAG "lwp.pid"
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 #include <dfs_file.h>
@@ -80,7 +80,6 @@ static pid_t lwp_pid_get_locked(void)
 {
     struct lwp_avl_struct *p;
     pid_t pid = 0;
-    RT_ASSERT(rt_mutex_owner_get(&pid_mtx) == rt_thread_self());
 
     p = lwp_pid_free_head;
     if (p)
@@ -120,7 +119,6 @@ static pid_t lwp_pid_get_locked(void)
         lwp_avl_insert(p, &lwp_pid_root);
         current_pid = pid;
     }
-
     return pid;
 }
 
@@ -229,7 +227,7 @@ int lwp_user_object_add(struct rt_lwp *lwp, rt_object_t object)
             node = (struct lwp_avl_struct *)rt_malloc(sizeof(struct lwp_avl_struct));
             if (node)
             {
-                rt_atomic_add(&object->lwp_ref_count_at, 1);
+                rt_atomic_add(&object->lwp_ref_count, 1);
                 node->avl_key = (avl_key_t)object;
                 lwp_avl_insert(node, &lwp->object_root);
                 ret = 0;
@@ -250,8 +248,8 @@ static rt_err_t _object_node_delete(struct rt_lwp *lwp, struct lwp_avl_struct *n
         return ret;
     }
     object = (rt_object_t)node->avl_key;
-    object->lwp_ref_count_at--;
-    if (object->lwp_ref_count_at == 0)
+    object->lwp_ref_count--;
+    if (object->lwp_ref_count == 0)
     {
         /* remove from kernel object list */
         switch (object->type)
@@ -339,7 +337,6 @@ void lwp_user_object_dup(struct rt_lwp *dst_lwp, struct rt_lwp *src_lwp)
 rt_lwp_t lwp_create(rt_base_t flags)
 {
     pid_t pid;
-    rt_base_t level;
     rt_lwp_t new_lwp = rt_calloc(1, sizeof(struct rt_lwp));
 
     if (new_lwp)
@@ -358,8 +355,8 @@ rt_lwp_t lwp_create(rt_base_t flags)
         /* lwp with pid */
         if (flags & LWP_CREATE_FLAG_ALLOC_PID)
         {
-            level = rt_hw_interrupt_disable();
-            pid = lwp_pid_get();
+            lwp_pid_lock_take();
+            pid = lwp_pid_get_locked();
             if (pid == 0)
             {
                 lwp_user_object_lock_destroy(new_lwp);
@@ -370,10 +367,9 @@ rt_lwp_t lwp_create(rt_base_t flags)
             else
             {
                 new_lwp->pid = pid;
-                lwp_pid_set_lwp(pid, new_lwp);
+                lwp_pid_set_lwp_locked(pid, new_lwp);
             }
-
-            rt_hw_interrupt_enable(level);
+            lwp_pid_lock_release();
         }
     }
     return new_lwp;
@@ -388,22 +384,14 @@ void lwp_free(struct rt_lwp* lwp)
     }
 
     /**
-     * @brief Recycle the lwp when reference is cleared
+     * Brief: Recycle the lwp when reference is cleared
      *
-     * @note Critical Section
+     * Note: Critical Section
      * - lwp (RW. there is no other writer/reader compete with lwp_free, since
      *   all the reference is clear)
      */
-    LOG_I("lwp free: %p\n", lwp);
+    LOG_D("lwp free: %p\n", lwp);
 
-    /**
-     * @brief The finish is used to mark a freed lwp. Since the parent still can
-     * access to it, it cannot freed itself until its parent clear their ref to
-     * it.
-     *
-     * @note if someone can access the lwp, it's ridiculous to mark a flag
-     * because this will do the writing operation which is definitely exclusive
-     */
     LWP_LOCK(lwp);
 
     if (lwp->args != RT_NULL)
@@ -464,29 +452,7 @@ void lwp_free(struct rt_lwp* lwp)
 #endif
     timer_list_free(&lwp->timer);
 
-    level = rt_hw_interrupt_disable();
-    /* for children */
-    while (lwp->first_child)
-    {
-        struct rt_lwp *child;
-
-        child = lwp->first_child;
-        lwp->first_child = child->sibling;
-        if (child->finish)
-        {
-            lwp_pid_put(lwp_to_pid(child));
-            rt_hw_interrupt_enable(level);
-            rt_free(child);
-            level = rt_hw_interrupt_disable();
-        }
-        else
-        {
-            child->sibling = RT_NULL;
-            child->parent = RT_NULL;
-        }
-    }
-
-    rt_hw_interrupt_enable(level);
+    /** release terminal, restore its status */
     if (!lwp->background)
     {
         struct termios *old_stdin_termios = get_old_termios();
@@ -501,43 +467,15 @@ void lwp_free(struct rt_lwp* lwp)
             rt_mutex_take(&lwp->tty->lock, RT_WAITING_FOREVER);
             if (lwp->tty->foreground == lwp)
             {
-                old_lwp = tty_pop(&lwp->tty->head, RT_NULL);
                 lwp->tty->foreground = old_lwp;
+                lwp->tty = RT_NULL;
             }
-            else
-            {
-                tty_pop(&lwp->tty->head, lwp);
-            }
-            rt_mutex_release(&lwp->tty->lock);
-
-            lwp->tty = RT_NULL;
         }
     }
 
-    /* for parent */
-    if (lwp->parent)
-    {
-        struct rt_thread *thread;
-        if (!rt_list_isempty(&lwp->wait_list))
-        {
-            thread = rt_list_entry(lwp->wait_list.next, struct rt_thread, tlist);
-            thread->error = RT_EOK;
-            thread->msg_ret = (void*)(rt_size_t)lwp->lwp_ret;
-            rt_thread_resume(thread);
-            rt_hw_interrupt_enable(level);
-            return;
-        }
-        else
-        {
-            struct rt_lwp **it = &lwp->parent->first_child;
-
-            lwp->tty = RT_NULL;
-        }
-    }
-
-    lwp_pid_put(lwp_to_pid(lwp));
+    lwp_pid_put(lwp);
     LWP_UNLOCK(lwp);
-    rt_mutex_detach(&lwp->lwp_mtx);
+    rt_mutex_detach(&lwp->lwp_lock);
     rt_free(lwp);
 }
 
@@ -556,7 +494,7 @@ int lwp_ref_dec(struct rt_lwp *lwp)
     int ref;
 
     ref = rt_atomic_add(&lwp->ref, -1);
-    LOG_D("%s(%p(%s)): before ref=%d", __func__, lwp, lwp->cmd, ref);
+    LOG_D("%s(lwp=%p,lwp->cmd=%s): before ref=%d", __func__, lwp, lwp->cmd, ref);
 
     if (ref == 1)
     {
@@ -576,7 +514,10 @@ int lwp_ref_dec(struct rt_lwp *lwp)
         lwp_free(lwp);
     }
     else
+    {
+        /* reference must be a positive integer */
         RT_ASSERT(ref > 1);
+    }
 
     return ref;
 }
@@ -585,8 +526,6 @@ struct rt_lwp* lwp_from_pid_locked(pid_t pid)
 {
     struct lwp_avl_struct *p;
     struct rt_lwp *lwp = RT_NULL;
-
-    RT_ASSERT(rt_mutex_owner_get(&pid_mtx) == rt_thread_self());
 
     p  = lwp_avl_find(pid, lwp_pid_root);
     if (p)
@@ -678,7 +617,7 @@ static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
     else
     {
         /**
-         * @note Critical Section
+         * Note: Critical Section
          * - child lwp (RW. This will modify its parent if valid)
          */
         LWP_LOCK(child);
@@ -688,9 +627,10 @@ static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
         }
         else if (rt_list_isempty(&child->wait_list))
         {
-            /* only one thread can wait on wait_list */
-
-            /** @note dont reschedule before mutex unlock */
+            /**
+             * Note: only one thread can wait on wait_list.
+             * dont reschedule before mutex unlock
+             */
             rt_enter_critical();
 
             error = rt_thread_suspend_with_flag(cur_thr, RT_INTERRUPTIBLE);
@@ -722,8 +662,10 @@ static sysret_t _lwp_wait_and_recycle(struct rt_lwp *child, rt_thread_t cur_thr,
         {
             if (terminated)
             {
-                /** @brief Reap the lwp if exited */
+                /** Reap the child process if it's exited */
                 lwp_children_unregister(self_lwp, child);
+                child->parent = RT_NULL;
+                lwp_pid_put(child);
             }
 
             if (status)
@@ -1097,9 +1039,9 @@ void lwp_terminate(struct rt_lwp *lwp)
         lwp_signal_detach(&lwp->signal);
 
         /**
-         * @brief Detach children from lwp
+         * Brief: Detach children from lwp
          *
-         * @note Critical Section
+         * Note: Critical Section
          * - the lwp (RW. Release lwp)
          * - the pid resource manager (RW. Release the pid)
          */
@@ -1110,7 +1052,7 @@ void lwp_terminate(struct rt_lwp *lwp)
             child = lwp->first_child;
             lwp->first_child = child->sibling;
 
-            /** @note safe since the slist node is release */
+            /** Note: safe since the slist node is release */
             LWP_UNLOCK(lwp);
             LWP_LOCK(child);
             child->sibling = RT_NULL;
@@ -1172,9 +1114,9 @@ void lwp_wait_subthread_exit(void)
         LOG_D("%s: wait for subthread exiting", __func__);
 
         /**
-         * @brief wait for all *running* sibling threads to exit
+         * Brief: wait for all *running* sibling threads to exit
          *
-         * @note Critical Section
+         * Note: Critical Section
          * - sibling list of lwp (RW. It will clear all siblings finally)
          */
         LWP_LOCK(lwp);
@@ -1205,7 +1147,7 @@ void lwp_wait_subthread_exit(void)
                     rt_list_remove(&sub_thread->sibling);
 
                     /**
-                     * @note Critical Section
+                     * Note: Critical Section
                      * - thread control block (RW. Since it will free the thread
                      *   control block, it must ensure no one else can access
                      *   thread any more)

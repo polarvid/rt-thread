@@ -37,6 +37,7 @@
 
 #ifdef ARCH_MM_MMU
 #include "lwp_shm.h"
+#include <locale.h>
 #include "mmu.h"
 #include "page.h"
 #else
@@ -78,7 +79,7 @@ struct rt_lwp_notify
 #ifdef RT_USING_MUSLLIBC
 #define LWP_CREATE_STAT(exit_code) (((exit_code) & 0xff) << 8)
 #else
-#error "No compatible lwp set status provided"
+#error "No compatible lwp set status provided for this libc"
 #endif
 
 struct rt_lwp
@@ -105,8 +106,6 @@ struct rt_lwp
     struct rt_lwp *sibling;
 
     rt_list_t wait_list;
-
-    /* flags */
     rt_bool_t terminated;
     rt_bool_t background;
     int lwp_ret;
@@ -167,12 +166,6 @@ enum lwp_exit_request_type
     LWP_EXIT_REQUEST_TRIGGERED,
     LWP_EXIT_REQUEST_IN_PROCESS,
 };
-
-enum lwp_tid_lock_cmd {
-    LWP_TID_LOCK_READ,
-    LWP_TID_LOCK_WRITE,
-};
-
 struct termios *get_old_termios(void);
 void lwp_setcwd(char *buf);
 char *lwp_getcwd(void);
@@ -184,8 +177,22 @@ void lwp_wait_subthread_exit(void);
 int lwp_tid_init(void);
 int lwp_tid_get(void);
 void lwp_tid_put(int tid);
+
+/**
+ * @brief Automatically get a thread and increase a reference count
+ *
+ * @param tid queried thread ID
+ * @return rt_thread_t
+ */
 rt_thread_t lwp_tid_get_thread_and_inc_ref(int tid);
+
+/**
+ * @brief Decrease a reference count
+ *
+ * @param thread target thread
+ */
 void lwp_tid_dec_ref(rt_thread_t thread);
+
 void lwp_tid_set_thread(int tid, rt_thread_t thread);
 
 int lwp_execve(char *filename, int debug, int argc, char **argv, char **envp);

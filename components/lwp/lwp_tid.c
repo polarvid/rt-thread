@@ -8,14 +8,12 @@
  * 2021-01-15     shaojinchun  first version
  */
 
-#include "lwp.h"
-#include "rtdef.h"
-#include <rthw.h>
-#include <rtthread.h>
-
 #define DBG_TAG    "lwp.tid"
 #define DBG_LVL    DBG_LOG
 #include <rtdbg.h>
+
+#include <rthw.h>
+#include <rtthread.h>
 
 #include "lwp_internal.h"
 
@@ -114,8 +112,8 @@ void lwp_tid_put(int tid)
     if (thread && thread->tid_ref)
     {
         current = rt_thread_self();
-        RT_ASSERT(thread->susp_putter == RT_NULL);
-        thread->susp_putter = current;
+        RT_ASSERT(thread->susp_recycler == RT_NULL);
+        thread->susp_recycler = current;
 
         rt_enter_critical();
         rt_thread_suspend_with_flag(current, RT_UNINTERRUPTIBLE);
@@ -153,7 +151,7 @@ void lwp_tid_dec_ref(rt_thread_t thread)
     if (thread)
     {
         RT_ASSERT(rt_object_get_type(&thread->parent) == RT_Object_Class_Thread);
-        susp_putter = thread->susp_putter;
+        susp_putter = thread->susp_recycler;
         lwp_mutex_take_safe(&tid_lock, RT_WAITING_FOREVER, 0);
 
         RT_ASSERT(thread->tid_ref > 0);

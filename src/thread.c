@@ -262,7 +262,7 @@ static rt_err_t _thread_init(struct rt_thread *thread,
 #ifdef RT_USING_SMART
     thread->tid_ref = 0;
     thread->lwp = RT_NULL;
-    thread->susp_putter = RT_NULL;
+    thread->susp_recycler = RT_NULL;
     rt_list_init(&(thread->sibling));
 
     /* lwp thread-signal init */

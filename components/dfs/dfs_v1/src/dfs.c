@@ -258,7 +258,7 @@ int fdt_fd_new(struct dfs_fdtable *fdt)
     dfs_file_lock();
 
     /* find an empty fd entry */
-    idx = fd_alloc(fdt, 0);
+    idx = fd_alloc(fdt, DFS_STDIO_OFFSET);
 
     /* can't find an empty fd entry */
     if (idx < 0)

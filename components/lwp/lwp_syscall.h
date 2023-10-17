@@ -12,7 +12,7 @@
 #define __LWP_SYSCALL_H__
 
 #ifdef RT_USING_MUSLLIBC
-#include "lwp_sys_musl.h"
+#include "libc_musl.h"
 #endif
 
 #include "syscall_generic.h"

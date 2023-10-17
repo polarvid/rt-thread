@@ -28,7 +28,17 @@ void lwp_pid_put(struct rt_lwp *lwp);
 void lwp_pid_lock_take(void);
 void lwp_pid_lock_release(void);
 
-/* create a lwp object */
+/**
+ * @brief Create a new lwp object
+ *        This will initialize the member in the object and register to system.
+ *        Besides, a new pid is allocate with lwp
+ *
+ * @param flags control the property of the lwp object. Can be ORed with:
+ *        LWP_CREATE_FLAG_NONE: raw lwp object
+ *        LWP_CREATE_FLAG_ALLOC_PID: lwp object with specified pid
+ *
+ * @return struct rt_lwp* object
+ */
 struct rt_lwp* lwp_create(rt_base_t flags);
 
 void lwp_free(struct rt_lwp* lwp);
