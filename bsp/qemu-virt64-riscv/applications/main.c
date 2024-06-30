@@ -8,13 +8,10 @@
  */
 
 #include <rtthread.h>
-#include <rthw.h>
-#include <stdio.h>
-#include <string.h>
 
 int main(void)
 {
-    printf("Hello RISC-V\n");
+    rt_kprintf("Hello RISC-V\n");
 
     return 0;
 }

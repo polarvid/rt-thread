@@ -225,7 +225,13 @@ void handle_user(rt_size_t scause, rt_size_t stval, rt_size_t sepc, struct rt_hw
     LOG_E("scause:0x%p,stval:0x%p,sepc:0x%p\n", scause, stval, sepc);
     dump_regs(sp);
 
-    rt_hw_backtrace((uint32_t *)sp->s0_fp, sepc);
+    rt_thread_t cur_thr = rt_thread_self();
+    struct rt_hw_backtrace_frame frame = {
+        .fp = sp->s0_fp,
+        .pc = sepc
+    };
+    rt_kprintf("fp = %p\n", frame.fp);
+    lwp_backtrace_frame(cur_thr, &frame);
 
     LOG_E("User Fault, killing thread: %s", rt_thread_self()->parent.name);
 
@@ -338,12 +344,17 @@ void handle_trap(rt_size_t scause, rt_size_t stval, rt_size_t sepc, struct rt_hw
 
     rt_kprintf("scause:0x%p,stval:0x%p,sepc:0x%p\n", scause, stval, sepc);
     dump_regs(sp);
-    rt_kprintf("--------------Thread list--------------\n");
-    rt_kprintf("current thread: %s\n", rt_thread_self()->parent.name);
 
-    extern struct rt_thread *rt_current_thread;
+    rt_thread_t cur_thr = rt_thread_self();
+    rt_kprintf("--------------Thread list--------------\n");
+    rt_kprintf("current thread: %s\n", cur_thr->parent.name);
+
     rt_kprintf("--------------Backtrace--------------\n");
-    rt_hw_backtrace((uint32_t *)sp->s0_fp, sepc);
+    struct rt_hw_backtrace_frame frame = {
+        .fp = sp->s0_fp,
+        .pc = sepc
+    };
+    lwp_backtrace_frame(cur_thr, &frame);
 
     while (1)
         ;
