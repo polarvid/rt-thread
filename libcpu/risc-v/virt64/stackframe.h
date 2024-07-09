@@ -8,7 +8,7 @@
  * 2021-02-02     lizhirui     first version
  * 2021-02-11     lizhirui     fixed gp save/store bug
  * 2021-11-18     JasonHu      add fpu registers save/restore
- * 2022/10/22     WangXiaoyao  Support kernel mode RVV;
+ * 2022-10-22     Shell        Support kernel mode RVV
  */
 
 #ifndef __STACKFRAME_H__

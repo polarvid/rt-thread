@@ -15,7 +15,7 @@
 #include <stdint.h>
 
 #define DBG_TAG "hw.mmu"
-#define DBG_LVL DBG_WARNING
+#define DBG_LVL DBG_INFO
 #include <rtdbg.h>
 
 #include <board.h>
@@ -44,78 +44,15 @@ volatile __attribute__((aligned(4 * 1024)))
 rt_ubase_t MMUTable[__SIZE(VPN2_BIT)];
 
 #ifdef ARCH_USING_ASID
-static rt_uint8_t ASID_BITS = 0;
-static rt_uint32_t next_asid;
-static rt_uint64_t global_asid_generation;
-#define ASID_MASK ((1 << ASID_BITS) - 1)
-#define ASID_FIRST_GENERATION (1 << ASID_BITS)
-#define MAX_ASID ASID_FIRST_GENERATION
-
-static void _asid_init()
-{
-    unsigned int satp_reg = read_csr(satp);
-    satp_reg |= (((rt_uint64_t)0xffff) << PPN_BITS);
-    write_csr(satp, satp_reg);
-    unsigned short valid_asid_bit = ((read_csr(satp) >> PPN_BITS) & 0xffff);
-
-    // The maximal value of ASIDLEN, is 9 for Sv32 or 16 for Sv39, Sv48, and Sv57
-    for (unsigned i = 0; i < 16; i++)
-    {
-        if (!(valid_asid_bit & 0x1))
-        {
-            break;
-        }
-
-        valid_asid_bit >>= 1;
-        ASID_BITS++;
-    }
-
-    global_asid_generation = ASID_FIRST_GENERATION;
-    next_asid = 1;
-}
-
-static rt_uint64_t _asid_check_switch(rt_aspace_t aspace)
-{
-    if ((aspace->asid ^ global_asid_generation) >> ASID_BITS) // not same generation
-    {
-        if (next_asid != MAX_ASID)
-        {
-            aspace->asid = global_asid_generation | next_asid;
-            next_asid++;
-        }
-        else
-        {
-            // scroll to next generation
-            global_asid_generation += ASID_FIRST_GENERATION;
-            next_asid = 1;
-            rt_hw_tlb_invalidate_all_local();
-
-            aspace->asid = global_asid_generation | next_asid;
-            next_asid++;
-        }
-    }
-
-    return aspace->asid & ASID_MASK;
-}
-
 void rt_hw_aspace_switch(rt_aspace_t aspace)
 {
     uintptr_t page_table = (uintptr_t)rt_kmem_v2p(aspace->page_table);
     current_mmu_table = aspace->page_table;
 
-    rt_uint64_t asid = _asid_check_switch(aspace);
-    write_csr(satp, (((size_t)SATP_MODE) << SATP_MODE_OFFSET) |
-                        (asid << PPN_BITS) |
-                        ((rt_ubase_t)page_table >> PAGE_OFFSET_BIT));
-    asm volatile("sfence.vma x0,%0"::"r"(asid):"memory");
+    rt_hw_asid_switch_pgtbl(aspace, page_table);
 }
 
-#define ASID_INIT() _asid_init()
-
-#else /* ARCH_USING_ASID */
-
-#define ASID_INIT()
-
+#else /* !ARCH_USING_ASID */
 void rt_hw_aspace_switch(rt_aspace_t aspace)
 {
     uintptr_t page_table = (uintptr_t)rt_kmem_v2p(aspace->page_table);
@@ -126,6 +63,9 @@ void rt_hw_aspace_switch(rt_aspace_t aspace)
     rt_hw_tlb_invalidate_all_local();
 }
 
+void rt_hw_asid_init(void)
+{
+}
 #endif /* ARCH_USING_ASID */
 
 void *rt_hw_mmu_tbl_get()
@@ -321,8 +261,7 @@ void rt_hw_mmu_unmap(struct rt_aspace *aspace, void *v_addr, size_t size)
         MM_PGTBL_UNLOCK(aspace);
 
         // when unmapped == 0, region not exist in pgtbl
-        if (!unmapped || unmapped > size)
-            break;
+        if (!unmapped || unmapped > size) break;
 
         size -= unmapped;
         v_addr += unmapped;
@@ -335,7 +274,8 @@ static inline void _init_region(void *vaddr, size_t size)
     rt_ioremap_start = vaddr;
     rt_ioremap_size = size;
     rt_mpr_start = rt_ioremap_start - rt_mpr_size;
-    LOG_D("rt_ioremap_start: %p, rt_mpr_start: %p", rt_ioremap_start, rt_mpr_start);
+    LOG_D("rt_ioremap_start: %p, rt_mpr_start: %p", rt_ioremap_start,
+          rt_mpr_start);
 }
 #else
 static inline void _init_region(void *vaddr, size_t size)
@@ -345,11 +285,11 @@ static inline void _init_region(void *vaddr, size_t size)
 #endif
 
 #if defined(RT_USING_SMART) && defined(ARCH_REMAP_KERNEL)
-#define KERN_SPACE_START    ((void *)KERNEL_VADDR_START)
-#define KERN_SPACE_SIZE     (0xfffffffffffff000UL - KERNEL_VADDR_START + 0x1000)
+#define KERN_SPACE_START ((void *)KERNEL_VADDR_START)
+#define KERN_SPACE_SIZE  (0xfffffffffffff000UL - KERNEL_VADDR_START + 0x1000)
 #else
-#define KERN_SPACE_START    ((void *)0x1000)
-#define KERN_SPACE_SIZE     ((size_t)USER_VADDR_START - 0x1000)
+#define KERN_SPACE_START ((void *)0x1000)
+#define KERN_SPACE_SIZE  ((size_t)USER_VADDR_START - 0x1000)
 #endif
 
 int rt_hw_mmu_map_init(rt_aspace_t aspace, void *v_address, rt_size_t size,
@@ -468,7 +408,7 @@ void *rt_hw_mmu_v2p(struct rt_aspace *aspace, void *vaddr)
     }
     else
     {
-        LOG_I("%s: failed at %p", __func__, vaddr);
+        LOG_D("%s: failed at %p", __func__, vaddr);
         paddr = (uintptr_t)ARCH_MAP_FAILED;
     }
     return (void *)paddr;
@@ -543,25 +483,25 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
         size_t attr;
         switch (mdesc->attr)
         {
-        case NORMAL_MEM:
-            attr = MMU_MAP_K_RWCB;
-            break;
-        case NORMAL_NOCACHE_MEM:
-            attr = MMU_MAP_K_RWCB;
-            break;
-        case DEVICE_MEM:
-            attr = MMU_MAP_K_DEVICE;
-            break;
-        default:
-            attr = MMU_MAP_K_DEVICE;
+            case NORMAL_MEM:
+                attr = MMU_MAP_K_RWCB;
+                break;
+            case NORMAL_NOCACHE_MEM:
+                attr = MMU_MAP_K_RWCB;
+                break;
+            case DEVICE_MEM:
+                attr = MMU_MAP_K_DEVICE;
+                break;
+            default:
+                attr = MMU_MAP_K_DEVICE;
         }
 
-        struct rt_mm_va_hint hint = {.flags = MMF_MAP_FIXED,
-                                    .limit_start = aspace->start,
-                                    .limit_range_size = aspace->size,
-                                    .map_size = mdesc->vaddr_end -
-                                                mdesc->vaddr_start + 1,
-                                    .prefer = (void *)mdesc->vaddr_start};
+        struct rt_mm_va_hint hint = {
+            .flags = MMF_MAP_FIXED,
+            .limit_start = aspace->start,
+            .limit_range_size = aspace->size,
+            .map_size = mdesc->vaddr_end - mdesc->vaddr_start + 1,
+            .prefer = (void *)mdesc->vaddr_start};
 
         if (mdesc->paddr_start == (rt_size_t)ARCH_MAP_FAILED)
             mdesc->paddr_start = mdesc->vaddr_start + PV_OFFSET;
@@ -571,29 +511,10 @@ void rt_hw_mmu_setup(rt_aspace_t aspace, struct mem_desc *mdesc, int desc_nr)
         mdesc++;
     }
 
-    ASID_INIT();
+    rt_hw_asid_init();
 
     rt_hw_aspace_switch(&rt_kernel_space);
     rt_page_cleanup();
-}
-
-void rt_hw_mmu_kernel_map_init(rt_aspace_t aspace, rt_size_t vaddr_start, rt_size_t size)
-{
-    rt_size_t paddr_start =
-        __UMASKVALUE(VPN_TO_PPN(vaddr_start, PV_OFFSET), PAGE_OFFSET_MASK);
-    rt_size_t va_s = GET_L1(vaddr_start);
-    rt_size_t va_e = GET_L1(vaddr_start + size - 1);
-    rt_size_t i;
-
-    for (i = va_s; i <= va_e; i++)
-    {
-        MMUTable[i] =
-            COMBINEPTE(paddr_start, PAGE_ATTR_RWX | PTE_G | PTE_V | PTE_CACHE |
-                                        PTE_SHARE | PTE_BUF | PTE_A | PTE_D);
-        paddr_start += L1_PAGE_SIZE;
-    }
-
-    rt_hw_tlb_invalidate_all_local();
 }
 
 #define SATP_BASE ((size_t)SATP_MODE << SATP_MODE_OFFSET)
@@ -617,7 +538,8 @@ void rt_hw_mem_setup_early(void)
     {
         if (pv_off & (1ul << (ARCH_INDEX_WIDTH * 2 + ARCH_PAGE_SHIFT)))
         {
-            LOG_E("%s: not aligned virtual address. pv_offset %p", __func__, pv_off);
+            LOG_E("%s: not aligned virtual address. pv_offset %p", __func__,
+                  pv_off);
             RT_ASSERT(0);
         }
 
@@ -627,8 +549,7 @@ void rt_hw_mem_setup_early(void)
          */
         for (size_t i = 0; i < __SIZE(PPN0_BIT); i++)
         {
-            early_pgtbl[i] = COMBINEPTE(ps, PAGE_ATTR_RWX | PTE_G | PTE_V | PTE_CACHE |
-                                        PTE_SHARE | PTE_BUF | PTE_A | PTE_D);
+            early_pgtbl[i] = COMBINEPTE(ps, MMU_MAP_EARLY);
             ps += L1_PAGE_SIZE;
         }
 
@@ -642,8 +563,7 @@ void rt_hw_mem_setup_early(void)
         rt_size_t ve_idx = GET_L1(vs + 0x80000000);
         for (size_t i = vs_idx; i < ve_idx; i++)
         {
-            early_pgtbl[i] = COMBINEPTE(ps, PAGE_ATTR_RWX | PTE_G | PTE_V | PTE_CACHE |
-                                        PTE_SHARE | PTE_BUF | PTE_A | PTE_D);
+            early_pgtbl[i] = COMBINEPTE(ps, MMU_MAP_EARLY);
             ps += L1_PAGE_SIZE;
         }
 

@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2021-01-30     lizhirui     first version
  * 2021-11-18     JasonHu      add fpu member
+ * 2022-10-22     Shell        Support kernel mode RVV
  */
 
 #ifndef __STACK_H__
@@ -48,8 +49,12 @@ struct rt_hw_stack_frame
     rt_ubase_t t5;         /* x30 - t5     - temporary register 5                */
     rt_ubase_t t6;         /* x31 - t6     - temporary register 6                */
     rt_ubase_t user_sp_exc_stack;    /* sscratch - user mode sp/exception stack  */
+    rt_ubase_t __padding;  /* align to 16bytes */
 #ifdef ENABLE_FPU
     rt_ubase_t f[CTX_FPU_REG_NR];      /* f0~f31 */
+#endif
+#ifdef ENABLE_VECTOR
+    rt_ubase_t v[CTX_VECTOR_REG_NR];
 #endif
 };
 

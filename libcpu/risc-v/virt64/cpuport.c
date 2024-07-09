@@ -7,6 +7,7 @@
  * Date           Author       Notes
  * 2018/10/28     Bernard      The unify RISC-V porting code.
  * 2021-02-11     lizhirui     add gp support
+ * 2021-11-19     JasonHu      add fpu support
  */
 
 #include <rthw.h>
@@ -18,6 +19,9 @@
 #include <encoding.h>
 
 #define K_SSTATUS_DEFAULT (SSTATUS_SPP | SSTATUS_SPIE | SSTATUS_SUM | SSTATUS_FS)
+#ifdef RT_USING_SMART
+#include <lwp_arch.h>
+#endif
 
 /**
  * @brief from thread used interrupt context switch

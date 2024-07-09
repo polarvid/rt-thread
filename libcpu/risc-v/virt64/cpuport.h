@@ -12,6 +12,7 @@
 #define CPUPORT_H__
 
 #include <rtconfig.h>
+#include <opcode.h>
 
 /* bytes of register width  */
 #ifdef ARCH_CPU_64BIT
@@ -61,20 +62,23 @@ typedef union {
 
 #ifndef __ASSEMBLY__
 #include <rtdef.h>
+
 rt_inline void rt_hw_dsb(void)
 {
-    asm volatile("fence":::"memory");
+    __asm__ volatile("fence":::"memory");
 }
 
 rt_inline void rt_hw_dmb(void)
 {
-    asm volatile("fence":::"memory");
+    __asm__ volatile("fence":::"memory");
 }
 
 rt_inline void rt_hw_isb(void)
 {
-    asm volatile(".long 0x0000100F":::"memory");
+    __asm__ volatile(OPC_FENCE_I:::"memory");
 }
+
+int rt_hw_cpu_id(void);
 
 #endif
 

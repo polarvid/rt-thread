@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2006-2022, RT-Thread Development Team
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Change Logs:
+ * Date           Author       Notes
+ */
 // See LICENSE for license details.
 
 #ifndef RISCV_CSR_ENCODING_H
@@ -15,6 +23,7 @@
 #define MSTATUS_HPP         0x00000600
 #define MSTATUS_MPP         0x00001800
 #define MSTATUS_FS          0x00006000
+#define MSTATUS_VS          0x00000600
 #define MSTATUS_XS          0x00018000
 #define MSTATUS_MPRV        0x00020000
 #define MSTATUS_PUM         0x00040000
@@ -32,6 +41,10 @@
 #define SSTATUS_FS_INITIAL  0x00002000
 #define SSTATUS_FS_CLEAN    0x00004000
 #define SSTATUS_FS_DIRTY    0x00006000
+#define SSTATUS_VS          0x00000600 /* Vector Status */
+#define SSTATUS_VS_INITIAL  0x00000200
+#define SSTATUS_VS_CLEAN    0x00000400
+#define SSTATUS_VS_DIRTY    0x00000600
 #define SSTATUS_XS          0x00018000
 #define SSTATUS_SUM         0x00040000
 #define SSTATUS32_SD        0x80000000
