@@ -221,6 +221,17 @@ static void sdhci_wait_data_complete(struct rthw_sdhci *sdhci)
     }
 }
 
+rt_inline uint64_t sdhci_data_v2p(uint64_t v)
+{
+#ifdef ARCH_REMAP_KERNEL
+    extern void *rt_kmem_v2p(void *vaddr);
+
+    return (uint64_t)rt_kmem_v2p((void*)v);
+#else
+    return v;
+#endif
+}
+
 uint32_t sdhci_prepare_data(struct rthw_sdhci *sdhci, struct rt_mmcsd_cmd *cmd, struct rt_mmcsd_data *data, sdhci_dma_config_t *dma_config)
 {
     uintptr_t BASE = (uintptr_t)sdhci->base;
@@ -235,6 +246,8 @@ uint32_t sdhci_prepare_data(struct rthw_sdhci *sdhci, struct rt_mmcsd_cmd *cmd, 
     load_addr = (uint64_t)dma_config->dma_des_buffer_start_addr;
 
     rt_hw_cpu_dcache_clean((void *)load_addr, dma_config->dma_des_buffer_len);
+
+    load_addr = sdhci_data_v2p(load_addr);
 
     mmio_write_32(BASE + SDIF_ADMA_SA_LOW, load_addr);
     mmio_write_32(BASE + SDIF_ADMA_SA_HIGH, (load_addr >> 32));
