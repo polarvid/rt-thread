@@ -25,13 +25,17 @@
 #include <drivers/sdio.h>
 
 #include "drv_sdhci.h"
+#include <rtioremap.h>
 
 #define SDMMC_DMA_ALIGN_CACHE 64
+
+#define SDMMC_REG_SIZE 0x10000 /* 64KB */
 
 struct rthw_sdhci
 {
     struct rt_mmcsd_host *host;
     rt_uint32_t *base;
+    rt_ubase_t reg;
     rt_uint32_t irq;
     volatile rt_err_t cmd_error;
     volatile rt_err_t data_error;
@@ -616,15 +620,26 @@ static void sdhci_hw_reset(rt_uint32_t *base)
 
 #define REG_TOP_SD_PWRSW_CTRL       (0x1F4)
 
-static void sdhci_pad_setting(rt_uint32_t *base)
+rt_inline void sdmmc_0_setpower(void)
 {
-    uintptr_t BASE = (uintptr_t)base;
+    uintptr_t top;
 
-    if (BASE == SDIO0_BASE)
+    top = (uintptr_t)rt_ioremap((void*)TOP_BASE, 0x1000);
+
+    mmio_write_32(top + REG_TOP_SD_PWRSW_CTRL, 0x9);
+    rt_thread_mdelay(1);
+
+    rt_iounmap((void*)top);
+}
+
+static void sdhci_pad_setting(struct rthw_sdhci *sdhci)
+{
+    uintptr_t BASE = (uintptr_t)sdhci->base;
+
+    if (sdhci->reg == SDIO0_BASE)
     {
         //set power for sd0
-        mmio_write_32(TOP_BASE + REG_TOP_SD_PWRSW_CTRL, 0x9);
-        rt_thread_mdelay(1);
+        sdmmc_0_setpower();
 
         //set pu/down
         mmio_write_32(REG_SDIO0_CD_PAD_REG, (mmio_read_32(REG_SDIO0_CD_PAD_REG) & REG_SDIO0_PAD_MASK) | REG_SDIO0_CD_PAD_VALUE << REG_SDIO0_PAD_SHIFT);
@@ -646,7 +661,7 @@ static void sdhci_pad_setting(rt_uint32_t *base)
         mmio_write_8(REG_SDIO0_DAT2_PIO_REG, REG_SDIO0_DAT2_PIO_VALUE);
         mmio_write_8(REG_SDIO0_DAT3_PIO_REG, REG_SDIO0_DAT3_PIO_VALUE);
     }
-    else if(BASE == SDIO1_BASE)
+    else if(sdhci->reg == SDIO1_BASE)
     {
         // set rtc sdio1 related register
         mmio_write_32(RTCSYS_CTRL, 0x1);
@@ -671,7 +686,7 @@ static void sdhci_pad_setting(rt_uint32_t *base)
         mmio_write_8(REG_SDIO1_DAT2_PIO_REG, REG_SDIO1_DAT2_PIO_VALUE);
         mmio_write_8(REG_SDIO1_DAT3_PIO_REG, REG_SDIO1_DAT3_PIO_VALUE);
     }
-    else if(BASE == SDIO2_BASE)
+    else if(sdhci->reg == SDIO2_BASE)
     {
         //set pu/down
         mmio_write_32(REG_SDIO2_RSTN_PAD_REG, (mmio_read_32(REG_SDIO2_RSTN_PAD_REG) & REG_SDIO2_PAD_MASK) | REG_SDIO2_RSTN_PAD_VALUE << REG_SDIO2_PAD_SHIFT);
@@ -693,19 +708,19 @@ static void sdhci_pad_setting(rt_uint32_t *base)
     }
 }
 
-static void sdhci_phy_init(rt_uint32_t *base)
+static void sdhci_phy_init(struct rthw_sdhci *sdhci)
 {
-    uintptr_t BASE = (uintptr_t)base;
+    uintptr_t BASE = (uintptr_t)sdhci->base;
 
     uintptr_t vendor_base = BASE + (mmio_read_16(BASE + P_VENDOR_SPECIFIC_AREA) & ((1<<12)-1));
 
-    sdhci_hw_reset(base);
+    sdhci_hw_reset(sdhci->base);
 
     rt_thread_mdelay(3);
 
-    sdhci_pad_setting(base);
+    sdhci_pad_setting(sdhci);
 
-    if (BASE == SDIO2_BASE)
+    if (sdhci->reg == SDIO2_BASE)
     {
         //reg_0x200[0] = 1 for sd2
         mmio_write_32(vendor_base, mmio_read_32(vendor_base) | BIT(0));
@@ -714,7 +729,7 @@ static void sdhci_phy_init(rt_uint32_t *base)
     //reg_0x200[1] = 1
     mmio_write_32(vendor_base, mmio_read_32(vendor_base) | BIT(1));
 
-    if (BASE == SDIO1_BASE)
+    if (sdhci->reg == SDIO1_BASE)
     {
         //reg_0x200[16] = 1 for sd1
         mmio_write_32(vendor_base, mmio_read_32(vendor_base) | BIT(16));
@@ -763,6 +778,20 @@ static void sdhci_init(rt_uint32_t *base)
 
 }
 
+rt_inline void sdmmc_pll_init(rt_ubase_t pllreg, rt_uint32_t bypassval)
+{
+    uintptr_t pll, bs;
+
+    pll = (uintptr_t)rt_ioremap((void*)pllreg, 0x1000);
+    bs = (uintptr_t)rt_ioremap((void*)CLOCK_BYPASS_SELECT_REGISTER, 0x1000);
+
+    mmio_write_32(pll, MMC_MAX_CLOCK_DIV_VALUE);
+    mmio_clrbits_32(bs, bypassval);
+
+    rt_iounmap((void*)pll);
+    rt_iounmap((void*)bs);
+}
+
 void rthw_sdhci_set_config(struct rthw_sdhci *sdhci)
 {
     uint32_t pio_irqs = SDIF_INT_DATA_AVAIL | SDIF_INT_SPACE_AVAIL;
@@ -774,38 +803,35 @@ void rthw_sdhci_set_config(struct rthw_sdhci *sdhci)
     static bool sd1_clock_state = false;
     static bool sd2_clock_state = false;
 
-    if (BASE == SDIO0_BASE)
+    if (sdhci->reg == SDIO0_BASE)
     {
         LOG_D("MMC_FLAG_SDCARD.");
         if (sd0_clock_state == false)
         {
-            mmio_write_32(MMC_SDIO0_PLL_REGISTER, MMC_MAX_CLOCK_DIV_VALUE);
-            mmio_clrbits_32(CLOCK_BYPASS_SELECT_REGISTER, BIT(6));
+            sdmmc_pll_init(MMC_SDIO0_PLL_REGISTER, BIT(6));
             sd0_clock_state = true;
         }
     }
-    else if (BASE == SDIO1_BASE)
+    else if (sdhci->reg == SDIO1_BASE)
     {
         LOG_D("MMC_FLAG_SDIO.");
         if (sd1_clock_state == false)
         {
-            mmio_write_32(MMC_SDIO1_PLL_REGISTER, MMC_MAX_CLOCK_DIV_VALUE);
-            mmio_clrbits_32(CLOCK_BYPASS_SELECT_REGISTER, BIT(7));
+            sdmmc_pll_init(MMC_SDIO1_PLL_REGISTER, BIT(7));
             sd1_clock_state = true;
         }
     }
-    else if (BASE == SDIO2_BASE)
+    else if (sdhci->reg == SDIO2_BASE)
     {
         LOG_D("MMC_FLAG_EMMC.");
         if (sd2_clock_state == false)
         {
-            mmio_write_32(MMC_SDIO2_PLL_REGISTER, MMC_MAX_CLOCK_DIV_VALUE);
-            mmio_clrbits_32(CLOCK_BYPASS_SELECT_REGISTER, BIT(5));
+            sdmmc_pll_init(MMC_SDIO2_PLL_REGISTER, BIT(5));
             sd2_clock_state = true;
         }
     }
 
-    sdhci_phy_init(sdhci->base);
+    sdhci_phy_init(sdhci);
     sdhci_init(sdhci->base);
 
     int_status = SDIF_INT_BUS_POWER | SDIF_INT_DATA_END_BIT |
@@ -995,7 +1021,8 @@ static int rthw_sdhci_init(void)
         return ret;
     }
 
-    sdhci->base = (rt_uint32_t *)SDIO0_BASE;
+    sdhci->reg = SDIO0_BASE;
+    sdhci->base = (rt_uint32_t *)rt_ioremap((void*)sdhci->reg, SDMMC_REG_SIZE);
     sdhci->irq = SDIO0_IRQ;
     strcpy(sdhci->name, "sdio0");
     rthw_sdhci_set_config(sdhci);
