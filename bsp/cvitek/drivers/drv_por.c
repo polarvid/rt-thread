@@ -31,8 +31,8 @@ static int cvi_restart(void)
 {
     uintptr_t regbase, ctrlbase;
 
-    regbase = rt_ioremap((void*)CVI_RTC_REG_BASE, 0x1000);
-    ctrlbase = rt_ioremap((void*)CVI_RTC_CTRL_BASE, 0x1000);
+    regbase = (uintptr_t)rt_ioremap((void*)CVI_RTC_REG_BASE, 0x1000);
+    ctrlbase = (uintptr_t)rt_ioremap((void*)CVI_RTC_CTRL_BASE, 0x1000);
 
     /* Enable power suspend wakeup source mask */
     mmio_write_32(regbase + RTC_APB_BUSY_SEL,0x1);
