@@ -10,7 +10,7 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
-
+#include <rtioremap.h>
 
 #define DBG_TAG "DRV.POR"
 #define DBG_LVL DBG_WARNING
@@ -29,19 +29,24 @@
 
 static int cvi_restart(void)
 {
+    uintptr_t regbase, ctrlbase;
+
+    regbase = (uintptr_t)rt_ioremap((void*)CVI_RTC_REG_BASE, 0x1000);
+    ctrlbase = (uintptr_t)rt_ioremap((void*)CVI_RTC_CTRL_BASE, 0x1000);
+
     /* Enable power suspend wakeup source mask */
-    mmio_write_32(CVI_RTC_REG_BASE + RTC_APB_BUSY_SEL,0x1);
+    mmio_write_32(regbase + RTC_APB_BUSY_SEL,0x1);
 
     /* unlock register */
-    mmio_write_32(CVI_RTC_CTRL_BASE + RTC_CTRL0_UNLOCKKEY, 0xAB18);
+    mmio_write_32(ctrlbase + RTC_CTRL0_UNLOCKKEY, 0xAB18);
 
-    mmio_write_32(CVI_RTC_REG_BASE + RTC_EN_WARM_RST_REQ, 0x1);
+    mmio_write_32(regbase + RTC_EN_WARM_RST_REQ, 0x1);
 
-    while (mmio_read_32(CVI_RTC_REG_BASE + RTC_EN_WARM_RST_REQ) != 0x01);
+    while (mmio_read_32(regbase + RTC_EN_WARM_RST_REQ) != 0x01);
 
-    while (mmio_read_32(CVI_RTC_REG_BASE + RSM_STATE) != ST_ON);
+    while (mmio_read_32(regbase + RSM_STATE) != ST_ON);
 
-    mmio_write_32( CVI_RTC_CTRL_BASE + RTC_CTRL0,0xFFFF0800 | (0x1 << 4));
+    mmio_write_32(ctrlbase + RTC_CTRL0, 0xFFFF0800 | (0x1 << 4));
 
     return 0;
 }
