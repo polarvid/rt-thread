@@ -328,6 +328,14 @@ static inline void *memalign(uint32_t align, uint32_t size, void **mem_unalign)
     return mem;
 }
 
+eth_mac_handle_t cvi_eth_mac_init(unsigned int *base);
+int32_t cvi_eth_mac_send_frame(eth_mac_handle_t handle, const uint8_t *frame, uint32_t len, uint32_t flags);
+void dw_eth_mac_connect_phy(eth_mac_handle_t handle_mac, eth_phy_handle_t handle_phy);
+int32_t cvi_eth_mac_read_frame(eth_mac_handle_t handle, uint8_t *frame, uint32_t len);
+int32_t dw_eth_mac_phy_write(eth_mac_handle_t handle, uint8_t phy_addr, uint8_t reg_addr, uint16_t data);
+int32_t dw_eth_mac_phy_read(eth_mac_handle_t handle, uint8_t phy_addr, uint8_t reg_addr, uint16_t *data);
+int32_t cvi_eth_mac_set_macaddr(eth_mac_handle_t handle, const eth_mac_addr_t *mac);
+
 #ifdef __cplusplus
 }
 #endif

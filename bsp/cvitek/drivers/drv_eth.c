@@ -21,7 +21,8 @@
 #include <netif/ethernetif.h>
 
 #include "drv_eth.h"
-
+#include <string.h>
+#include <rtioremap.h>
 
 // #define ETH_TX_DUMP
 // #define ETH_RX_DUMP
@@ -38,14 +39,15 @@ struct _dw_eth
     rt_uint8_t dev_addr[MAX_ADDR_LEN];      /* interface address info, hw address */
 
     struct rt_semaphore rx_sem;
+    eth_mac_handle_t mac_handle;
+    eth_phy_handle_t phy_handle;
+    eth_phy_priv_t ephy;
 };
 static struct _dw_eth dw_eth_device = {0};
 
 #define GMAC_BUF_LEN (1500 + 20)
 static uint8_t g_mac_addr[6] = {0xf2, 0x42, 0x9f, 0xa5, 0x0a, 0x72};
 static uint8_t g_mac_phy_init_finish = 0;
-static eth_mac_handle_t g_mac_handle;
-static eth_phy_handle_t g_phy_handle;
 
 static uint8_t SendDataBuf[GMAC_BUF_LEN];
 static uint8_t RecvDataBuf[GMAC_BUF_LEN];
@@ -69,7 +71,7 @@ static void cvi_ephy_id_init(void)
     mmio_write_32(0x03009804, 0x0000);
 }
 
-static int cvi_eth_mac_phy_enable(uint32_t enable)
+static int cvi_eth_mac_phy_enable(struct _dw_eth *dwe, uint32_t enable)
 {
     eth_mac_addr_t addr;
     int32_t ret;
@@ -77,7 +79,7 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
     if ((g_mac_phy_init_finish == 0) && enable)
     {
         /* startup mac */
-        ret = cvi_eth_mac_control(g_mac_handle, CSI_ETH_MAC_CONFIGURE, 1);
+        ret = cvi_eth_mac_control(dwe->mac_handle, CSI_ETH_MAC_CONFIGURE, 1);
         if (ret != 0)
         {
            LOG_E("Failed to control mac");
@@ -85,7 +87,7 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
         }
 
         /* Start up the PHY */
-        ret = cvi_eth_phy_power_control(g_phy_handle, CSI_ETH_POWER_FULL);
+        ret = cvi_eth_phy_power_control(dwe->phy_handle, CSI_ETH_POWER_FULL);
         if (ret != 0)
         {
            LOG_E("Failed to control phy, ret:0x%d", ret);
@@ -94,14 +96,14 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
     }
 
     /* enable mac TX/RX */
-    ret = cvi_eth_mac_control(g_mac_handle, CSI_ETH_MAC_CONTROL_TX, enable ? 1 : 0);
+    ret = cvi_eth_mac_control(dwe->mac_handle, CSI_ETH_MAC_CONTROL_TX, enable ? 1 : 0);
     if (ret != 0)
     {
        LOG_E("Failed to enable mac TX");
        return ret;
     }
 
-    ret = cvi_eth_mac_control(g_mac_handle, CSI_ETH_MAC_CONTROL_RX, enable ? 1 : 0);
+    ret = cvi_eth_mac_control(dwe->mac_handle, CSI_ETH_MAC_CONTROL_RX, enable ? 1 : 0);
     if (ret != 0)
     {
        LOG_E("Failed to enable mac RX");
@@ -110,7 +112,7 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
 
     /* set mac address */
     memcpy(addr.b, g_mac_addr, sizeof(g_mac_addr));
-    ret = cvi_eth_mac_set_macaddr(g_mac_handle, &addr);
+    ret = cvi_eth_mac_set_macaddr(dwe->mac_handle, &addr);
     if (ret != 0)
     {
        LOG_E("Failed to set mac address");
@@ -118,7 +120,7 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
     }
 
     /* adjust mac link parameter */
-    ret = cvi_eth_mac_control(g_mac_handle, DRV_ETH_MAC_ADJUST_LINK, 1);
+    ret = cvi_eth_mac_control(dwe->mac_handle, DRV_ETH_MAC_ADJUST_LINK, 1);
     if (ret != 0)
     {
        LOG_E("Failed to adjust link");
@@ -128,14 +130,14 @@ static int cvi_eth_mac_phy_enable(uint32_t enable)
     return 0;
 }
 
-static int32_t fn_phy_read(uint8_t phy_addr, uint8_t reg_addr, uint16_t *data)
+static int32_t fn_phy_read(void *ctx, uint8_t phy_addr, uint8_t reg_addr, uint16_t *data)
 {
-    return dw_eth_mac_phy_read(g_mac_handle, phy_addr, reg_addr, data);
+    return dw_eth_mac_phy_read((eth_mac_handle_t)ctx, phy_addr, reg_addr, data);
 }
 
-static int32_t fn_phy_write(uint8_t phy_addr, uint8_t reg_addr, uint16_t data)
+static int32_t fn_phy_write(void *ctx, uint8_t phy_addr, uint8_t reg_addr, uint16_t data)
 {
-    return dw_eth_mac_phy_write(g_mac_handle, phy_addr, reg_addr, data);
+    return dw_eth_mac_phy_write((eth_mac_handle_t)ctx, phy_addr, reg_addr, data);
 }
 
 static void dw_gmac_handler_irq(int vector, void *param)
@@ -174,6 +176,17 @@ static void dw_gmac_handler_irq(int vector, void *param)
     }
 }
 
+rt_inline struct _dw_eth *dw_eth_from_dev(rt_device_t dev)
+{
+    struct _dw_eth *dw_eth;
+    struct eth_device *eth_dev;
+
+    eth_dev = rt_container_of(dev, struct eth_device, parent);
+    dw_eth = rt_container_of(eth_dev, struct _dw_eth, parent);
+
+    return dw_eth;
+}
+
 static rt_err_t rt_dw_eth_init(rt_device_t dev)
 {
     struct _dw_eth *dw_eth;
@@ -192,21 +205,22 @@ static rt_err_t rt_dw_eth_init(rt_device_t dev)
     cvi_ephy_id_init();
 
     /* initialize MAC & PHY */
-    g_mac_handle = cvi_eth_mac_init(dw_eth->base);
-    if (g_mac_handle == NULL)
+    dw_eth->mac_handle = cvi_eth_mac_init(dw_eth->base);
+    if (dw_eth->mac_handle == NULL)
         return -RT_ERROR;
 
-    g_phy_handle = cvi_eth_phy_init(fn_phy_read, fn_phy_write);
+    dw_eth->ephy.mdio_ctx = dw_eth->mac_handle;
+    dw_eth->phy_handle = cvi_eth_phy_init(&dw_eth->ephy, fn_phy_read, fn_phy_write);
 
-    dw_eth_mac_connect_phy(g_mac_handle, g_phy_handle);
+    dw_eth_mac_connect_phy(dw_eth->mac_handle, dw_eth->phy_handle);
 
-    if (cvi_eth_mac_phy_enable(1))
+    if (cvi_eth_mac_phy_enable(dw_eth, 1))
     {
        LOG_E("PHY MAC init fail");
         return -RT_ERROR;
     }
 
-    rt_hw_interrupt_install(dw_eth->irq, dw_gmac_handler_irq, g_mac_handle, "e0");
+    rt_hw_interrupt_install(dw_eth->irq, dw_gmac_handler_irq, dw_eth->mac_handle, "e0");
     rt_hw_interrupt_umask(dw_eth->irq);
 
     /* change device link status */
@@ -273,8 +287,9 @@ struct pbuf* rt_dw_eth_rx(rt_device_t dev)
     struct pbuf *p = NULL;
     struct pbuf *q = NULL;
     uint32_t i = 0;
+    struct _dw_eth *dwe = dw_eth_from_dev(dev);
 
-    int32_t len = cvi_eth_mac_read_frame(g_mac_handle, RecvDataBuf, GMAC_BUF_LEN);
+    int32_t len = cvi_eth_mac_read_frame(dwe->mac_handle, RecvDataBuf, GMAC_BUF_LEN);
     if((len <= 0) || (len > GMAC_BUF_LEN))
     {
         return NULL;
@@ -328,6 +343,7 @@ struct pbuf* rt_dw_eth_rx(rt_device_t dev)
 rt_err_t rt_dw_eth_tx(rt_device_t dev, struct pbuf* p)
 {
     rt_err_t ret = RT_EOK;
+    struct _dw_eth *dwe = dw_eth_from_dev(dev);
 
 #ifdef ETH_TX_DUMP
     packet_dump("send", p);
@@ -357,7 +373,7 @@ rt_err_t rt_dw_eth_tx(rt_device_t dev, struct pbuf* p)
 
     if(len == p->tot_len)
     {
-        if (cvi_eth_mac_send_frame(g_mac_handle, SendDataBuf, len) < 0)
+        if (cvi_eth_mac_send_frame(dwe->mac_handle, SendDataBuf, len, 0) < 0)
             ret = -RT_ERROR;
     }
     else
@@ -384,7 +400,9 @@ static int rthw_eth_init(void)
 {
     rt_err_t ret = RT_EOK;
 
-    dw_eth_device.base = (rt_uint32_t *)DW_MAC_BASE;
+    dw_eth_device.ephy.ephy_base = (uintptr_t)rt_ioremap((void*)ETH_PHY_BASE, 0x1000);
+    dw_eth_device.ephy.efuse_base = (uintptr_t)rt_ioremap((void*)ETH_EFUSE_BASE, 0x1000);
+    dw_eth_device.base = (rt_uint32_t *)rt_ioremap((void*)DW_MAC_BASE, 0x1000);
     dw_eth_device.irq = DW_MAC_IRQ;
 
     dw_eth_device.parent.parent.ops = &dw_eth_ops;

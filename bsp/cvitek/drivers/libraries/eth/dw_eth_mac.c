@@ -5,6 +5,7 @@
 
 #include "dw_eth_mac.h"
 #include "cache.h"
+#include <string.h>
 
 #define roundup(x, y) (                 \
 {                           \
