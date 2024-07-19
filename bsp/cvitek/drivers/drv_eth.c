@@ -401,8 +401,8 @@ static int rthw_eth_init(void)
     rt_err_t ret = RT_EOK;
 
     dw_eth_device.ephy.ephy_base = (uintptr_t)rt_ioremap((void*)ETH_PHY_BASE, 0x1000);
-    dw_eth_device.ephy.efuse_base = (uintptr_t)rt_ioremap((void*)ETH_EFUSE_BASE, 0x1000);
-    dw_eth_device.base = (rt_uint32_t *)rt_ioremap((void*)DW_MAC_BASE, 0x1000);
+    dw_eth_device.ephy.efuse_base = (uintptr_t)rt_ioremap((void*)ETH_EFUSE_BASE, 0x10000);
+    dw_eth_device.base = (rt_uint32_t *)rt_ioremap((void*)DW_MAC_BASE, 0x10000);
     dw_eth_device.irq = DW_MAC_IRQ;
 
     dw_eth_device.parent.parent.ops = &dw_eth_ops;
