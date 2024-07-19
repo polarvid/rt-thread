@@ -52,23 +52,23 @@ static uint8_t g_mac_phy_init_finish = 0;
 static uint8_t SendDataBuf[GMAC_BUF_LEN];
 static uint8_t RecvDataBuf[GMAC_BUF_LEN];
 
-static void cvi_ephy_id_init(void)
+static void cvi_ephy_id_init(struct _dw_eth *dw_eth)
 {
     // set rg_ephy_apb_rw_sel 0x0804@[0]=1/APB by using APB interface
-    mmio_write_32(0x03009804, 0x0001);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x804, 0x0001);
 
     // Release 0x0800[0]=0/shutdown
-    mmio_write_32(0x03009800, 0x0900);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x800, 0x0900);
 
     // Release 0x0800[2]=1/dig_rst_n, Let mii_reg can be accessabile
-    mmio_write_32(0x03009800, 0x0904);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x800, 0x0904);
 
     // PHY_ID
-    mmio_write_32(0x03009008, 0x0043);
-    mmio_write_32(0x0300900c, 0x5649);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x008, 0x0043);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x00c, 0x5649);
 
     // switch to MDIO control by ETH_MAC
-    mmio_write_32(0x03009804, 0x0000);
+    mmio_write_32(dw_eth->ephy.ephy_base + 0x804, 0x0000);
 }
 
 static int cvi_eth_mac_phy_enable(struct _dw_eth *dwe, uint32_t enable)
@@ -202,7 +202,7 @@ static rt_err_t rt_dw_eth_init(rt_device_t dev)
         return -RT_ERROR;
 
     /* init phy id */
-    cvi_ephy_id_init();
+    cvi_ephy_id_init(dw_eth);
 
     /* initialize MAC & PHY */
     dw_eth->mac_handle = cvi_eth_mac_init(dw_eth->base);

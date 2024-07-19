@@ -335,6 +335,7 @@ int32_t cvi_eth_mac_read_frame(eth_mac_handle_t handle, uint8_t *frame, uint32_t
 int32_t dw_eth_mac_phy_write(eth_mac_handle_t handle, uint8_t phy_addr, uint8_t reg_addr, uint16_t data);
 int32_t dw_eth_mac_phy_read(eth_mac_handle_t handle, uint8_t phy_addr, uint8_t reg_addr, uint16_t *data);
 int32_t cvi_eth_mac_set_macaddr(eth_mac_handle_t handle, const eth_mac_addr_t *mac);
+int32_t cvi_eth_mac_control(eth_mac_handle_t handle, uint32_t control, uint32_t arg);
 
 #ifdef __cplusplus
 }
