@@ -18,6 +18,20 @@
 
 static gmac_dev_t gmac_instance[CONFIG_GMAC_NUM];
 
+#ifdef ARCH_REMAP_KERNEL
+extern void *rt_kmem_v2p(void *vaddr);
+
+rt_inline uintptr_t eth_mac_v2p(void *v)
+{
+    return (uintptr_t)rt_kmem_v2p(v);
+}
+#else
+rt_inline uintptr_t eth_mac_v2p(void *v)
+{
+    return (uintptr_t)v;
+}
+#endif
+
 static int32_t designware_read_hwaddr(eth_mac_handle_t handle)
 {
     gmac_dev_t *mac_dev = (gmac_dev_t *)handle;
@@ -70,8 +84,8 @@ static void tx_descs_init(eth_mac_handle_t handle)
 
     for (idx = 0; idx < CVI_CONFIG_TX_DESCR_NUM; idx++) {
         desc_p = &desc_table_p[idx];
-        desc_p->dmamac_addr = (unsigned long)&txbuffs[idx * CVI_CONFIG_ETH_BUFSIZE];
-        desc_p->dmamac_next = (unsigned long)&desc_table_p[idx + 1];
+        desc_p->dmamac_addr = eth_mac_v2p(&txbuffs[idx * CVI_CONFIG_ETH_BUFSIZE]);
+        desc_p->dmamac_next = eth_mac_v2p(&desc_table_p[idx + 1]);
 
 #if defined(CONFIG_DW_ALTDESCRIPTOR)
         desc_p->txrx_status &= ~(CVI_DESC_TXSTS_TXINT | CVI_DESC_TXSTS_TXLAST |
@@ -89,12 +103,12 @@ static void tx_descs_init(eth_mac_handle_t handle)
     }
 
     /* Correcting the last pointer of the chain */
-    desc_p->dmamac_next = (unsigned long)&desc_table_p[0];
+    desc_p->dmamac_next = eth_mac_v2p(&desc_table_p[0]);
 
     /* Flush all Tx buffer descriptors at once */
     rt_hw_cpu_dcache_clean((unsigned long)priv->tx_mac_descrtable, sizeof(priv->tx_mac_descrtable));
 
-    dma_reg->txdesclistaddr = (unsigned long)&desc_table_p[0];
+    dma_reg->txdesclistaddr = eth_mac_v2p(&desc_table_p[0]);
 
     priv->tx_currdescnum = 0;
 }
@@ -119,8 +133,8 @@ static void rx_descs_init(eth_mac_handle_t handle)
 
     for (idx = 0; idx < CVI_CONFIG_RX_DESCR_NUM; idx++) {
         desc_p = &desc_table_p[idx];
-        desc_p->dmamac_addr = (unsigned long)&rxbuffs[idx * CVI_CONFIG_ETH_BUFSIZE];
-        desc_p->dmamac_next = (unsigned long)&desc_table_p[idx + 1];
+        desc_p->dmamac_addr = eth_mac_v2p(&rxbuffs[idx * CVI_CONFIG_ETH_BUFSIZE]);
+        desc_p->dmamac_next = eth_mac_v2p(&desc_table_p[idx + 1]);
 
         desc_p->dmamac_cntl =
             (CVI_MAC_MAX_FRAME_SZ & CVI_DESC_RXCTRL_SIZE1MASK) |
@@ -130,12 +144,12 @@ static void rx_descs_init(eth_mac_handle_t handle)
     }
 
     /* Correcting the last pointer of the chain */
-    desc_p->dmamac_next = (unsigned long)&desc_table_p[0];
+    desc_p->dmamac_next = eth_mac_v2p(&desc_table_p[0]);
 
     /* Flush all Rx buffer descriptors at once */
     rt_hw_cpu_dcache_clean((unsigned long)priv->rx_mac_descrtable, sizeof(priv->rx_mac_descrtable));
 
-    dma_reg->rxdesclistaddr = (unsigned long)&desc_table_p[0];
+    dma_reg->rxdesclistaddr = eth_mac_v2p(&desc_table_p[0]);
 
     priv->rx_currdescnum = 0;
 }
