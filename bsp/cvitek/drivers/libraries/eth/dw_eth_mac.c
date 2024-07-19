@@ -407,7 +407,7 @@ static int32_t designware_eth_recv(eth_mac_handle_t handle, uint8_t **packetp)
         /* Invalidate received data */
         data_end = data_start + roundup(length, DW_GMAC_DMA_ALIGN);
         rt_hw_cpu_dcache_invalidate(data_start, data_end - data_start);
-        *packetp = (uint8_t *)((uint64_t)desc_p->dmamac_addr);
+        *packetp = (uint8_t *)data_start;
     }
 
     return length;
