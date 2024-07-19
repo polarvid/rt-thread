@@ -257,12 +257,12 @@ int32_t cv181x_config(eth_phy_handle_t handle)
     ephy_dev_write(dev, 0x054, 0x2F62);
 
 // LED PAD MUX
-    mmio_write_32(0x030010e0, 0x05);
-    mmio_write_32(0x030010e4, 0x05);
+//    mmio_write_32(0x030010e0, 0x05);
+//    mmio_write_32(0x030010e4, 0x05);
     //(SD1_CLK selphy)
-    mmio_write_32(0x050270b0, 0x11111111);
+//    mmio_write_32(0x050270b0, 0x11111111);
     //(SD1_CMD selphy)
-    mmio_write_32(0x050270b4, 0x11111111);
+//    mmio_write_32(0x050270b4, 0x11111111);
 
 // LED
     // Switch to MII-page1
