@@ -256,9 +256,6 @@ struct dw_gmac_priv {
     char txbuffs[CVI_TX_TOTAL_BUFSIZE] __aligned(DW_GMAC_DMA_ALIGN);
     char rxbuffs[CVI_RX_TOTAL_BUFSIZE] __aligned(DW_GMAC_DMA_ALIGN);
 
-    struct dmamacdescr* next_txdesc[CVI_CONFIG_TX_DESCR_NUM];
-    struct dmamacdescr* next_rxdesc[CVI_CONFIG_TX_DESCR_NUM];
-
     uint32_t interface;
     uint32_t max_speed;
     uint32_t tx_currdescnum;

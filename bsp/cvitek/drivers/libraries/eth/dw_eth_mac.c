@@ -320,7 +320,7 @@ static int32_t designware_eth_send(eth_mac_handle_t handle, const uint8_t *frame
     struct dmamacdescr *desc_p = &priv->tx_mac_descrtable[desc_num];
     uint64_t desc_start = (uint64_t)desc_p;
     uint64_t desc_end = desc_start + roundup(sizeof(*desc_p), DW_GMAC_DMA_ALIGN);
-    uint64_t data_start = desc_p->dmamac_addr;
+    uint64_t data_start = priv->txbuffs + (desc_num * CVI_CONFIG_ETH_BUFSIZE);
     uint64_t data_end = data_start + roundup(length, DW_GMAC_DMA_ALIGN);
     uint32_t count = 0;
 
@@ -394,7 +394,7 @@ static int32_t designware_eth_recv(eth_mac_handle_t handle, uint8_t **packetp)
     uint64_t desc_start = (uint64_t)desc_p;
     uint64_t desc_end = desc_start +
         roundup(sizeof(*desc_p), DW_GMAC_DMA_ALIGN);
-    uint64_t data_start = desc_p->dmamac_addr;
+    uint64_t data_start = priv->rxbuffs + (desc_num * CVI_CONFIG_ETH_BUFSIZE);
     uint64_t data_end;
 
     /* Invalidate entire buffer descriptor */
