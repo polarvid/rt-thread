@@ -24,14 +24,14 @@ int32_t eth_phy_read(eth_phy_priv_t *priv, uint8_t phy_addr, uint8_t reg_addr, u
 {
     RT_ASSERT(priv);
     RT_ASSERT(priv->phy_read);
-    return priv->phy_read(phy_addr, reg_addr, data);
+    return priv->phy_read(priv->mdio_ctx, phy_addr, reg_addr, data);
 }
 
 int32_t eth_phy_write(eth_phy_priv_t *priv, uint8_t phy_addr, uint8_t reg_addr, uint16_t data)
 {
     RT_ASSERT(priv);
     RT_ASSERT(priv->phy_write);
-    return priv->phy_write(phy_addr, reg_addr, data);
+    return priv->phy_write(priv->mdio_ctx, phy_addr, reg_addr, data);
 }
 
 static eth_phy_dev_t *eth_get_phy_device(eth_phy_priv_t *priv, uint8_t phy_addr, uint32_t phy_id)
@@ -106,16 +106,16 @@ static eth_phy_dev_t * eth_get_phy_by_mask(eth_phy_priv_t *priv, uint32_t phy_ma
     return NULL;
 }
 
-static void eth_config(void)
+static void eth_config(eth_phy_priv_t *priv)
 {
     unsigned int val;
 
-    val = mmio_read_32(ETH_PHY_BASE) & ETH_PHY_INIT_MASK;
-    mmio_write_32(ETH_PHY_BASE, (val | ETH_PHY_SHUTDOWN) & ETH_PHY_RESET);
+    val = mmio_read_32(priv->ephy_base) & ETH_PHY_INIT_MASK;
+    mmio_write_32(priv->ephy_base, (val | ETH_PHY_SHUTDOWN) & ETH_PHY_RESET);
     rt_thread_mdelay(1);
-    mmio_write_32(ETH_PHY_BASE, val & ETH_PHY_POWERUP & ETH_PHY_RESET);
+    mmio_write_32(priv->ephy_base, val & ETH_PHY_POWERUP & ETH_PHY_RESET);
     rt_thread_mdelay(20);
-    mmio_write_32(ETH_PHY_BASE, (val & ETH_PHY_POWERUP) | ETH_PHY_RESET_N);
+    mmio_write_32(priv->ephy_base, (val & ETH_PHY_POWERUP) | ETH_PHY_RESET_N);
     rt_thread_mdelay(1);
 }
 
@@ -125,7 +125,7 @@ static eth_phy_dev_t *eth_connect_phy(eth_phy_priv_t *priv, uint32_t phy_mask, p
     eth_phy_dev_t *phydev = NULL;
 
     /* config eth internal phy on ASIC board */
-    eth_config();
+    eth_config(priv);
 
 #ifdef CONFIG_PHY_ADDR
     phy_mask = 1 << CONFIG_PHY_ADDR;
@@ -571,7 +571,7 @@ int32_t genphy_config(eth_phy_dev_t *phy_dev)
     return 0;
 }
 
-eth_phy_handle_t cvi_eth_phy_init(csi_eth_phy_read_t  fn_read, csi_eth_phy_write_t fn_write)
+eth_phy_handle_t cvi_eth_phy_init(eth_phy_priv_t *ephy, csi_eth_phy_read_t  fn_read, csi_eth_phy_write_t fn_write)
 {
     eth_phy_dev_t *phy_dev;
     eth_phy_priv_t *priv;
@@ -581,7 +581,7 @@ eth_phy_handle_t cvi_eth_phy_init(csi_eth_phy_read_t  fn_read, csi_eth_phy_write
     RT_ASSERT(fn_read != RT_NULL);
     RT_ASSERT(fn_write != RT_NULL);
 
-    priv = &phy_priv_list[0];
+    priv = ephy;
 
     priv->phy_read = fn_read;
     priv->phy_write = fn_write;
@@ -590,7 +590,7 @@ eth_phy_handle_t cvi_eth_phy_init(csi_eth_phy_read_t  fn_read, csi_eth_phy_write
     phy_dev = eth_connect_phy(priv, phy_mask, interface);
     if (phy_dev == NULL) {
         rt_kprintf("No phy device found!\n");
-        return;
+        return phy_dev;
     }
     rt_kprintf("connect phy id: 0x%X\n", phy_dev->phy_id);
 

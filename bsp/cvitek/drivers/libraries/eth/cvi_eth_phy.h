@@ -39,8 +39,8 @@ typedef enum eth_power_state
     CSI_ETH_POWER_FULL                        ///< Power on: full operation at maximum performance
 } eth_power_state_t;
 
-typedef int32_t (*csi_eth_phy_read_t)(uint8_t phy_addr, uint8_t reg_addr, uint16_t *data);   ///< Read Ethernet PHY Register.
-typedef int32_t (*csi_eth_phy_write_t)(uint8_t phy_addr, uint8_t reg_addr, uint16_t  data);  ///< Write Ethernet PHY Register.
+typedef int32_t (*csi_eth_phy_read_t)(void *ctx, uint8_t phy_addr, uint8_t reg_addr, uint16_t *data);   ///< Read Ethernet PHY Register.
+typedef int32_t (*csi_eth_phy_write_t)(void *ctx, uint8_t phy_addr, uint8_t reg_addr, uint16_t  data);  ///< Write Ethernet PHY Register.
 
 typedef volatile struct eth_link_info
 {
@@ -54,6 +54,10 @@ typedef volatile struct eth_link_info
 
 typedef struct
 {
+    uintptr_t ephy_base;
+    uintptr_t efuse_base;
+    void *mdio_ctx;
+
     csi_eth_phy_read_t  phy_read;
     csi_eth_phy_write_t phy_write;
     eth_link_info_t     link_info;
@@ -336,6 +340,7 @@ typedef struct {
 } eth_phy_dev_t;
 
 /* ethernet phy config */
+#define ETH_EFUSE_BASE 0x03005000
 #define ETH_PHY_BASE 0x03009000
 #define ETH_PHY_INIT_MASK 0xFFFFFFF9
 #define ETH_PHY_SHUTDOWN (1 << 1)
@@ -393,6 +398,9 @@ int32_t genphy_update_link(eth_phy_dev_t *phy_dev);
 //  }
 //  return r;
 // }
+
+eth_phy_handle_t cvi_eth_phy_init(eth_phy_priv_t *ephy, csi_eth_phy_read_t  fn_read, csi_eth_phy_write_t fn_write);
+int32_t cvi_eth_phy_power_control(eth_phy_handle_t handle, eth_power_state_t state);
 
 #ifdef __cplusplus
 }
