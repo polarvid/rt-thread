@@ -528,6 +528,12 @@ rt_thread_t rt_thread_create(const char *name,
     struct rt_thread *thread;
     void *stack_start;
 
+    if (stack_size < 16384)
+    {
+        stack_size = 16384;
+        rt_kprintf("Reset %s stack size to 16384\n", name);
+    }
+
     thread = (struct rt_thread *)rt_object_allocate(RT_Object_Class_Thread,
                                                     name);
     if (thread == RT_NULL)

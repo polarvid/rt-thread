@@ -68,6 +68,7 @@
 #define KERNEL_VADDR_START 0x40000000
 #define ARCH_RISCV
 #define ARCH_RISCV64
+#define ARCH_USING_NEW_CTX_SWITCH
 #define ARCH_USING_RISCV_COMMON64
 
 /* RT-Thread Components */

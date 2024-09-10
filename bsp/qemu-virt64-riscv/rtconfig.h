@@ -4,6 +4,7 @@
 /* RT-Thread Kernel */
 
 #define RT_NAME_MAX 24
+#define RT_USING_SMART
 #define RT_CPUS_NR 1
 #define RT_ALIGN_SIZE 8
 #define RT_THREAD_PRIORITY_32
@@ -11,6 +12,7 @@
 #define RT_TICK_PER_SECOND 100
 #define RT_USING_HOOK
 #define RT_HOOK_USING_FUNC_PTR
+#define RT_USING_HOOKLIST
 #define RT_USING_IDLE_HOOK
 #define RT_IDLE_HOOK_LIST_SIZE 4
 #define IDLE_THREAD_STACK_SIZE 16384
@@ -40,7 +42,6 @@
 #define RT_USING_EVENT
 #define RT_USING_MAILBOX
 #define RT_USING_MESSAGEQUEUE
-#define RT_USING_SIGNALS
 /* end of Inter-Thread communication */
 
 /* Memory Management */
@@ -64,10 +65,12 @@
 /* end of RT-Thread Kernel */
 #define ARCH_CPU_64BIT
 #define RT_USING_CACHE
-#define RT_USING_HW_ATOMIC
 #define ARCH_MM_MMU
+#define KERNEL_VADDR_START 0xffffffc000000000
 #define ARCH_RISCV
+#define ARCH_RISCV_FPU
 #define ARCH_RISCV64
+#define ARCH_USING_NEW_CTX_SWITCH
 #define ARCH_USING_RISCV_COMMON64
 #define ARCH_REMAP_KERNEL
 
@@ -117,6 +120,18 @@
 /* end of elm-chan's FatFs, Generic FAT Filesystem Module */
 #define RT_USING_DFS_DEVFS
 #define RT_USING_DFS_ROMFS
+#define RT_USING_DFS_PTYFS
+#define RT_USING_PAGECACHE
+
+/* page cache config */
+
+#define RT_PAGECACHE_COUNT 4096
+#define RT_PAGECACHE_ASPACE_COUNT 1024
+#define RT_PAGECACHE_PRELOAD 4
+#define RT_PAGECACHE_HASH_NR 1024
+#define RT_PAGECACHE_GC_WORK_LEVEL 90
+#define RT_PAGECACHE_GC_STOP_LEVEL 70
+/* end of page cache config */
 /* end of DFS: device virtual file system */
 
 /* Device Drivers */
@@ -168,6 +183,9 @@
 #define RT_USING_POSIX_STDIO
 #define RT_USING_POSIX_POLL
 #define RT_USING_POSIX_SELECT
+#define RT_USING_POSIX_EPOLL
+#define RT_USING_POSIX_SIGNALFD
+#define RT_SIGNALFD_MAX_NUM 10
 #define RT_USING_POSIX_TERMIOS
 #define RT_USING_POSIX_AIO
 #define RT_USING_POSIX_DELAY
@@ -264,6 +282,22 @@
 #define RT_USING_ADT_HASHMAP
 #define RT_USING_ADT_REF
 /* end of Utilities */
+#define RT_USING_LWP
+#define LWP_DEBUG
+#define LWP_DEBUG_INIT
+#define RT_LWP_MAX_NR 30
+#define LWP_TASK_STACK_SIZE 16384
+#define RT_CH_MSG_MAX_NR 1024
+#define LWP_CONSOLE_INPUT_BUFFER_SIZE 1024
+#define LWP_TID_MAX_NR 64
+#define RT_LWP_SHM_MAX_NR 64
+#define RT_USING_LDSO
+#define LWP_USING_TERMINAL
+#define LWP_PTY_MAX_PARIS_LIMIT 64
+
+/* Memory management */
+
+/* end of Memory management */
 
 /* Using USB legacy version */
 
@@ -460,7 +494,14 @@
 
 /* RT-Thread Smart */
 
+#define PKG_USING_UKERNEL
+#define PKG_USING_UKERNEL_LATEST_VERSION
+#define RT_USING_DFS_PROCFS
+#define RT_USING_DFS_CMDFS
+#define SAL_USING_AF_UNIX
 /* end of RT-Thread Smart */
+#define PKG_USING_EXT4
+#define PKG_USING_EXT4_SMART_DFS_VERSION
 /* end of Privated Packages of RealThread */
 
 /* RISC-V QEMU virt64 configs */
@@ -472,7 +513,6 @@
 /* end of RISC-V QEMU virt64 configs */
 #define BOARD_QEMU_VIRT_RV64
 #define ENABLE_FPU
-#define ARCH_USING_NEW_CTX_SWITCH
 #define __STACKSIZE__ 16384
 
 #endif

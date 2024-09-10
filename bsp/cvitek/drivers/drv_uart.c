@@ -19,6 +19,8 @@
 #define DBG_LVL DBG_WARNING
 #include <rtdbg.h>
 
+#include <ioremap.h>
+
 /*
  * Divide positive or negative dividend by positive divisor and round
  * to closest integer. Result is undefined for negative divisors and
@@ -110,7 +112,7 @@ static void dw8250_uart_setbrg(rt_ubase_t addr, int baud_divisor)
     dw8250_write32(addr, UART_LCR, lcr_val);
 }
 
-static rt_err_t dw8250_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
+static void _dw8250_uart_init(struct rt_serial_device *serial)
 {
     rt_base_t base;
     struct hw_uart_device *uart;
@@ -131,7 +133,16 @@ static rt_err_t dw8250_uart_configure(struct rt_serial_device *serial, struct se
 
     clock_divisor = DIV_ROUND_CLOSEST(UART_INPUT_CLK, 16 * serial->config.baud_rate);
     dw8250_uart_setbrg(base, clock_divisor);
+}
 
+static rt_err_t dw8250_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
+{
+    static int init_flag = 0;
+    if (!init_flag)
+    {
+        init_flag = 1;
+        _dw8250_uart_init(serial);
+    }
     return RT_EOK;
 }
 
@@ -438,51 +449,51 @@ int rt_hw_uart_init(void)
     _serial##no.ops    = &_uart_ops;    \
     _serial##no.config = config;        \
     rt_hw_serial_register(&_serial##no, "uart" #no, RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, uart); \
-    rt_hw_interrupt_install(uart->irqno, rt_hw_uart_isr, &_serial##no, "uart" #no);
+    rt_hw_interrupt_install(uart->irqno, rt_hw_uart_isr, &_serial##no, "uart" #no);                     \
 
 #ifdef BSP_USING_UART0
     pinmux_config(BSP_UART0_RX_PINNAME, UART0_RX, pinname_whitelist_uart0_rx);
     pinmux_config(BSP_UART0_TX_PINNAME, UART0_TX, pinname_whitelist_uart0_tx);
     BSP_INSTALL_UART_DEVICE(0);
-#if defined(ARCH_ARM)
+#if defined(ARCH_REMAP_KERNEL)
     uart->hw_base = (rt_size_t)rt_ioremap((void*)uart->hw_base, 0x10000);
-#endif /* defined(ARCH_ARM) */
+#endif /* defined(ARCH_REMAP_KERNEL) */
 #endif
 
 #ifdef BSP_USING_UART1
     pinmux_config(BSP_UART1_RX_PINNAME, UART1_RX, pinname_whitelist_uart1_rx);
     pinmux_config(BSP_UART1_TX_PINNAME, UART1_TX, pinname_whitelist_uart1_tx);
     BSP_INSTALL_UART_DEVICE(1);
-#if defined(ARCH_ARM)
+#if defined(ARCH_REMAP_KERNEL)
     uart->hw_base = (rt_size_t)rt_ioremap((void*)uart->hw_base, 0x10000);
-#endif /* defined(ARCH_ARM) */
+#endif /* defined(ARCH_REMAP_KERNEL) */
 #endif
 
 #ifdef BSP_USING_UART2
     pinmux_config(BSP_UART2_RX_PINNAME, UART2_RX, pinname_whitelist_uart2_rx);
     pinmux_config(BSP_UART2_TX_PINNAME, UART2_TX, pinname_whitelist_uart2_tx);
     BSP_INSTALL_UART_DEVICE(2);
-#if defined(ARCH_ARM)
+#if defined(ARCH_REMAP_KERNEL)
     uart->hw_base = (rt_size_t)rt_ioremap((void*)uart->hw_base, 0x10000);
-#endif /* defined(ARCH_ARM) */
+#endif /* defined(ARCH_REMAP_KERNEL) */
 #endif
 
 #ifdef BSP_USING_UART3
     pinmux_config(BSP_UART3_RX_PINNAME, UART3_RX, pinname_whitelist_uart3_rx);
     pinmux_config(BSP_UART3_TX_PINNAME, UART3_TX, pinname_whitelist_uart3_tx);
     BSP_INSTALL_UART_DEVICE(3);
-#if defined(ARCH_ARM)
+#if defined(ARCH_REMAP_KERNEL)
     uart->hw_base = (rt_size_t)rt_ioremap((void*)uart->hw_base, 0x10000);
-#endif /* defined(ARCH_ARM) */
+#endif /* defined(ARCH_REMAP_KERNEL) */
 #endif
 
 #ifdef BSP_USING_UART4
     pinmux_config(BSP_UART4_RX_PINNAME, UART4_RX, pinname_whitelist_uart4_rx);
     pinmux_config(BSP_UART4_TX_PINNAME, UART4_TX, pinname_whitelist_uart4_tx);
     BSP_INSTALL_UART_DEVICE(4);
-#if defined(ARCH_ARM)
+#if defined(ARCH_REMAP_KERNEL)
     uart->hw_base = (rt_size_t)rt_ioremap((void*)uart->hw_base, 0x10000);
-#endif /* defined(ARCH_ARM) */
+#endif /* defined(ARCH_REMAP_KERNEL) */
 #endif
 
     return 0;
